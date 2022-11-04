@@ -378,9 +378,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         else {
             _loss = debt - assets;
         }
-
-        // we're done harvesting, so reset our trigger if we used it
-        forceHarvestTriggerOnce = false;
     }
 
     // migrate our want token to a new strategy if needed
@@ -411,6 +408,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         override
         returns (bool)
     {
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        if (!isActive()) {
+            return false;
+        }
+        
         // only check if we need to earmark on vaults we know are problematic
         if (checkEarmark) {
             // don't harvest if we need to earmark convex rewards
@@ -440,6 +442,17 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             return true;
         }
 
+        StrategyParams memory params = vault.strategies(address(this));
+        // harvest regardless of profit once we reach our maxDelay
+        if (block.timestamp - params.lastReport > maxReportDelay) {
+            return true;
+        }
+
+        // harvest our credit if it's above our threshold
+        if (vault.creditAvailable() > creditThreshold) {
+            return true;
+        }
+
         // otherwise, we don't harvest
         return false;
     }
@@ -462,16 +475,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         view
         override
         returns (uint256)
-    {
-        return _ethAmount;
-    }
-
-    // check if the current baseFee is below our external target
-    function isBaseFeeAcceptable() internal view returns (bool) {
-        return
-            IBaseFee(0xb5e1CAcB567d98faaDB60a1fD4820720141f064F)
-                .isCurrentBaseFeeAcceptable();
-    }
+    {}
 
     // check if someone needs to earmark rewards on convex before keepers harvest again
     function needsEarmarkReward() public view returns (bool needsEarmark) {
@@ -634,15 +638,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
     function setClaimRewards(bool _claimRewards) external onlyAuthorized {
         claimRewards = _claimRewards;
-    }
-
-    // This determines when we tell our keepers to start allowing harvests based on profit, and when to sell no matter what. this is how much in USDT we need to make. remember, 6 decimals!
-    function setHarvestProfitNeeded(
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
-    ) external onlyAuthorized {
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
     }
 
     function updateTradeFactory(address _newTradeFactory)

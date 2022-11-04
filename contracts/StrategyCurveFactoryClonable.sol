@@ -26,10 +26,6 @@ interface IFeedRegistry {
     );
 }
 
-interface IBaseFee {
-    function isCurrentBaseFeeAcceptable() external view returns (bool);
-}
-
 interface IConvexRewards {
     // strategy's staked balance in the synthetix staking contract
     function balanceOf(address account) external view returns (uint256);
@@ -104,10 +100,9 @@ interface IConvexDeposit {
 
 contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     /* ========== STATE VARIABLES ========== */
-    // these should stay the same across different wants.
 
     // curve infrastructure contracts
-    ICurveStrategyProxy public proxy; // Below we set it to Yearn's Updated v4 StrategyProxy
+    ICurveStrategyProxy public proxy; // Yearn's strategyProxy, needed for interacting with our Curve Voter
     address public gauge; // Curve gauge contract, most are tokenized, held by Yearn's voter
     uint256 public localKeepCRV;
 
@@ -115,9 +110,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     IERC20 public crv;
-
-    /* ========== STATE VARIABLES ========== */
-    // these will likely change across different wants.
 
     string internal stratName; // we use this to be able to adjust our strategy's name
 
@@ -138,12 +130,15 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     constructor(
         address _vault,
+        address _proxy,
         address _gauge,
         address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax
     ) public BaseStrategy(_vault) {
         _initializeStrat(
+            _vault,
+            _proxy,
             _gauge,
             _tradeFactory,
             _harvestProfitMin,
@@ -161,6 +156,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
+        address _proxy,
         address _gauge,
         address _tradeFactory,
         uint256 _harvestProfitMin,
@@ -192,6 +188,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             _strategist,
             _rewards,
             _keeper,
+            _proxy,
             _gauge,
             _tradeFactory,
             _harvestProfitMin,
@@ -207,6 +204,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
+        address _proxy,
         address _gauge,
         address _tradeFactory,
         uint256 _harvestProfitMin,
@@ -214,6 +212,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
+            _proxy,
             _gauge,
             _tradeFactory,
             _harvestProfitMin,
@@ -223,6 +222,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
+        address _proxy,
         address _gauge,
         address _tradeFactory,
         uint256 _harvestProfitMin,
@@ -234,20 +234,21 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         }
 
         // want = Curve LP
-        want.approve(address(proxy), type(uint256).max);
+        want.approve(_proxy, type(uint256).max);
 
         // set our curve gauge contract
         gauge = address(_gauge);
 
         // need to set our proxy when cloning since it's not a constant **************** ADD THIS TO GLOBAL SETTINGS INSTEAD
-        proxy = ICurveStrategyProxy(0xA420A63BbEFfbda3B147d0585F1852C358e2C152);
+        proxy = ICurveStrategyProxy(_proxy);
 
         // harvest profit max set to 25k usdt. will trigger harvest in this situation
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
 
         crv = IERC20(dp.crv());
-
+        
+        // probably remove this, or pass something through the booster?
         if(address(lptoken) != address(want)) {
             revert();
         }
@@ -356,9 +357,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         else {
             _loss = debt - assets;
         }
-
-        // we're done harvesting, so reset our trigger if we used it
-        forceHarvestTriggerOnce = false;
     }
 
     // migrate our want token to a new strategy if needed

@@ -170,7 +170,8 @@ contract CurveGlobal {
         address indexed lpToken,
         address gauge,
         address indexed vault,
-        address strategy
+        address convexStrategy
+        address curveStrategy
     );
 
     ///////////////////////////////////
@@ -427,10 +428,12 @@ contract CurveGlobal {
     constructor(
         address _registry,
         address _convexStratImplementation,
+        address _curveStratImplementation,
         address _owner
     ) public {
         registry = Registry(_registry);
         convexStratImplementation = _convexStratImplementation;
+        curveStratImplementation = _curveStratImplementation;
         owner = _owner;
     }
 
