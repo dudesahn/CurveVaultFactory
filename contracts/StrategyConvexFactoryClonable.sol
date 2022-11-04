@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity 0.6.12;
+pragma solidity ^0.8.15;
 pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/math/Math.sol";
 
 import "./interfaces/curve.sol";
-import {BaseStrategy} from "@yearnvaults/contracts/BaseStrategy.sol";
+import "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface ITradeFactory {
     function enable(address, address) external;
@@ -109,8 +107,6 @@ interface IConvexDeposit {
 }
 
 contract StrategyConvexFactoryClonable is BaseStrategy {
-    using Address for address;
-
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
@@ -129,14 +125,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     IERC20 public crv;
     IERC20 public convexToken;
-
-    /* ========== STATE VARIABLES ========== */
-    // these will likely change across different wants.
-
-    // keeper stuff
-    uint256 public harvestProfitMin; // minimum size in USDT that we want to harvest
-    uint256 public harvestProfitMax; // maximum size in USDT that we want to harvest
-    bool internal forceHarvestTriggerOnce; // only set this to true when we want to trigger our keepers to harvest for us
 
     string internal stratName; // we use this to be able to adjust our strategy's name
 
