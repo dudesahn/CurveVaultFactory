@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0
 
 pragma solidity ^0.6.12;
 
@@ -42,6 +42,7 @@ contract StrategyProxy {
     address public constant yveCRV = address(0xc5bDdf9843308380375a611c18B50Fb9341f502A);
     address public constant CRV3 = address(0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490);
     address public feeRecipient = address(0xc5bDdf9843308380375a611c18B50Fb9341f502A); // Default value is yveCRV
+    address public factory; // our permissionless curve vault factory
     FeeDistribution public constant feeDistribution = FeeDistribution(0xA464e6DCda8AC41e03616F95f4BC98a13b8922Dc);
     VeCRV public constant veCRV  = VeCRV(0x5f3b5DfEb7B28CDbD7FAba78963EE202a494e2A2);
     // gauge => strategies
@@ -54,6 +55,7 @@ contract StrategyProxy {
 
     // Events so that indexers can keep track of key actions
     event GovernanceSet(address governance);
+    event FactorySet(address factory);
     event FeeRecipientSet(address feeRecipient);
     event StrategyApproved(address gauge, address strategy);
     event StrategyRevoked(address gauge);
@@ -76,6 +78,15 @@ contract StrategyProxy {
         emit GovernanceSet(_governance);
     }
 
+    /// @notice Set curve vault factory address
+    /// @param _factory Address to set as curve vault factory
+    function setFactory(address _factory) external {
+        require(msg.sender == governance, "!governance");
+        require(_factory != factory, "already set");
+        factory = _factory;
+        emit FactorySet(_factory);
+    }
+
     /// @notice Set recipient of weekly 3CRV admin fees
     /// @dev Only a single address can be approved at any time
     /// @param _feeRecipient Address to approve for fees
@@ -91,7 +102,7 @@ contract StrategyProxy {
     /// @param _gauge Gauge to permit strategy on
     /// @param _strategy Strategy to approve on gauge
     function approveStrategy(address _gauge, address _strategy) external {
-        require(msg.sender == governance, "!governance");
+        require(msg.sender == governance || msg.sender == factory, "!governance");
         require(_strategy != address(0), "disallow zero");
         require(strategies[_gauge] != _strategy, "already approved");
         strategies[_gauge] = _strategy;
