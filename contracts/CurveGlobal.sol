@@ -103,10 +103,24 @@ interface IStrategy {
         address _booster,
         address _convexToken
     ) external returns (address newStrategy);
+    
+    function cloneStrategyCurveBoosted(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        address _proxy,
+        address _gauge,
+        address _tradeFactory,
+        uint256 _harvestProfitMin,
+        uint256 _harvestProfitMax
+    ) external returns (address newStrategy);
 
-    function updateVoters(address _curveVoter, address _convexVoter) external;
+    function updateVoter(address _convexVoter) external;
 
     function updateLocalKeepCrvs(uint256 _keepCrv, uint256 _keepCvx) external;
+
+    function updateLocalKeepCrv(uint256 _keepCrv) external;
 
     function setHealthCheck(address) external;
 }
@@ -170,7 +184,7 @@ contract CurveGlobal {
         address indexed lpToken,
         address gauge,
         address indexed vault,
-        address convexStrategy
+        address convexStrategy,
         address curveStrategy
     );
 
@@ -332,8 +346,19 @@ contract CurveGlobal {
         convexStratImplementation = _convexStratImplementation;
     }
 
+    address public curveStratImplementation;
+
+    function setCurveStratImplementation(address _curveStratImplementation)
+        external
+    {
+        if(msg.sender != owner) {
+            revert();
+        }
+        curveStratImplementation = _curveStratImplementation;
+    }
+
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points). Default is 0%.
-    address public constant voterCRV = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter
+    address public constant voterCRV = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, will never change
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest.
     function setKeepCRV(uint256 _keepCRV) external {
@@ -342,11 +367,6 @@ contract CurveGlobal {
         }
         if(_keepCRV > 10_000) {
             revert();
-        }
-        if (_keepCRV > 0) {
-            if(_voterCRV == address(0)) {
-            revert();
-            }
         }
         keepCRV = _keepCRV;
     }
@@ -430,7 +450,7 @@ contract CurveGlobal {
         address _convexStratImplementation,
         address _curveStratImplementation,
         address _owner
-    ) public {
+    ) {
         registry = Registry(_registry);
         convexStratImplementation = _convexStratImplementation;
         curveStratImplementation = _curveStratImplementation;
@@ -487,29 +507,33 @@ contract CurveGlobal {
         return proxy;
     }
 
-    // only permissioned users can deploy if there is already one endorsed
+    // only permissioned users can set custom name and symbol or deploy if there is already one endorsed
     function createNewVaultsAndStrategies(
         address _gauge,
-        bool _allowDuplicate
+        bool _allowDuplicate,
+        string memory _name,
+        string memory _symbol
     ) external returns (address vault, address convexStrategy, address curveStrategy) {
         if(!(msg.sender == owner || msg.sender == management)) {
             revert();
         }
 
-        return _createNewVaultsAndStrategies(_gauge, _allowDuplicate);
+        return _createNewVaultsAndStrategies(_gauge, _allowDuplicate, _name, _symbol);
     }
 
     function createNewVaultsAndStrategies(address _gauge)
         external
-        returns (address vault, address convexStrategy)
+        returns (address vault, address convexStrategy, address curveStrategy)
     {
-        return _createNewVaultsAndStrategies(_gauge, false);
+        return _createNewVaultsAndStrategies(_gauge, false, "", "");
     }
 
     function _createNewVaultsAndStrategies(
         address _gauge,
-        bool _allowDuplicate
-    ) internal returns (address vault, address strategy) {
+        bool _allowDuplicate,
+        string memory _name,
+        string memory _symbol
+    ) internal returns (address vault, address convexStrategy, address curveStrategy) {
         if (!_allowDuplicate) {
             require(
                 canCreateVaultPermissionlessly(_gauge),
@@ -529,9 +553,38 @@ contract CurveGlobal {
                 "Unable to add pool to Convex"
             );
         }
+                
+        if (_allowDuplicate) { 
+            // allow trusted users to input the name and symbol—hopefully they behave!
+            vault = _createCustomVault(lptoken, _name, _symbol);
+        } else {
+            // anyone can create a vault, but it will have an auto-generated name and symbol
+            vault = _createStandardVault(lptoken);
+        }
         
-        // ************** ADD THE ABILITY FOR PERMISSIONED USERS TO INPUT THE VAULT NAME AND SYMBOL ON DEPLOYMENT SO WE CAN CUSTOMIZE THIS AS NEEDED **********
-        //now we create the vault, endorses it as well
+        // setup our fees, deposit limit, gov, etc
+        _setupVaultParams(vault);
+        
+        // setup our strategies as needed
+        (convexStrategy, curveStrategy)= _setupStrategies(vault, _gauge, pid);
+
+        emit NewAutomatedVault(CATEGORY, lptoken, _gauge, vault, convexStrategy, curveStrategy);
+    }
+    
+    function _createCustomVault(address lptoken, string memory _name, string memory _symbol) internal returns (address vault) {
+        vault = registry.newVault(
+            lptoken,
+            address(this),
+            guardian,
+            treasury,
+            _name,
+            _symbol,
+            0,
+            VaultType.AUTOMATED
+        );
+    }
+    
+    function _createStandardVault(address lptoken) internal returns (address vault) {
         vault = registry.newVault(
             lptoken,
             address(this),
@@ -550,28 +603,34 @@ contract CurveGlobal {
             0,
             VaultType.AUTOMATED
         );
-        deployedVaults.push(vault);
-
-        Vault v = Vault(vault);
+    }
+    
+    function _setupVaultParams(address _vault) internal {
+        deployedVaults.push(_vault);
+        
+        Vault v = Vault(_vault);
         v.setManagement(management);
+        
         //set governance to ychad who needs to accept before it is finalised. until then governance is this factory
         v.setGovernance(governance);
         v.setDepositLimit(depositLimit);
-
+        
         if (v.managementFee() != managementFee) {
             v.setManagementFee(managementFee);
         }
         if (v.performanceFee() != performanceFee) {
             v.setPerformanceFee(performanceFee);
         }
-
+    }
+    
+    function _setupStrategies(address _vault, address _gauge, uint256 _pid) internal returns (address convexStrategy, address curveStrategy){
         // first we create the convex strat
         convexStrategy = IStrategy(convexStratImplementation).cloneStrategyConvex(
-            vault,
+            _vault,
             management,
             treasury,
             keeper,
-            pid,
+            _pid,
             tradeFactory,
             harvestProfitMinInUsdt,
             harvestProfitMaxInUsdt,
@@ -579,35 +638,36 @@ contract CurveGlobal {
             CVX
         );
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
-
+        
         if (keepCRV > 0 || keepCVX > 0) {
-            IStrategy(convexStrategy).updateVoters(voterCRV, voterCVX);
+            IStrategy(convexStrategy).updateVoter(voterCVX);
             IStrategy(convexStrategy).updateLocalKeepCrvs(keepCRV, keepCVX);
         }
         
         // only attach a curve strategy if this is the first vault for this LP
-        // ADD AUTO-ADDITION TO PROXY AS WELL HERE, may need to modify proxy but since it's upgradeable shouldn't be an issue
-        // strategies need to pull latest proxy from the voter as well voter.strategy()
         if (canCreateVaultPermissionlessly(_gauge)) {
+            // pull our strategyProxy from our voter
+            IProxy proxy = IProxy(getProxy());
+            
             // create the curve voter strategy
             curveStrategy = IStrategy(curveStratImplementation).cloneStrategyCurveBoosted(
-                vault,
+                _vault,
                 management,
                 treasury,
                 keeper,
+                address(proxy),
                 _gauge,
                 tradeFactory,
                 harvestProfitMinInUsdt,
-                harvestProfitMaxInUsdt,
+                harvestProfitMaxInUsdt
             );
             IStrategy(curveStrategy).setHealthCheck(healthCheck);
             
-            if (keepCRV > 0 || keepCVX > 0) {
-                IStrategy(curveStrategy).updateVoters(voterCRV, voterCVX);
-                IStrategy(curveStrategy).updateLocalKeepCrvs(keepCRV, keepCVX);
+            if (keepCRV > 0) {
+                IStrategy(curveStrategy).updateLocalKeepCrv(keepCRV);
             }
             
-            Vault(vault).addStrategy(
+            Vault(_vault).addStrategy(
                 convexStrategy,
                 5_000,
                 0,
@@ -615,7 +675,7 @@ contract CurveGlobal {
                 0
             );
             
-            Vault(vault).addStrategy(
+            Vault(_vault).addStrategy(
                 curveStrategy,
                 5_000,
                 0,
@@ -623,11 +683,10 @@ contract CurveGlobal {
                 0
             );
             
-            // approve our strategy on the proxy
-            IProxy proxy = IProxy(getProxy());
+            // approve our new voter strategy on the proxy
             proxy.approveStrategy(_gauge, curveStrategy);
         } else {
-            Vault(vault).addStrategy(
+            Vault(_vault).addStrategy(
                 convexStrategy,
                 10_000,
                 0,
@@ -635,7 +694,5 @@ contract CurveGlobal {
                 0
             );
         }
-
-        emit NewAutomatedVault(CATEGORY, lptoken, _gauge, vault, convexStrategy, curveStrategy);
     }
 }

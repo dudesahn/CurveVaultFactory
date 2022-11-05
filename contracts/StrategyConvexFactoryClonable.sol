@@ -3,7 +3,7 @@ pragma solidity ^0.8.15;
 pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
-import "@openzeppelin/contracts/math/Math.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
 import "./interfaces/curve.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
@@ -28,10 +28,6 @@ interface IFeedRegistry {
         uint256 updatedAt,
         uint80 answeredInRound
     );
-}
-
-interface IBaseFee {
-    function isCurrentBaseFeeAcceptable() external view returns (bool);
 }
 
 interface IConvexRewards {
@@ -107,6 +103,7 @@ interface IConvexDeposit {
 }
 
 contract StrategyConvexFactoryClonable is BaseStrategy {
+    using SafeERC20 for IERC20;
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
@@ -130,12 +127,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
-
+    uint256 public harvestProfitMin; // minimum size in USDT that we want to harvest
+    uint256 public harvestProfitMax; // maximum size in USDT that we want to harvest
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
-
+    
+    // ySwaps stuff
     address public tradeFactory;
-
-    // rewards token info. we can have more than 1 reward token
     address[] public rewardsTokens;
 
     // check for cloning. Will only be true on the original deployed contract and not on the clones
@@ -151,7 +148,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMax,
         address _booster,
         address _convexToken
-    ) public BaseStrategy(_vault) {
+    ) BaseStrategy(_vault) {
         _initializeStrat(
             _pid,
             _tradeFactory,
@@ -331,10 +328,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
-        if (_localKeepCRV > 0 && _curveVoter != address(0)) {
+        if (_localKeepCRV > 0) {
             uint256 crvBalance = crv.balanceOf(address(this));
             uint256 _sendToVoter =
-                crvBalance.mul(_localKeepCRV).div(FEE_DENOMINATOR);
+                crvBalance * _localKeepCRV / FEE_DENOMINATOR;
             if (_sendToVoter > 0) {
                 crv.safeTransfer(_curveVoter, _sendToVoter);
             }
@@ -345,7 +342,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
             uint256 cvxBalance = convexToken.balanceOf(address(this));
             uint256 _sendToVoter =
-                cvxBalance.mul(_localKeepCVX).div(FEE_DENOMINATOR);
+                cvxBalance * _localKeepCVX / FEE_DENOMINATOR;
             if (_sendToVoter > 0) {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
             }
@@ -360,7 +357,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             _profit = assets - debt;
             _debtPayment = _debtOutstanding;
 
-            uint256 toFree = _profit.add(_debtPayment);
+            uint256 toFree = _profit + _debtPayment;
 
             //freed is math.min(wantBalance, toFree)
             (uint256 freed, ) = liquidatePosition(toFree);
@@ -466,7 +463,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         );
 
         //Get the latest oracle price for bal * amount of bal / (1e18 + 1e2) to adjust oracle price that is 1e8
-        return uint256(crvPrice).mul(claimableBalance()).div(1e20);
+        return uint256(crvPrice) * claimableBalance() / 1e20;
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
@@ -531,6 +528,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     // Use to turn off extra rewards claiming and selling.
+    //  ******************************************** DOES THE TRADE FACTORY ALWAYS CHECK REWARDS[] TO SEE WHAT ELSE IT SHOULD TRANSFER?!?!
     function turnOffRewards() external onlyGovernance {
         delete rewardsTokens;
     }
@@ -562,7 +560,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant().add(stakedBalance());
+        return balanceOfWant() + stakedBalance();
     }
 
     /* ========== CONSTANT FUNCTIONS ========== */
@@ -654,11 +652,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    function updateVoters(address _curveVoter, address _convexVoter)
+    function updateVoter(address _convexVoter)
         external
         onlyGovernance
     {
-        curveVoter = _curveVoter;
         convexVoter = _convexVoter;
     }
 
@@ -692,11 +689,24 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         tradeFactory = address(0);
     }
 
-    // This allows us to manually harvest with our keeper as needed
-    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
-        external
-        onlyAuthorized
-    {
-        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
+
+    /**
+     * @notice
+     * Here we set various parameters to optimize our harvestTrigger.
+     * @param _harvestProfitMin The amount of profit (in USDC, 6 decimals)
+     * that will trigger a harvest if gas price is acceptable.
+     * @param _harvestProfitMax The amount of profit in USDC that
+     * will trigger a harvest regardless of gas price.
+     * @param _checkEarmark Whether or not we should check Convex's
+     * booster to see if we need to earmark before harvesting.
+     */
+    function setHarvestTriggerParams(
+        uint256 _harvestProfitMin,
+        uint256 _harvestProfitMax,
+        bool _checkEarmark
+    ) external onlyVaultManagers {
+        harvestProfitMin = _harvestProfitMin;
+        harvestProfitMax = _harvestProfitMax;
+        checkEarmark = _checkEarmark;
     }
 }
