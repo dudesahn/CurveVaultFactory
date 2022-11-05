@@ -3,8 +3,9 @@ pragma solidity ^0.8.15;
 pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
-import "@openzeppelin/contracts/math/Math.sol";
+import "@openzeppelin/contracts/utils/math/Math.sol";
 
+import "./interfaces/yearn.sol";
 import "./interfaces/curve.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
@@ -99,6 +100,7 @@ interface IConvexDeposit {
 }
 
 contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
+    using SafeERC20 for IERC20;
     /* ========== STATE VARIABLES ========== */
 
     // curve infrastructure contracts
@@ -108,8 +110,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
+    IConvexRewards public rewardsContract; // This is unique to each curve pool
 
-    IERC20 public crv;
+    IERC20 public constant crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     string internal stratName; // we use this to be able to adjust our strategy's name
 
@@ -135,9 +138,8 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax
-    ) public BaseStrategy(_vault) {
+    ) BaseStrategy(_vault) {
         _initializeStrat(
-            _vault,
             _proxy,
             _gauge,
             _tradeFactory,
@@ -192,7 +194,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             _gauge,
             _tradeFactory,
             _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMax
         );
 
         emit Cloned(newStrategy);
@@ -216,7 +218,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             _gauge,
             _tradeFactory,
             _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMax
         );
     }
 
@@ -226,7 +228,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _gauge,
         address _tradeFactory,
         uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMax
     ) internal {
         // make sure that we haven't initialized this before
         if(address(tradeFactory) != address(0)) {
@@ -239,23 +241,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         // set our curve gauge contract
         gauge = address(_gauge);
 
-        // need to set our proxy when cloning since it's not a constant **************** ADD THIS TO GLOBAL SETTINGS INSTEAD
+        // our factory checks the latest proxy from curve voter and passes it here
         proxy = ICurveStrategyProxy(_proxy);
-
-        // harvest profit max set to 25k usdt. will trigger harvest in this situation
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
-
-        crv = IERC20(dp.crv());
         
-        // probably remove this, or pass something through the booster?
-        if(address(lptoken) != address(want)) {
-            revert();
-        }
-
+        // ySwaps setup
         tradeFactory = _tradeFactory;
-
-        _updateRewards();
         _setUpTradeFactory();
 
         // set our strategy's name
@@ -263,7 +253,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             abi.encodePacked(
                 IDetails(address(want)).name(),
                 " Auto-Compounding ",
-                IDetails(address(convexToken)).symbol(),
+                IDetails(address(crv)).symbol(),
                 " Strategy"
             )
         );
@@ -288,9 +278,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             );
             tf.enable(_rewardsToken, _want);
         }
-
-        convexToken.approve(_tradeFactory, type(uint256).max);
-        tf.enable(address(convexToken), _want);
     }
 
     /* ========== FUNCTIONS ========== */
@@ -304,30 +291,27 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             uint256 _debtPayment
         )
     {
-        // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
-        rewardsContract.getReward(address(this), true);
-
-        uint256 _localKeepCRV = localKeepCRV;
-        address _curveVoter = curveVoter;
-        if (_localKeepCRV > 0 && _curveVoter != address(0)) {
-            uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 _sendToVoter =
-                crvBalance.mul(_localKeepCRV).div(FEE_DENOMINATOR);
-            if (_sendToVoter > 0) {
-                crv.safeTransfer(_curveVoter, _sendToVoter);
+        // if we have anything in the gauge, then harvest CRV from the gauge
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
+            proxy.harvest(gauge);
+            uint256 _crvBalance = crv.balanceOf(address(this));
+            uint256 _localKeepCRV = localKeepCRV;
+            if (_crvBalance > 0 && _localKeepCRV > 0) {
+                // keep some of our CRV to increase our boost
+                uint256 _sendToVoter =
+                    _crvBalance * _localKeepCRV / FEE_DENOMINATOR;
+                if (_sendToVoter > 0) {
+                    crv.safeTransfer(voter, _sendToVoter);
+                }
             }
         }
-
-        uint256 _localKeepCVX = localKeepCVX;
-        address _convexVoter = convexVoter;
-        if (_localKeepCVX > 0 && _convexVoter != address(0)) {
-            uint256 cvxBalance = convexToken.balanceOf(address(this));
-            uint256 _sendToVoter =
-                cvxBalance.mul(_localKeepCVX).div(FEE_DENOMINATOR);
-            if (_sendToVoter > 0) {
-                convexToken.safeTransfer(_convexVoter, _sendToVoter);
-            }
+        
+        // claim any rewards we may have
+        uint256 rewardsLength = rewardsTokens.length;
+        if (rewardsLength > 0) {
+            proxy.claimRewards(gauge, rewardsTokens);
         }
 
         // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
@@ -339,7 +323,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             _profit = assets - debt;
             _debtPayment = _debtOutstanding;
 
-            uint256 toFree = _profit.add(_debtPayment);
+            uint256 toFree = _profit + _debtPayment;
 
             //freed is math.min(wantBalance, toFree)
             (uint256 freed, ) = liquidatePosition(toFree);
@@ -360,23 +344,13 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     }
 
     // migrate our want token to a new strategy if needed
-    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
+    // also send over any CRV that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
-        uint256 stakedBal = stakedBalance();
-        
-        if (stakedBal > 0) {
-            rewardsContract.withdrawAndUnwrap(stakedBal, claimRewards);
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
+            proxy.withdraw(gauge, address(want), _stakedBal);
         }
-
-        uint256 crvBal = crv.balanceOf(address(this));
-        uint256 cvxBal = convexToken.balanceOf(address(this));
-
-        if (crvBal > 0){
-            crv.safeTransfer(_newStrategy, crvBal);
-        }
-        if (cvxBal > 0){
-            convexToken.safeTransfer(_newStrategy, cvxBal);
-        }
+        crv.safeTransfer(_newStrategy, crv.balanceOf(address(this)));
     }
 
     /* ========== KEEP3RS ========== */
@@ -387,17 +361,14 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         override
         returns (bool)
     {
-        // only check if we need to earmark on vaults we know are problematic
-        if (checkEarmark) {
-            // don't harvest if we need to earmark convex rewards
-            if (needsEarmarkReward()) {
-                return false;
-            }
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        if (!isActive()) {
+            return false;
         }
 
-        // harvest if we have a profit to claim at our upper limit without considering gas price
-        uint256 claimableProfit = claimableProfitInUsdt();
-        if (claimableProfit > harvestProfitMax) {
+        StrategyParams memory params = vault.strategies(address(this));
+        // harvest no matter what once we reach our maxDelay
+        if (block.timestamp - params.lastReport > maxReportDelay) {
             return true;
         }
 
@@ -411,25 +382,18 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfit > harvestProfitMin) {
+        // harvest if we hit our minDelay, but only if our gas price is acceptable
+        if (block.timestamp - params.lastReport > minReportDelay) {
+            return true;
+        }
+
+        // harvest our credit if it's above our threshold
+        if (vault.creditAvailable() > creditThreshold) {
             return true;
         }
 
         // otherwise, we don't harvest
         return false;
-    }
-
-    // only checks crv rewards. do we need to also check convexToken?
-    //Returns the expected value of the rewards in USDT, 1e6
-    function claimableProfitInUsdt() public view returns (uint256) {
-        (, int256 crvPrice,,,) = IFeedRegistry(0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf).latestRoundData(
-            address(crv),
-            address(0x0000000000000000000000000000000000000348) // USD
-        );
-
-        //Get the latest oracle price for bal * amount of bal / (1e18 + 1e2) to adjust oracle price that is 1e8
-        return uint256(crvPrice).mul(claimableBalance()).div(1e20);
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
@@ -440,67 +404,35 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         returns (uint256)
     {}
 
-    // check if someone needs to earmark rewards on convex before keepers harvest again
-    function needsEarmarkReward() public view returns (bool needsEarmark) {
-        // check if there is any CRV we need to earmark
-        uint256 crvExpiry = rewardsContract.periodFinish();
-        if (crvExpiry < block.timestamp) {
-            return true;
-        }
-    }
-
     /* ========== SETTERS ========== */
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // Use to add or update rewards
     // Rebuilds tradefactory too
-    function updateRewards() external onlyGovernance {
+    function updateRewards(address[] memory _rewards) external onlyGovernance {
         address tf = tradeFactory;
         _removeTradeFactoryPermissions();
-        _updateRewards();
+        rewardsTokens = _rewards;
 
         tradeFactory = tf;
         _setUpTradeFactory();
     }
 
-    function _updateRewards() internal {
-        delete rewardsTokens; //empty the rewardsTokens and rebuild
-
-        uint256 length = rewardsContract.extraRewardsLength();
-        address _convexToken = address(convexToken);
-        for (uint256 i; i < length; ++i) {
-            address virtualRewardsPool = rewardsContract.extraRewards(i);
-            address _rewardsToken =
-                IConvexRewards(virtualRewardsPool).rewardToken();
-
-            // we only need to approve the new token and turn on rewards if the extra rewards isn't CVX
-            if (_rewardsToken != _convexToken) {
-                rewardsTokens.push(_rewardsToken);
-            }
-        }
-    }
-
-    function updateLocalKeepCrvs(uint256 _keepCrv, uint256 _keepCvx)
+    function updateLocalKeepCrv(uint256 _keepCrv)
         external
         onlyGovernance
     {
-        if(_keepCrv > 10_000 || _keepCvx > 10_000) {
+        if(_keepCrv > 10_000) {
             revert();
         }
 
         localKeepCRV = _keepCrv;
-        localKeepCVX = _keepCvx;
     }
 
     // Use to turn off extra rewards claiming and selling.
     function turnOffRewards() external onlyGovernance {
         delete rewardsTokens;
-    }
-
-    // determine whether we will check if our convex rewards need to be earmarked
-    function setCheckEarmark(bool _checkEarmark) external onlyAuthorized {
-        checkEarmark = _checkEarmark;
     }
 
     /* ========== VIEWS ========== */
@@ -509,23 +441,18 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         return stratName;
     }
 
+    ///@notice How much want we have staked in Curve's gauge
     function stakedBalance() public view returns (uint256) {
-        // how much want we have staked in Convex
-        return rewardsContract.balanceOf(address(this));
+        return proxy.balanceOf(gauge);
     }
 
+    ///@notice Balance of want sitting in our strategy
     function balanceOfWant() public view returns (uint256) {
-        // balance of want sitting in our strategy
         return want.balanceOf(address(this));
     }
 
-    function claimableBalance() public view returns (uint256) {
-        // how much CRV we can claim from the staking contract
-        return rewardsContract.earned(address(this));
-    }
-
     function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant().add(stakedBalance());
+        return balanceOfWant() + stakedBalance();
     }
 
     /* ========== CONSTANT FUNCTIONS ========== */
@@ -535,11 +462,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         if (emergencyExit) {
             return;
         }
-        // Send all of our Curve pool tokens to be deposited
+        // Send all of our LP tokens to the proxy and deposit to the gauge if we have any
         uint256 _toInvest = balanceOfWant();
-        // deposit into convex and stake immediately but only if we have something to invest
         if (_toInvest > 0) {
-            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+            want.safeTransfer(address(proxy), _toInvest);
+            proxy.deposit(gauge, address(want));
         }
     }
 
@@ -550,11 +477,13 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     {
         uint256 _wantBal = balanceOfWant();
         if (_amountNeeded > _wantBal) {
+            // check if we have enough free funds to cover the withdrawal
             uint256 _stakedBal = stakedBalance();
             if (_stakedBal > 0) {
-                rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _amountNeeded - _wantBal),
-                    claimRewards
+                proxy.withdraw(
+                    gauge,
+                    address(want),
+                    Math.min(_stakedBal, _amountNeeded - _wantBal)
                 );
             }
             uint256 _withdrawnBal = balanceOfWant();
@@ -571,19 +500,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             // don't bother withdrawing zero
-            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
+            proxy.withdraw(gauge, address(want), _stakedBal);
         }
         return balanceOfWant();
-    }
-
-    // in case we need to exit into the convex deposit token, this will allow us to do that
-    // make sure to check claimRewards before this step if needed
-    // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyAuthorized {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            rewardsContract.withdraw(_stakedBal, claimRewards);
-        }
     }
 
     // we don't want for these tokens to be swept out. We allow gov to sweep out cvx vault tokens; we would only be holding these if things were really, really rekt.
@@ -598,20 +517,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
-        claimRewards = _claimRewards;
-    }
-
-    // This determines when we tell our keepers to start allowing harvests based on profit, and when to sell no matter what. this is how much in USDT we need to make. remember, 6 decimals!
-    function setHarvestProfitNeeded(
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
-    ) external onlyAuthorized {
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
-    }
-
     function updateTradeFactory(address _newTradeFactory)
         external
         onlyGovernance
@@ -624,14 +529,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         if (_newTradeFactory != address(0)) {
             _setUpTradeFactory();
         }
-    }
-
-    function updateVoters(address _curveVoter, address _convexVoter)
-        external
-        onlyGovernance
-    {
-        curveVoter = _curveVoter;
-        convexVoter = _convexVoter;
     }
 
     // once this is called setupTradefactory must be called to get things working again
@@ -658,17 +555,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             tf.disable(_rewardsToken, _want);
         }
 
-        convexToken.approve(_tradeFactory, 0);
-        tf.disable(address(convexToken), _want);
-
         tradeFactory = address(0);
-    }
-
-    // This allows us to manually harvest with our keeper as needed
-    function setForceHarvestTriggerOnce(bool _forceHarvestTriggerOnce)
-        external
-        onlyAuthorized
-    {
-        forceHarvestTriggerOnce = _forceHarvestTriggerOnce;
     }
 }
