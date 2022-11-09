@@ -139,6 +139,7 @@ interface IStrategy {
         address _rewards,
         address _keeper,
         uint256 _fraxPid,
+        address _stakingAddress,
         address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
@@ -588,7 +589,15 @@ contract CurveGlobal {
 
     function getFraxPid(
         uint256 _convexPid
-    ) public view returns (uint256 convexFraxPid, bool hasFraxPool) {
+    )
+        public
+        view
+        returns (
+            bool hasFraxPool,
+            uint256 convexFraxPid,
+            address stakingAddress
+        )
+    {
         IPoolRegistry _convexFraxPoolRegistry = IPoolRegistry(
             convexFraxPoolRegistry
         );
@@ -596,7 +605,7 @@ contract CurveGlobal {
             // we start at the end and work back for most recent
             (
                 ,
-                ,
+                address _stakingAddress,
                 address stakingToken,
                 ,
                 uint8 isActive
@@ -611,13 +620,10 @@ contract CurveGlobal {
                 uint256 currentPoolConvexPid
             ) {
                 if (_convexPid == currentPoolConvexPid) {
-                    return ((i - 1), true);
+                    return (true, (i - 1), _stakingAddress);
                 }
             } catch {}
         }
-
-        // if we don't find an active frax pool for our convex pid, return false
-        return (0, false);
     }
 
     function getProxy() public view returns (address proxy) {
@@ -811,12 +817,14 @@ contract CurveGlobal {
         }
 
         // check if we can add a convex frax strategy
-        (uint256 fraxPid, bool hasPool) = getFraxPid(_pid);
+        (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxPid(
+            _pid
+        );
         if (hasPool) {
             if (convexFraxStratImplementation == address(0)) {
                 // revert(); // dev: must set convex frax implementation first
             } else {
-                _addConvexStrategy(_vault, fraxPid);
+                _addConvexFraxStrategy(_vault, fraxPid, stakingAddress);
             }
         }
     }
@@ -825,7 +833,7 @@ contract CurveGlobal {
         address _vault,
         uint256 _pid
     ) internal returns (address convexStrategy) {
-        convexStrategy = IStrategy(convexFraxStratImplementation)
+        convexStrategy = IStrategy(convexStratImplementation)
             .cloneStrategyConvex(
                 _vault,
                 management,
@@ -895,7 +903,8 @@ contract CurveGlobal {
 
     function _addConvexFraxStrategy(
         address _vault,
-        uint256 _fraxPid
+        uint256 _fraxPid,
+        address _stakingAddress
     ) internal returns (address convexFraxStrategy) {
         convexFraxStrategy = IStrategy(convexFraxStratImplementation)
             .cloneStrategyConvexFrax(
@@ -904,6 +913,7 @@ contract CurveGlobal {
                 treasury,
                 keeper,
                 _fraxPid,
+                _stakingAddress,
                 tradeFactory,
                 harvestProfitMinInUsdt,
                 harvestProfitMaxInUsdt,

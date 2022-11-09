@@ -14,7 +14,9 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    function latestAnswer() external view returns (uint256);
+    function getPriceUsdcRecommended(
+        address tokenAddress
+    ) external view returns (uint256);
 }
 
 interface IConvexRewards {
@@ -439,11 +441,13 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
-        IOracle yearnOracle =
-            IOracle(0x83d95e0D5f402511dB06817Aff3f9eA88224B030); // yearn lens oracle
+        IOracle yearnOracle = IOracle(
+            0x83d95e0D5f402511dB06817Aff3f9eA88224B030
+        ); // yearn lens oracle
         uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
-        uint256 convexTokenPrice =
-            yearnOracle.getPriceUsdcRecommended(address(convexToken));
+        uint256 convexTokenPrice = yearnOracle.getPriceUsdcRecommended(
+            address(convexToken)
+        );
 
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
@@ -597,11 +601,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    function liquidatePosition(uint256 _amountNeeded)
-        internal
-        override
-        returns (uint256 _liquidatedAmount, uint256 _loss)
-    {
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) internal override returns (uint256 _liquidatedAmount, uint256 _loss) {
         uint256 _wantBal = balanceOfWant();
         if (_amountNeeded > _wantBal) {
             uint256 _stakedBal = stakedBalance();

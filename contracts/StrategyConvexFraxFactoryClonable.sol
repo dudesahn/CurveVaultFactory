@@ -14,10 +14,9 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    function getPriceUsdcRecommended(address tokenAddress)
-        external
-        view
-        returns (uint256);
+    function getPriceUsdcRecommended(
+        address tokenAddress
+    ) external view returns (uint256);
 }
 
 interface IConvexRewards {
@@ -114,6 +113,24 @@ interface IConvexFrax {
     function fxs() external view returns (address);
 
     function crv() external view returns (address);
+
+    function cvx() external view returns (address);
+
+    struct LockedStake {
+        bytes32 kek_id;
+        uint256 start_timestamp;
+        uint256 amount;
+        uint256 ending_timestamp;
+        uint256 multiplier; // 6 decimals of precision. 1x = 1000000
+    }
+
+    function lockedLiquidityOf(address user) external view returns (uint256);
+
+    function lockedStakesOf(
+        address _address
+    ) external view returns (LockedStake[] memory);
+
+    function withdrawLockedAndUnwrap(bytes32 _kek_id) external;
 }
 
 contract StrategyConvexFraxFactoryClonable is BaseStrategy {
@@ -121,12 +138,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /* ========== STATE VARIABLES ========== */
     // these should stay the same across different wants.
 
-    // convex stuff
-    address public fraxBooster;
-    IConvexFrax public userVault; // This is the vault our strategy uses to stake with frax
-    uint256 public stakeTime; // this is how long our LP is locked in frax when staking
-
-    uint256 public fraxPid; // this is unique to each pool
     uint256 public localKeepCRV;
     uint256 public localKeepCVX;
     uint256 public localKeepFXS;
@@ -153,24 +164,46 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     // check for cloning. Will only be true on the original deployed contract and not on the clones
     bool public isOriginal = true;
 
+    // frax-specific stuff
+    address public fraxBooster;
+    IConvexFrax public userVault; // This is the vault our strategy uses to stake with frax
+    IConvexFrax public stakingAddress;
+
+    uint256 public fraxPid; // this is unique to each pool
+
+    //Timestamp of the most recent deposit to track liquid funds
+    uint256 public lastDeposit;
+    //Most recent amount deposited
+    uint256 public lastDepositAmount;
+    uint256 public minDeposit;
+
+    //This is the time the tokens are locked for when staked
+    //Inititally set to the min time, 24hours, can be updated later if desired
+    uint256 public lockTime;
+    //A new "kek" is created each time we stake the LP token and a whole kek must be withdrawn during any withdraws
+    //This is the max amount of Keks, we will allow the strat to have open at one time to limit withdraw loops
+    uint256 public maxKeks = 5;
+    //The index of the next kek to be deposited for deposit/withdraw tracking
+    uint256 public nextKek;
+
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _vault,
         address _tradeFactory,
         uint256 _fraxPid,
+        address _stakingAddress,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
-        address _booster,
-        address _convexToken
+        address _booster
     ) BaseStrategy(_vault) {
         _initializeStrat(
             _fraxPid,
+            _stakingAddress,
             _tradeFactory,
             _harvestProfitMin,
             _harvestProfitMax,
-            _booster,
-            _convexToken
+            _booster
         );
     }
 
@@ -185,11 +218,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _rewards,
         address _keeper,
         uint256 _fraxPid,
+        address _stakingAddress,
         address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
-        address _booster,
-        address _convexToken
+        address _booster
     ) external returns (address newStrategy) {
         if (!isOriginal) {
             revert();
@@ -218,11 +251,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             _rewards,
             _keeper,
             _fraxPid,
+            _stakingAddress,
             _tradeFactory,
             _harvestProfitMin,
             _harvestProfitMax,
-            _booster,
-            _convexToken
+            _booster
         );
 
         emit Cloned(newStrategy);
@@ -235,31 +268,31 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _rewards,
         address _keeper,
         uint256 _fraxPid,
+        address _stakingAddress,
         address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
-        address _booster,
-        address _convexToken
+        address _booster
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
             _fraxPid,
+            _stakingAddress,
             _tradeFactory,
             _harvestProfitMin,
             _harvestProfitMax,
-            _booster,
-            _convexToken
+            _booster
         );
     }
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
         uint256 _fraxPid,
+        address _stakingAddress,
         address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
-        address _booster,
-        address _convexToken
+        address _booster
     ) internal {
         // make sure that we haven't initialized this before
         if (address(tradeFactory) != address(0)) {
@@ -268,7 +301,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // have our strategy deploy our vault from the booster using the fraxPid
         userVault = IConvexFrax(IConvexFrax(fraxBooster).createVault(_fraxPid));
-        convexToken = IERC20(_convexToken);
+        convexToken = IERC20(userVault.cvx());
         crv = IERC20(userVault.crv());
         fxs = IERC20(userVault.fxs());
 
@@ -278,13 +311,15 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
 
+        stakingAddress = IConvexFrax(_stakingAddress);
+
         fraxPid = _fraxPid;
 
-        stakeTime = 604800; // default to minimum of 1 week
+        lockTime = 604800; // default to minimum of 1 week
 
-        if (address(lptoken) != address(want)) {
-            revert();
-        }
+        //         if (address(lptoken) != address(want)) {
+        //             revert();
+        //         }
 
         tradeFactory = _tradeFactory;
 
@@ -311,16 +346,24 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         crv.approve(_tradeFactory, type(uint256).max);
         tf.enable(address(crv), _want);
 
-        //enable for all rewards tokens too
-        uint256 rLength = rewardsTokens.length;
-        for (uint256 i; i < rLength; ++i) {
-            address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
-            tf.enable(_rewardsToken, _want);
-        }
-
         convexToken.approve(_tradeFactory, type(uint256).max);
         tf.enable(address(convexToken), _want);
+
+        fxs.approve(_tradeFactory, type(uint256).max);
+        tf.enable(address(fxs), _want);
+
+        // check if we have anything other than CRV, CVX, and FXS
+        (address[] memory tokenAddresses, ) = userVault.earned();
+        uint256 rewardsLength = tokenAddresses.length;
+
+        // enable if we have anything else
+        if (rewardsLength > 3) {
+            for (uint256 i = 1; i < rewardsLength - 2; ++i) {
+                address _rewardsToken = tokenAddresses[i];
+                IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
+                tf.enable(_rewardsToken, _want);
+            }
+        }
     }
 
     /* ========== FUNCTIONS ========== */
@@ -397,20 +440,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
     }
 
-    // migrate our want token to a new strategy if needed
-    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
+    //Migration should only be called if all funds are completely liquid
+    //In case of problems, emergencyExit can be set to true and then harvest the strategy.
+    //Or manually withdraw all liquid keks and wait until the remainder becomes liquid
+    //This will allow as much of the liquid position to be withdrawn while allowing future withdraws for still locked tokens
     function prepareMigration(address _newStrategy) internal override {
         require(
             lastDeposit + lockTime < block.timestamp,
             "Latest deposit is not avialable yet for withdraw"
         );
         withdrawSome(type(uint256).max);
-
-        uint256 stakedBal = stakedBalance();
-
-        if (stakedBal > 0) {
-            rewardsContract.withdrawAndUnwrap(stakedBal, claimRewards);
-        }
 
         uint256 crvBal = crv.balanceOf(address(this));
         uint256 cvxBal = convexToken.balanceOf(address(this));
@@ -435,14 +474,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) {
             return false;
-        }
-
-        // only check if we need to earmark on vaults we know are problematic
-        if (checkEarmark) {
-            // don't harvest if we need to earmark convex rewards
-            if (needsEarmarkReward()) {
-                return false;
-            }
         }
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
@@ -530,17 +561,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     function _updateRewards() internal {
-        delete rewardsTokens; //empty the rewardsTokens and rebuild
+        delete rewardsTokens; // empty the rewardsTokens and rebuild
 
-        uint256 length = rewardsContract.extraRewardsLength();
-        address _convexToken = address(convexToken);
-        for (uint256 i; i < length; ++i) {
-            address virtualRewardsPool = rewardsContract.extraRewards(i);
-            address _rewardsToken = IConvexRewards(virtualRewardsPool)
-                .rewardToken();
+        // check our user vault to see what rewards we have
+        (address[] memory tokenAddresses, ) = userVault.earned();
+        uint256 rewardsLength = tokenAddresses.length;
 
-            // we only need to approve the new token and turn on rewards if the extra rewards isn't CVX
-            if (_rewardsToken != _convexToken) {
+        // if we have rewards other than CRV, CVX, and FXS then add them too
+        if (rewardsLength > 3) {
+            for (uint256 i = 1; i < rewardsLength - 2; ++i) {
+                address _rewardsToken = tokenAddresses[i];
                 rewardsTokens.push(_rewardsToken);
             }
         }
@@ -561,7 +591,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     // Use to turn off extra rewards claiming and selling.
-    //  ******************************************** DOES THE TRADE FACTORY ALWAYS CHECK REWARDS[] TO SEE WHAT ELSE IT SHOULD TRANSFER?!?!
     function turnOffRewards() external onlyGovernance {
         delete rewardsTokens;
     }
@@ -573,18 +602,13 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     function stakedBalance() public view returns (uint256) {
-        // how much want we have staked in Convex
-        return rewardsContract.balanceOf(address(this));
+        // how much want we have staked in Convex-Frax
+        return stakingAddress.lockedLiquidityOf(address(userVault));
     }
 
     function balanceOfWant() public view returns (uint256) {
         // balance of want sitting in our strategy
         return want.balanceOf(address(this));
-    }
-
-    function claimableBalance() public view returns (uint256) {
-        // how much CRV we can claim from the staking contract
-        return rewardsContract.earned(address(this));
     }
 
     function estimatedTotalAssets() public view override returns (uint256) {
@@ -602,45 +626,101 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
 
-        // if this is our first deposit, create the kek. otherwise, just add to our kek
-        // deposit into convex and stake immediately but only if we have something to invest
-        if (_toInvest > 0) {
-            if (xxxx) {
-                stakeLockedCurveLp(_toInvest, stakeTime); // stake for the minimum of 1 week
-            } else {
-                IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+        // If we have already locked the max amount of keks, we need to withdraw the oldest one
+        // and reinvest that alongside the new funds
+        if (nextKek >= maxKeks && _toInvest > minDeposit) {
+            //Get the oldest kek that could have funds in it
+            IConvexFrax.LockedStake memory stake = stakingAddress
+                .lockedStakesOf(address(this))[nextKek - maxKeks];
+            //Make sure it hasnt already been withdrawn
+            if (stake.amount > 0) {
+                //Withdraw funds and add them to the amount to deposit
+                userVault.withdrawLockedAndUnwrap(stake.kek_id);
+                unchecked {
+                    _toInvest += stake.amount;
+                }
             }
         }
+
+        userVault.stakeLockedCurveLp(_toInvest, lockTime);
+
+        lastDeposit = block.timestamp;
+        lastDepositAmount = _toInvest;
+        nextKek++;
     }
 
     function liquidatePosition(
         uint256 _amountNeeded
     ) internal override returns (uint256 _liquidatedAmount, uint256 _loss) {
-        uint256 _wantBal = balanceOfWant();
-        if (_amountNeeded > _wantBal) {
-            uint256 _stakedBal = stakedBalance();
-            if (_stakedBal > 0) {
-                rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _amountNeeded - _wantBal),
-                    claimRewards
+        uint256 _liquidWant = balanceOfWant();
+
+        if (_liquidWant < _amountNeeded) {
+            uint256 needed;
+            unchecked {
+                needed = _amountNeeded - _liquidWant;
+            }
+
+            //Need to check that there is enough liquidity to withdraw so we dont report loss thats not true
+            if (lastDeposit + lockTime > block.timestamp) {
+                require(
+                    stakedBalance() - stillLockedStake() >= needed,
+                    "Need to wait till most recent deposit unlocks"
                 );
             }
-            uint256 _withdrawnBal = balanceOfWant();
-            _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
-            _loss = _amountNeeded - _liquidatedAmount;
-        } else {
-            // we have enough balance to cover the liquidation available
-            return (_amountNeeded, 0);
+
+            withdrawSome(needed);
+
+            _liquidWant = balanceOfWant();
+        }
+
+        unchecked {
+            if (_liquidWant >= _amountNeeded) {
+                _liquidatedAmount = _amountNeeded;
+            } else {
+                _liquidatedAmount = _liquidWant;
+                _loss = _amountNeeded - _liquidWant;
+            }
         }
     }
 
-    // fire sale, get rid of it all!
-    function liquidateAllPositions() internal override returns (uint256) {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            // don't bother withdrawing zero
-            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
+    function withdrawSome(uint256 _amount) internal {
+        if (_amount == 0) return;
+
+        IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
+            address(this)
+        );
+
+        uint256 i = nextKek > maxKeks ? nextKek - maxKeks : 0;
+        uint256 needed = Math.min(_amount, stakedBalance());
+        IConvexFrax.LockedStake memory stake;
+        uint256 liquidity;
+        while (needed > 0 && i < nextKek) {
+            stake = stakes[i];
+            liquidity = stake.amount;
+
+            if (liquidity > 0 && stake.ending_timestamp <= block.timestamp) {
+                userVault.withdrawLockedAndUnwrap(stake.kek_id);
+
+                if (liquidity < needed) {
+                    unchecked {
+                        needed -= liquidity;
+                        i++;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                unchecked {
+                    i++;
+                }
+            }
         }
+    }
+
+    //Will liquidate as much as possible at the time. May not be able to liquidate all if anything has been deposited in the last day
+    // Would then have to be called again after locked period has expired
+    function liquidateAllPositions() internal override returns (uint256) {
+        withdrawSome(type(uint256).max);
         return balanceOfWant();
     }
 
@@ -658,10 +738,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     //Returns the total amount that cannot yet be withdrawn from the staking contract
     function stillLockedStake() public view returns (uint256 stillLocked) {
-        IStaker.LockedStake[] memory stakes = staker.lockedStakesOf(
+        IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
             address(this)
         );
-        IStaker.LockedStake memory stake;
+        IConvexFrax.LockedStake memory stake;
         uint256 time = block.timestamp;
         uint256 _nextKek = nextKek;
         uint256 _maxKeks = maxKeks;
@@ -681,8 +761,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Available if the counter or loops fail
     //Pass the index of the kek to withdraw as the param
     function manualWithdraw(uint256 index) external onlyEmergencyAuthorized {
-        staker.withdrawLocked(
-            staker.lockedStakesOf(address(this))[index].kek_id
+        userVault.withdrawLockedAndUnwrap(
+            stakingAddress.lockedStakesOf(address(this))[index].kek_id
         );
     }
 
@@ -692,10 +772,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         //If we are lowering the max we need to withdraw the diff if we are already over the new max
         if (_maxKeks < maxKeks && nextKek > _maxKeks) {
             uint256 toWithdraw = maxKeks - _maxKeks;
-            IStaker.LockedStake[] memory stakes = staker.lockedStakesOf(
-                address(this)
-            );
-            IStaker.LockedStake memory stake;
+            IConvexFrax.LockedStake[] memory stakes = stakingAddress
+                .lockedStakesOf(address(this));
+            IConvexFrax.LockedStake memory stake;
             for (uint256 i; i < toWithdraw; i++) {
                 stake = stakes[nextKek - maxKeks + i];
 
@@ -705,17 +784,22 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                         stake.ending_timestamp < block.timestamp,
                         "Not liquid"
                     );
-                    staker.withdrawLocked(stake.kek_id);
+                    userVault.withdrawLockedAndUnwrap(stake.kek_id);
                 }
             }
         }
         maxKeks = _maxKeks;
     }
 
-    // set the default amount of time we use for new locked stakes (keks)
-    function setStakeTime(uint256 _stakeTime) external onlyAuthorized {
-        require(594000 < _stakeTime < 365 * 86400, "1 week < x < 1 year");
-        stakeTime = _stakeTime;
+    //This can be used to update how long the tokens are locked when staked
+    //Care should be taken when increasing the time to only update directly before a harvest
+    //Otherwise the timestamp checks when withdrawing could be inaccurate
+    function setLockTime(uint256 _lockTime) external onlyVaultManagers {
+        require(
+            594000 < _lockTime && _lockTime < 31536000,
+            "1 week < x < 1 year"
+        );
+        lockTime = _lockTime;
     }
 
     function updateTradeFactory(
@@ -757,19 +841,23 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         crv.approve(_tradeFactory, 0);
         tf.disable(address(crv), _want);
 
-        //disable for all rewards tokens too
-        uint256 rLength = rewardsTokens.length;
-        for (uint256 i; i < rLength; ++i) {
-            address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, 0);
-            tf.disable(_rewardsToken, _want);
-        }
-
         convexToken.approve(_tradeFactory, 0);
         tf.disable(address(convexToken), _want);
 
         fxs.approve(_tradeFactory, 0);
         tf.disable(address(fxs), _want);
+
+        (address[] memory tokenAddresses, ) = userVault.earned();
+        uint256 rewardsLength = tokenAddresses.length;
+
+        // enable for any other rewards tokens too
+        if (rewardsLength > 3) {
+            for (uint256 i = 1; i < rewardsLength - 2; ++i) {
+                address _rewardsToken = tokenAddresses[i];
+                IERC20(_rewardsToken).approve(_tradeFactory, 0);
+                tf.disable(_rewardsToken, _want);
+            }
+        }
 
         tradeFactory = address(0);
     }
