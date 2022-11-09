@@ -1,4 +1,6 @@
 import brownie
+
+
 def test_keepers(
     strategist,
     vault,
@@ -15,7 +17,9 @@ def test_keepers(
 
     # test a default type
     assert (
-        curve_global.alreadyExistsFromToken("0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e")
+        curve_global.alreadyExistsFromToken(
+            "0xC4C319E2D4d66CcA4464C0c2B32c9Bd23ebe784e"
+        )
         == "0x718AbE90777F5B778B52D553a5aBaa148DD0dc5D"
     )
 
@@ -38,15 +42,13 @@ def test_keeps(
     curve_global.setKeepCRV(new_keep_crv, voter_crv, {"from": gov})
     curve_global.setKeepCVX(new_keep_cvx, voter_cvx, {"from": gov})
 
-    t1 = curve_global.createNewVaultsAndStrategies(
-        other_gauge, {"from": gov}
-    )
+    t1 = curve_global.createNewVaultsAndStrategies(other_gauge, {"from": gov})
 
-    new_strategy = StrategyConvexFactoryClonable.at(t1.events['NewAutomatedVault']['strategy'])
+    new_strategy = StrategyConvexFactoryClonable.at(
+        t1.events["NewAutomatedVault"]["strategy"]
+    )
 
     assert new_strategy.localKeepCRV() == new_keep_crv
     assert new_strategy.localKeepCVX() == new_keep_cvx
     assert new_strategy.curveVoter() == voter_crv
     assert new_strategy.convexVoter() == voter_cvx
-
-    
