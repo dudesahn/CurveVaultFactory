@@ -4,7 +4,6 @@ pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/math/Math.sol";
-
 import "./interfaces/curve.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
@@ -16,18 +15,6 @@ interface ITradeFactory {
 
 interface IOracle {
     function latestAnswer() external view returns (uint256);
-}
-
-interface IFeedRegistry {
-    function getFeed(address, address) external view returns (address);
-
-    function latestRoundData(address, address) external view returns (
-        uint80 roundId,
-        int256 answer,
-        uint256 startedAt,
-        uint256 updatedAt,
-        uint80 answeredInRound
-    );
 }
 
 interface IConvexRewards {
@@ -44,14 +31,16 @@ interface IConvexRewards {
     function withdraw(uint256 _amount, bool _claim) external returns (bool);
 
     // withdraw directly to curve LP token, this is what we primarily use
-    function withdrawAndUnwrap(uint256 _amount, bool _claim)
-        external
-        returns (bool);
+    function withdrawAndUnwrap(
+        uint256 _amount,
+        bool _claim
+    ) external returns (bool);
 
     // claim rewards, with an option to claim extra rewards or not
-    function getReward(address _account, bool _claimExtras)
-        external
-        returns (bool);
+    function getReward(
+        address _account,
+        bool _claimExtras
+    ) external returns (bool);
 
     // check if we have rewards on a pool
     function extraRewardsLength() external view returns (uint256);
@@ -89,17 +78,9 @@ interface IConvexDeposit {
     function crv() external view returns (address);
 
     // give us info about a pool based on its pid
-    function poolInfo(uint256)
-        external
-        view
-        returns (
-            address,
-            address,
-            address,
-            address,
-            address,
-            bool
-        );
+    function poolInfo(
+        uint256
+    ) external view returns (address, address, address, address, address, bool);
 }
 
 contract StrategyConvexFactoryClonable is BaseStrategy {
@@ -127,16 +108,16 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
-    uint256 public harvestProfitMin; // minimum size in USDT that we want to harvest
-    uint256 public harvestProfitMax; // maximum size in USDT that we want to harvest
+    uint256 public harvestProfitMin; // minimum size in USDC that we want to harvest
+    uint256 public harvestProfitMax; // maximum size in USDC that we want to harvest
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
-    
+
     // ySwaps stuff
     address public tradeFactory;
     address[] public rewardsTokens;
 
     // check for cloning. Will only be true on the original deployed contract and not on the clones
-    bool internal isOriginal = true;
+    bool public isOriginal = true;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -176,7 +157,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _booster,
         address _convexToken
     ) external returns (address newStrategy) {
-        if(!isOriginal) {
+        if (!isOriginal) {
             revert();
         }
 
@@ -247,8 +228,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexToken
     ) internal {
         // make sure that we haven't initialized this before
-        if(address(tradeFactory) != address(0)) {
-            revert();  // already initialized.
+        if (address(tradeFactory) != address(0)) {
+            revert(); // already initialized.
         }
 
         depositContract = _booster;
@@ -257,7 +238,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(_booster), type(uint256).max);
 
-        // harvest profit max set to 25k usdt. will trigger harvest in this situation
         harvestProfitMin = _harvestProfitMin;
         harvestProfitMax = _harvestProfitMax;
 
@@ -267,7 +247,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         (address lptoken, , , address _rewardsContract, , ) = dp.poolInfo(_pid);
         rewardsContract = IConvexRewards(_rewardsContract);
 
-        if(address(lptoken) != address(want)) {
+        if (address(lptoken) != address(want)) {
             revert();
         }
 
@@ -300,10 +280,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         uint256 rLength = rewardsTokens.length;
         for (uint256 i; i < rLength; ++i) {
             address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(
-                _tradeFactory,
-                type(uint256).max
-            );
+            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
             tf.enable(_rewardsToken, _want);
         }
 
@@ -313,14 +290,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     /* ========== FUNCTIONS ========== */
 
-    function prepareReturn(uint256 _debtOutstanding)
+    function prepareReturn(
+        uint256 _debtOutstanding
+    )
         internal
         override
-        returns (
-            uint256 _profit,
-            uint256 _loss,
-            uint256 _debtPayment
-        )
+        returns (uint256 _profit, uint256 _loss, uint256 _debtPayment)
     {
         // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
@@ -328,10 +303,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
-        if (_localKeepCRV > 0) {
+        if (_localKeepCRV > 0 && _curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 _sendToVoter =
-                crvBalance * _localKeepCRV / FEE_DENOMINATOR;
+            uint256 _sendToVoter;
+            unchecked {
+                _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 crv.safeTransfer(_curveVoter, _sendToVoter);
             }
@@ -341,8 +318,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexVoter = convexVoter;
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
             uint256 cvxBalance = convexToken.balanceOf(address(this));
-            uint256 _sendToVoter =
-                cvxBalance * _localKeepCVX / FEE_DENOMINATOR;
+            uint256 _sendToVoter;
+            unchecked {
+                _sendToVoter = (cvxBalance * _localKeepCVX) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
             }
@@ -354,7 +333,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
         // if assets are greater than debt, things are working great!
         if (assets >= debt) {
-            _profit = assets - debt;
+            unchecked {
+                _profit = assets - debt;
+            }
             _debtPayment = _debtOutstanding;
 
             uint256 toFree = _profit + _debtPayment;
@@ -367,13 +348,17 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                     _debtPayment = freed;
                     _profit = 0;
                 } else {
-                    _profit = freed - _debtPayment;
+                    unchecked {
+                        _profit = freed - _debtPayment;
+                    }
                 }
             }
         }
         // if assets are less than debt, we are in trouble. should never happen. dont worry about withdrawing here just report profit
         else {
-            _loss = debt - assets;
+            unchecked {
+                _loss = debt - assets;
+            }
         }
     }
 
@@ -381,7 +366,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
         uint256 stakedBal = stakedBalance();
-        
+
         if (stakedBal > 0) {
             rewardsContract.withdrawAndUnwrap(stakedBal, claimRewards);
         }
@@ -389,27 +374,24 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         uint256 crvBal = crv.balanceOf(address(this));
         uint256 cvxBal = convexToken.balanceOf(address(this));
 
-        if (crvBal > 0){
+        if (crvBal > 0) {
             crv.safeTransfer(_newStrategy, crvBal);
         }
-        if (cvxBal > 0){
+        if (cvxBal > 0) {
             convexToken.safeTransfer(_newStrategy, cvxBal);
         }
     }
 
     /* ========== KEEP3RS ========== */
     // use this to determine when to harvest automagically
-    function harvestTrigger(uint256 callCostinEth)
-        public
-        view
-        override
-        returns (bool)
-    {
+    function harvestTrigger(
+        uint256 callCostinEth
+    ) public view override returns (bool) {
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
         if (!isActive()) {
             return false;
         }
-        
+
         // only check if we need to earmark on vaults we know are problematic
         if (checkEarmark) {
             // don't harvest if we need to earmark convex rewards
@@ -419,7 +401,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
-        uint256 claimableProfit = claimableProfitInUsdt();
+        uint256 claimableProfit = claimableProfitInUsdc();
         if (claimableProfit > harvestProfitMax) {
             return true;
         }
@@ -454,25 +436,62 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         return false;
     }
 
-    // only checks crv rewards. do we need to also check convexToken?
-    //Returns the expected value of the rewards in USDT, 1e6
-    function claimableProfitInUsdt() public view returns (uint256) {
-        (, int256 crvPrice,,,) = IFeedRegistry(0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf).latestRoundData(
-            address(crv),
-            address(0x0000000000000000000000000000000000000348) // USD
-        );
+    /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+    /// @return Total return in USDC from selling claimable CRV and CVX.
+    function claimableProfitInUsdc() public view returns (uint256) {
+        IOracle yearnOracle =
+            IOracle(0x83d95e0D5f402511dB06817Aff3f9eA88224B030); // yearn lens oracle
+        uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
+        uint256 convexTokenPrice =
+            yearnOracle.getPriceUsdcRecommended(address(convexToken));
 
-        //Get the latest oracle price for bal * amount of bal / (1e18 + 1e2) to adjust oracle price that is 1e8
-        return uint256(crvPrice) * claimableBalance() / 1e20;
+        // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
+        uint256 totalCliffs = 1_000;
+        uint256 maxSupply; // 100mil
+        unchecked {
+            maxSupply = 100 * 1_000_000 * 1e18;
+        }
+        uint256 reductionPerCliff; // 100,000
+        unchecked {
+            reductionPerCliff = 100_000 * 1e18;
+        }
+        uint256 supply = convexToken.totalSupply();
+        uint256 mintableCvx;
+
+        uint256 cliff;
+        unchecked {
+            cliff = supply / reductionPerCliff;
+        }
+        uint256 _claimableBal = claimableBalance();
+        //mint if below total cliffs
+        if (cliff < totalCliffs) {
+            uint256 reduction; // for reduction% take inverse of current cliff
+            unchecked {
+                reduction = totalCliffs - cliff;
+            }
+            // reduce
+            unchecked {
+                mintableCvx = (_claimableBal * reduction) / totalCliffs;
+            }
+
+            uint256 amtTillMax; // supply cap check
+            unchecked {
+                amtTillMax = maxSupply - supply;
+            }
+            if (mintableCvx > amtTillMax) {
+                mintableCvx = amtTillMax;
+            }
+        }
+
+        // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
+        return
+            (crvPrice * _claimableBal + convexTokenPrice * mintableCvx) / 1e18;
     }
 
     // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
-    function ethToWant(uint256 _ethAmount)
-        public
-        view
-        override
-        returns (uint256)
-    {}
+    function ethToWant(
+        uint256 _ethAmount
+    ) public view override returns (uint256) {}
 
     // check if someone needs to earmark rewards on convex before keepers harvest again
     function needsEarmarkReward() public view returns (bool needsEarmark) {
@@ -505,8 +524,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexToken = address(convexToken);
         for (uint256 i; i < length; ++i) {
             address virtualRewardsPool = rewardsContract.extraRewards(i);
-            address _rewardsToken =
-                IConvexRewards(virtualRewardsPool).rewardToken();
+            address _rewardsToken = IConvexRewards(virtualRewardsPool)
+                .rewardToken();
 
             // we only need to approve the new token and turn on rewards if the extra rewards isn't CVX
             if (_rewardsToken != _convexToken) {
@@ -515,11 +534,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    function updateLocalKeepCrvs(uint256 _keepCrv, uint256 _keepCvx)
-        external
-        onlyGovernance
-    {
-        if(_keepCrv > 10_000 || _keepCvx > 10_000) {
+    function updateLocalKeepCrvs(
+        uint256 _keepCrv,
+        uint256 _keepCvx
+    ) external onlyGovernance {
+        if (_keepCrv > 10_000 || _keepCvx > 10_000) {
             revert();
         }
 
@@ -587,14 +606,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         if (_amountNeeded > _wantBal) {
             uint256 _stakedBal = stakedBalance();
             if (_stakedBal > 0) {
+                uint256 _neededFromStaked;
+                unchecked {
+                    _neededFromStaked = _amountNeeded - _wantBal;
+                }
                 rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _amountNeeded - _wantBal),
+                    Math.min(_stakedBal, _neededFromStaked),
                     claimRewards
                 );
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
-            _loss = _amountNeeded - _liquidatedAmount;
+            unchecked {
+                _loss = _amountNeeded - _liquidatedAmount;
+            }
         } else {
             // we have enough balance to cover the liquidation available
             return (_amountNeeded, 0);
@@ -638,10 +663,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         claimRewards = _claimRewards;
     }
 
-    function updateTradeFactory(address _newTradeFactory)
-        external
-        onlyGovernance
-    {
+    function updateTradeFactory(
+        address _newTradeFactory
+    ) external onlyGovernance {
         if (tradeFactory != address(0)) {
             _removeTradeFactoryPermissions();
         }
@@ -652,10 +676,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    function updateVoter(address _convexVoter)
-        external
-        onlyGovernance
-    {
+    function updateVoters(
+        address _curveVoter,
+        address _convexVoter
+    ) external onlyGovernance {
+        curveVoter = _curveVoter;
         convexVoter = _convexVoter;
     }
 
@@ -688,7 +713,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
         tradeFactory = address(0);
     }
-
 
     /**
      * @notice
