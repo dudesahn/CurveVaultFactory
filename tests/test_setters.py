@@ -79,7 +79,6 @@ def test_setters(
 
     zero = "0x0000000000000000000000000000000000000000"
 
-
     with brownie.reverts():
         strategy.setRewards(zero, {"from": strategist})
     with brownie.reverts():

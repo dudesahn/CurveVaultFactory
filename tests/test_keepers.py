@@ -23,23 +23,21 @@ def test_keepers(
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
-    
 
-    keeper_contract.harvestStrategy(strategy, {'from': rando})
+    keeper_contract.harvestStrategy(strategy, {"from": rando})
 
-    #assert that money deposited to aura
+    # assert that money deposited to aura
     assert strategy.stakedBalance() > 0
 
-    balboost = interface.ERC20(booster.poolInfo(strategy.pid())['token'])
+    balboost = interface.ERC20(booster.poolInfo(strategy.pid())["token"])
 
-
-    strategy.withdrawToConvexDepositTokens({'from': gov})
+    strategy.withdrawToConvexDepositTokens({"from": gov})
     assert balboost.balanceOf(strategy) > 0
-    strategy.sweep(balboost, {'from': gov})
+    strategy.sweep(balboost, {"from": gov})
 
     with brownie.reverts():
-        keeper_contract.harvestStrategy(strategy, {'from': rando})
+        keeper_contract.harvestStrategy(strategy, {"from": rando})
 
-    #turn off healthcheck
-    strategy.setDoHealthCheck(False, {'from': gov})
-    keeper_contract.harvestStrategy(strategy, {'from': rando})
+    # turn off healthcheck
+    strategy.setDoHealthCheck(False, {"from": gov})
+    keeper_contract.harvestStrategy(strategy, {"from": rando})

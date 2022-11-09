@@ -28,7 +28,7 @@ def test_triggers(
     chain.sleep(1)
 
     # simulate 1 days of earnings
-    chain.sleep(1*86400)
+    chain.sleep(1 * 86400)
     chain.mine(1)
     booster.earmarkRewards(strategy.pid(), {"from": strategist})
 
@@ -48,10 +48,10 @@ def test_triggers(
         assert t1 == False
     strategy.setCheckEarmark(False, {"from": gov})
     # simulate 1 days of earnings
-    chain.sleep(30*86400)
+    chain.sleep(30 * 86400)
     chain.mine(1)
     # update our minProfit so our harvest triggers true
-    print("claimable profit:", strategy.claimableProfitInUsdt()/1e6)
+    print("claimable profit:", strategy.claimableProfitInUsdt() / 1e6)
     strategy.setHarvestProfitNeeded(1e6, 1000000e6, {"from": gov})
     t1 = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", t1)
