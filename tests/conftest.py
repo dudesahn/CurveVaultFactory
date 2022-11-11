@@ -545,19 +545,17 @@ if chain_used == 1:  # mainnet
         test_staking_address,
         test_frax_pid,
     ):
-        frax_template = ZERO_ADDRESS
-        if which_strategy == 2:
+        frax_template = strategist.deploy(
+            StrategyConvexFraxFactoryClonable,
+            test_vault,
+            new_trade_factory,
+            test_frax_pid,
+            test_staking_address,
+            10_000 * 1e6,
+            25_000 * 1e6,
+            frax_booster,
+        )
 
-            frax_template = strategist.deploy(
-                StrategyConvexFraxFactoryClonable,
-                test_vault,
-                new_trade_factory,
-                test_frax_pid,
-                test_staking_address,
-                10_000 * 1e6,
-                25_000 * 1e6,
-                frax_booster,
-            )
         print("Frax Template:", frax_template)
 
         yield frax_template
@@ -580,7 +578,6 @@ if chain_used == 1:  # mainnet
         accounts,
         pid,
         frax_booster,
-        which_strategy,
         convex_template,
         curve_template,
         frax_template,

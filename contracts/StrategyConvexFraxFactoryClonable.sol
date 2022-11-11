@@ -298,7 +298,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (address(tradeFactory) != address(0)) {
             revert(); // already initialized.
         }
-        
+
         fraxBooster = _booster;
 
         // have our strategy deploy our vault from the booster using the fraxPid
