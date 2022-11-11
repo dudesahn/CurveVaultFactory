@@ -113,8 +113,8 @@ interface IStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
         address _tradeFactory,
+        uint256 _pid,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster,
@@ -126,9 +126,9 @@ interface IStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
+        address _tradeFactory,
         address _proxy,
         address _gauge,
-        address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax
     ) external returns (address newStrategy);
@@ -138,9 +138,9 @@ interface IStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
+        address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster
@@ -839,8 +839,8 @@ contract CurveGlobal {
                 management,
                 treasury,
                 keeper,
-                _pid,
                 tradeFactory,
+                _pid,
                 harvestProfitMinInUsdt,
                 harvestProfitMaxInUsdt,
                 address(booster),
@@ -876,9 +876,9 @@ contract CurveGlobal {
                 management,
                 treasury,
                 keeper,
+                tradeFactory,
                 address(proxy),
                 _gauge,
-                tradeFactory,
                 harvestProfitMinInUsdt,
                 harvestProfitMaxInUsdt
             );
@@ -912,9 +912,9 @@ contract CurveGlobal {
                 management,
                 treasury,
                 keeper,
+                tradeFactory,
                 _fraxPid,
                 _stakingAddress,
-                tradeFactory,
                 harvestProfitMinInUsdt,
                 harvestProfitMaxInUsdt,
                 address(fraxBooster)

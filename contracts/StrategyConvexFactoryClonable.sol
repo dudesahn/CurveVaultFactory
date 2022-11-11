@@ -133,8 +133,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexToken
     ) BaseStrategy(_vault) {
         _initializeStrat(
-            _pid,
             _tradeFactory,
+            _pid,
             _harvestProfitMin,
             _harvestProfitMax,
             _booster,
@@ -152,8 +152,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
         address _tradeFactory,
+        uint256 _pid,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster,
@@ -185,8 +185,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             _strategist,
             _rewards,
             _keeper,
-            _pid,
             _tradeFactory,
+            _pid,
             _harvestProfitMin,
             _harvestProfitMax,
             _booster,
@@ -202,8 +202,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
-        uint256 _pid,
         address _tradeFactory,
+        uint256 _pid,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster,
@@ -211,8 +211,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
-            _pid,
             _tradeFactory,
+            _pid,
             _harvestProfitMin,
             _harvestProfitMax,
             _booster,
@@ -222,8 +222,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
-        uint256 _pid,
         address _tradeFactory,
+        uint256 _pid,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster,
