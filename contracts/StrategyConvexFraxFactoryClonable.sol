@@ -198,9 +198,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _booster
     ) BaseStrategy(_vault) {
         _initializeStrat(
+            _tradeFactory,
             _fraxPid,
             _stakingAddress,
-            _tradeFactory,
             _harvestProfitMin,
             _harvestProfitMax,
             _booster
@@ -217,9 +217,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
+        address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster
@@ -250,9 +250,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             _strategist,
             _rewards,
             _keeper,
+            _tradeFactory,
             _fraxPid,
             _stakingAddress,
-            _tradeFactory,
             _harvestProfitMin,
             _harvestProfitMax,
             _booster
@@ -267,18 +267,18 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _strategist,
         address _rewards,
         address _keeper,
+        address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
+            _tradeFactory,
             _fraxPid,
             _stakingAddress,
-            _tradeFactory,
             _harvestProfitMin,
             _harvestProfitMax,
             _booster
@@ -287,9 +287,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(
+        address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        address _tradeFactory,
         uint256 _harvestProfitMin,
         uint256 _harvestProfitMax,
         address _booster
@@ -298,9 +298,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (address(tradeFactory) != address(0)) {
             revert(); // already initialized.
         }
+        
+        fraxBooster = _booster;
 
         // have our strategy deploy our vault from the booster using the fraxPid
-        userVault = IConvexFrax(IConvexFrax(fraxBooster).createVault(_fraxPid));
+        userVault = IConvexFrax(IConvexFrax(_booster).createVault(_fraxPid));
         convexToken = IERC20(userVault.cvx());
         crv = IERC20(userVault.crv());
         fxs = IERC20(userVault.fxs());

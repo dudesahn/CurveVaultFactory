@@ -45,11 +45,32 @@ def tests_using_tenderly():
 chain_used = 1
 
 
-# put our pool's convex pid here
+# put our test pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 100  # 100 FRAX-USDC
+    pid = 100  # 115 DOLA FRAXBP, 100 FRAX-USDC
     yield pid
+
+
+# put our test pool's convex pid here
+@pytest.fixture(scope="session")
+def test_pid():
+    test_pid = 115  # 115 DOLA FRAXBP, 100 FRAX-USDC
+    yield test_pid
+
+
+# put our pool's frax pid here
+@pytest.fixture(scope="session")
+def test_frax_pid():
+    test_frax_pid = 27  # 27 DOLA-FRAXBP, 9 FRAX-USDC
+    yield test_frax_pid
+
+
+# put our pool's staking address here
+@pytest.fixture(scope="session")
+def test_staking_address():
+    test_staking_address = "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab"  # 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC, 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP
+    yield test_staking_address
 
 
 # put our pool's convex pid here
@@ -292,12 +313,12 @@ if chain_used == 1:  # mainnet
         yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
 
     @pytest.fixture(scope="session")
-    def test_vault():  # USDC-ibGBP
-        yield Contract("0x6B5ce31AF687a671a804d8070Ddda99Cab926dfE")
+    def test_vault():  # DOLA-FRAXBP
+        yield Contract("0xd395DEC4F1733ff09b750D869eEfa7E0D37C3eE6")
 
     @pytest.fixture(scope="session")
-    def test_gauge():  # USDC-ibGBP
-        yield Contract("0x1Ba86c33509013c937344f6e231DA2E63ea45197")
+    def test_gauge():  # DOLA-FRAXBP
+        yield Contract("0xBE266d68Ce3dDFAb366Bb866F4353B6FC42BA43c")
 
     @pytest.fixture(scope="session")
     def frax_booster():
@@ -449,7 +470,7 @@ if chain_used == 1:  # mainnet
         test_gauge,
         proxy,
         accounts,
-        pid,
+        test_pid,
         frax_booster,
         which_strategy,
     ):
@@ -458,7 +479,7 @@ if chain_used == 1:  # mainnet
             StrategyConvexFactoryClonable,
             test_vault,
             new_trade_factory,
-            87,
+            test_pid,
             10_000 * 1e6,
             25_000 * 1e6,
             booster,
@@ -518,21 +539,21 @@ if chain_used == 1:  # mainnet
         test_gauge,
         proxy,
         accounts,
-        pid,
+        test_pid,
         frax_booster,
         which_strategy,
+        test_staking_address,
+        test_frax_pid,
     ):
         frax_template = ZERO_ADDRESS
         if which_strategy == 2:
-            fraxPid = 9
-            stakingAddress = "0x963f487796d54d2f27bA6F3Fbe91154cA103b199"
 
             frax_template = strategist.deploy(
                 StrategyConvexFraxFactoryClonable,
                 test_vault,
                 new_trade_factory,
-                fraxPid,
-                stakingAddress,
+                test_frax_pid,
+                test_staking_address,
                 10_000 * 1e6,
                 25_000 * 1e6,
                 frax_booster,
@@ -560,9 +581,9 @@ if chain_used == 1:  # mainnet
         pid,
         frax_booster,
         which_strategy,
+        convex_template,
         curve_template,
         frax_template,
-        convex_template,
     ):
         # before we deploy our first vault, we need to update to the latest release (0.4.5)
         release_registry = Contract(new_registry.releaseRegistry())
