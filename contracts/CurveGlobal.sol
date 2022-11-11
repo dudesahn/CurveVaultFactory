@@ -631,7 +631,7 @@ contract CurveGlobal {
     }
 
     // only permissioned users can set custom name and symbol or deploy if there is already one endorsed
-    function createNewVaultsAndStrategies(
+    function createNewVaultsAndStrategiesPermissioned(
         address _gauge,
         bool _allowDuplicate,
         string memory _name,
@@ -809,11 +809,11 @@ contract CurveGlobal {
         )
     {
         // first we create the convex strat, all vaults will at least have this
-        _addConvexStrategy(_vault, _pid);
+        convexStrategy = _addConvexStrategy(_vault, _pid);
 
         // only attach a curve strategy if this is the first vault for this LP
         if (canCreateVaultPermissionlessly(_gauge)) {
-            _addCurveStrategy(_vault, _gauge);
+            curveStrategy = _addCurveStrategy(_vault, _gauge);
         }
 
         // check if we can add a convex frax strategy
@@ -824,7 +824,7 @@ contract CurveGlobal {
             if (convexFraxStratImplementation == address(0)) {
                 // revert(); // dev: must set convex frax implementation first
             } else {
-                _addConvexFraxStrategy(_vault, fraxPid, stakingAddress);
+                // convexFraxStrategy = _addConvexFraxStrategy(_vault, fraxPid, stakingAddress);
             }
         }
     }

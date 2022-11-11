@@ -63,7 +63,7 @@ def which_strategy():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 4_000e18  # 4k for agEUR-EUROC
+    amount = 500_000e18  #
     yield amount
 
 
@@ -241,7 +241,7 @@ if chain_used == 1:  # mainnet
     @pytest.fixture(scope="session")
     def dai():
         yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
-        
+
     @pytest.fixture(scope="session")
     def new_registry(interface):
         yield interface.IRegistry("0x78f73705105A63e06B932611643E0b210fAE93E9")
@@ -292,12 +292,16 @@ if chain_used == 1:  # mainnet
         yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
 
     @pytest.fixture(scope="session")
-    def test_vault(): # USDC-ibGBP
+    def test_vault():  # USDC-ibGBP
         yield Contract("0x6B5ce31AF687a671a804d8070Ddda99Cab926dfE")
 
     @pytest.fixture(scope="session")
-    def test_gauge(): # USDC-ibGBP
+    def test_gauge():  # USDC-ibGBP
         yield Contract("0x1Ba86c33509013c937344f6e231DA2E63ea45197")
+
+    @pytest.fixture(scope="session")
+    def frax_booster():
+        yield Contract("0x569f5B842B5006eC17Be02B8b94510BA8e79FbCa")
 
     ########################################## FACTORY TESTING CONTRACTS ABOVE ##########################################
 
@@ -428,13 +432,13 @@ if chain_used == 1:  # mainnet
     @pytest.fixture(scope="session")
     def strategist(accounts):
         yield accounts.at("0x16388463d60FFE0661Cf7F1f31a7D658aC790ff7", force=True)
-        
-        
+
     @pytest.fixture(scope="module")
-    def curve_global(
+    def convex_template(
         CurveGlobal,
         StrategyConvexFactoryClonable,
         StrategyCurveBoostedFactoryClonable,
+        StrategyConvexFraxFactoryClonable,
         new_trade_factory,
         test_vault,
         strategist,
@@ -445,8 +449,11 @@ if chain_used == 1:  # mainnet
         test_gauge,
         proxy,
         accounts,
+        pid,
+        frax_booster,
+        which_strategy,
     ):
-        # first, deploy our templates
+        # deploy our convex template
         convex_template = strategist.deploy(
             StrategyConvexFactoryClonable,
             test_vault,
@@ -457,7 +464,31 @@ if chain_used == 1:  # mainnet
             booster,
             convexToken,
         )
-        
+        print("Convex Template:", convex_template)
+
+        yield convex_template
+
+    @pytest.fixture(scope="module")
+    def curve_template(
+        CurveGlobal,
+        StrategyConvexFactoryClonable,
+        StrategyCurveBoostedFactoryClonable,
+        StrategyConvexFraxFactoryClonable,
+        new_trade_factory,
+        test_vault,
+        strategist,
+        new_registry,
+        gov,
+        booster,
+        convexToken,
+        test_gauge,
+        proxy,
+        accounts,
+        pid,
+        frax_booster,
+        which_strategy,
+    ):
+        # deploy our curve template
         curve_template = strategist.deploy(
             StrategyCurveBoostedFactoryClonable,
             test_vault,
@@ -467,18 +498,90 @@ if chain_used == 1:  # mainnet
             10_000 * 1e6,
             25_000 * 1e6,
         )
-        
+        print("Curve Template:", curve_template)
+
+        yield curve_template
+
+    @pytest.fixture(scope="module")
+    def frax_template(
+        CurveGlobal,
+        StrategyConvexFactoryClonable,
+        StrategyCurveBoostedFactoryClonable,
+        StrategyConvexFraxFactoryClonable,
+        new_trade_factory,
+        test_vault,
+        strategist,
+        new_registry,
+        gov,
+        booster,
+        convexToken,
+        test_gauge,
+        proxy,
+        accounts,
+        pid,
+        frax_booster,
+        which_strategy,
+    ):
         frax_template = ZERO_ADDRESS
-        
+        if which_strategy == 2:
+            fraxPid = 9
+            stakingAddress = "0x963f487796d54d2f27bA6F3Fbe91154cA103b199"
+
+            frax_template = strategist.deploy(
+                StrategyConvexFraxFactoryClonable,
+                test_vault,
+                new_trade_factory,
+                fraxPid,
+                stakingAddress,
+                10_000 * 1e6,
+                25_000 * 1e6,
+                frax_booster,
+            )
+        print("Frax Template:", frax_template)
+
+        yield frax_template
+
+    @pytest.fixture(scope="module")
+    def curve_global(
+        CurveGlobal,
+        StrategyConvexFactoryClonable,
+        StrategyCurveBoostedFactoryClonable,
+        StrategyConvexFraxFactoryClonable,
+        new_trade_factory,
+        test_vault,
+        strategist,
+        new_registry,
+        gov,
+        booster,
+        convexToken,
+        test_gauge,
+        proxy,
+        accounts,
+        pid,
+        frax_booster,
+        which_strategy,
+        curve_template,
+        frax_template,
+        convex_template,
+    ):
         # before we deploy our first vault, we need to update to the latest release (0.4.5)
         release_registry = Contract(new_registry.releaseRegistry())
         template_vault_045 = "0xBb1988ab99d4839Af8b6c94853B890307770E48B"
         release_registry_owner = accounts.at(release_registry.owner(), force=True)
-        release_registry.newRelease(template_vault_045, {"from": release_registry_owner})
-        
+        release_registry.newRelease(
+            template_vault_045, {"from": release_registry_owner}
+        )
+
         # then, deploy our factory
-        factory = strategist.deploy(CurveGlobal, new_registry, convex_template, curve_template, frax_template, gov)
-        
+        factory = strategist.deploy(
+            CurveGlobal,
+            new_registry,
+            convex_template,
+            curve_template,
+            frax_template,
+            gov,
+        )
+
         # once our factory is deployed, setup the factory from gov
         registry_owner = accounts.at(new_registry.owner(), force=True)
         new_registry.setApprovedVaultsOwner(factory, True, {"from": registry_owner})
@@ -486,12 +589,12 @@ if chain_used == 1:  # mainnet
 
         yield factory
 
-
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
         StrategyConvexFactoryClonable,
         StrategyCurveBoostedFactoryClonable,
+        StrategyConvexFraxFactoryClonable,
         strategist,
         keeper,
         ymechs_safe,
@@ -512,34 +615,39 @@ if chain_used == 1:  # mainnet
         gauge,
         which_strategy,
     ):
-    
+
         print("Factory address: ", curve_global)
         print("Gauge: ", gauge)
-            
+
         tx = curve_global.createNewVaultsAndStrategies(gauge, {"from": strategist})
         print("Vault endorsed!")
-        
-        if which_strategy == 0: # convex
+
+        if which_strategy == 0:  # convex
             strat = tx.events["NewAutomatedVault"]["convexStrategy"]
             strategy = StrategyConvexFactoryClonable.at(strat)
-        elif which_strategy == 1: # curve
+        elif which_strategy == 1:  # curve
             strat = tx.events["NewAutomatedVault"]["curveStrategy"]
             strategy = StrategyCurveBoostedFactoryClonable.at(strat)
-        else: # frax
+        else:  # frax
             strat = tx.events["NewAutomatedVault"]["convexFraxStrategy"]
             strategy = StrategyConvexFraxFactoryClonable.at(strat)
-        
+
         vault_address = tx.events["NewAutomatedVault"]["vault"]
         vault = Contract(vault_address)
-            
+
+        # daddy needs to accept gov on all new vaults
+        vault.acceptGovernance({"from": gov})
+        assert vault.governance() == gov.address
+
         # set all debtRatios to zero, then set to 10k for our strategy we want to test
         vault.updateStrategyDebtRatio(vault.withdrawalQueue(0), 0, {"from": gov})
         if vault.withdrawalQueue(1) != ZERO_ADDRESS:
             vault.updateStrategyDebtRatio(vault.withdrawalQueue(1), 0, {"from": gov})
         if vault.withdrawalQueue(2) != ZERO_ADDRESS:
+            vault.updateStrategyDebtRatio(vault.withdrawalQueue(1), 0, {"from": gov})
             vault.updateStrategyDebtRatio(vault.withdrawalQueue(2), 0, {"from": gov})
         vault.updateStrategyDebtRatio(strategy, 10_000, {"from": gov})
-        
+
         # turn our oracle into testing mode by setting the provider to 0x00, should default to true
         strategy.setBaseFeeOracle(gasOracle, {"from": strategist_ms})
         gasOracle = Contract(strategy.baseFeeOracle())
@@ -552,7 +660,6 @@ if chain_used == 1:  # mainnet
         strategy.harvest({"from": strategist_ms})
         chain.sleep(1)
         yield strategy
-
 
     @pytest.fixture(scope="module")
     def vault(strategy):
