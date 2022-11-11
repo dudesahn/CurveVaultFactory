@@ -633,7 +633,6 @@ contract CurveGlobal {
     // only permissioned users can set custom name and symbol or deploy if there is already one endorsed
     function createNewVaultsAndStrategiesPermissioned(
         address _gauge,
-        bool _allowDuplicate,
         string memory _name,
         string memory _symbol
     )
@@ -649,13 +648,7 @@ contract CurveGlobal {
             revert();
         }
 
-        return
-            _createNewVaultsAndStrategies(
-                _gauge,
-                _allowDuplicate,
-                _name,
-                _symbol
-            );
+        return _createNewVaultsAndStrategies(_gauge, true, _name, _symbol);
     }
 
     function createNewVaultsAndStrategies(
@@ -674,7 +667,7 @@ contract CurveGlobal {
 
     function _createNewVaultsAndStrategies(
         address _gauge,
-        bool _allowDuplicate,
+        bool _permissionedUser,
         string memory _name,
         string memory _symbol
     )
@@ -686,11 +679,12 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
-        if (!_allowDuplicate) {
-            require(
-                canCreateVaultPermissionlessly(_gauge),
-                "Vault already exists"
-            );
+        // use this to track if we should clone a curve voter strategy onto our new vault
+        // need to set this before we create the vault below
+        bool cloneCurve = canCreateVaultPermissionlessly(_gauge);
+
+        if (!_permissionedUser) {
+            require(cloneCurve, "Vault already exists");
         }
         address lptoken = ICurveGauge(_gauge).lp_token();
 
@@ -706,7 +700,7 @@ contract CurveGlobal {
             );
         }
 
-        if (_allowDuplicate) {
+        if (_permissionedUser) {
             // allow trusted users to input the name and symbol—hopefully they behave!
             vault = _createCustomVault(lptoken, _name, _symbol);
         } else {
@@ -721,7 +715,8 @@ contract CurveGlobal {
         (convexStrategy, curveStrategy, convexFraxStrategy) = _setupStrategies(
             vault,
             _gauge,
-            pid
+            pid,
+            cloneCurve
         );
 
         emit NewAutomatedVault(
@@ -799,7 +794,8 @@ contract CurveGlobal {
     function _setupStrategies(
         address _vault,
         address _gauge,
-        uint256 _pid
+        uint256 _pid,
+        bool _cloneCurve
     )
         internal
         returns (
@@ -812,7 +808,7 @@ contract CurveGlobal {
         convexStrategy = _addConvexStrategy(_vault, _pid);
 
         // only attach a curve strategy if this is the first vault for this LP
-        if (canCreateVaultPermissionlessly(_gauge)) {
+        if (_cloneCurve) {
             curveStrategy = _addCurveStrategy(_vault, _gauge);
         }
 
@@ -824,7 +820,11 @@ contract CurveGlobal {
             if (convexFraxStratImplementation == address(0)) {
                 // revert(); // dev: must set convex frax implementation first
             } else {
-                convexFraxStrategy = _addConvexFraxStrategy(_vault, fraxPid, stakingAddress);
+                convexFraxStrategy = _addConvexFraxStrategy(
+                    _vault,
+                    fraxPid,
+                    stakingAddress
+                );
             }
         }
     }
@@ -921,7 +921,7 @@ contract CurveGlobal {
 //             );
 //         IStrategy(convexFraxStrategy).setHealthCheck(healthCheck);
 // 
-//         if (keepCRV > 0 || keepCVX > 0) {
+//         if (keepCRV > 0 || keepCVX > 0 || keepFXS > 0) {
 //             IStrategy(convexFraxStrategy).updateVoters(
 //                 voterCRV,
 //                 voterCVX,

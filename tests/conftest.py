@@ -13,7 +13,7 @@ def isolation(fn_isolation):
 
 
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
-use_tenderly = False
+use_tenderly = True
 
 
 ################################################## TENDERLY DEBUGGING ##################################################
@@ -352,10 +352,6 @@ if chain_used == 1:  # mainnet
         yield Contract("0x8423590CD0343c4E18d35aA780DF50a5751bebae")
 
     @pytest.fixture(scope="session")
-    def proxy():
-        yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
-
-    @pytest.fixture(scope="session")
     def curve_registry():
         yield Contract("0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5")
 
@@ -468,7 +464,6 @@ if chain_used == 1:  # mainnet
         booster,
         convexToken,
         test_gauge,
-        proxy,
         accounts,
         test_pid,
         frax_booster,
@@ -537,7 +532,6 @@ if chain_used == 1:  # mainnet
         booster,
         convexToken,
         test_gauge,
-        proxy,
         accounts,
         test_pid,
         frax_booster,
@@ -559,16 +553,17 @@ if chain_used == 1:  # mainnet
         print("Frax Template:", frax_template)
 
         cloned_strategy = frax_template.cloneStrategyConvexFrax(
-                test_vault,
-                test_vault.management(),
-                test_vault.rewards(),
-                frax_template.keeper(),
-                new_trade_factory,
-                27,
-                "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab",
-                10_000 * 1e6,
-                25_000 * 1e6,
-                frax_booster)
+            test_vault,
+            test_vault.management(),
+            test_vault.rewards(),
+            frax_template.keeper(),
+            new_trade_factory,
+            27,  # this is using values for DOLX-FRAXBP since it's on that vault
+            "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab",  # this is using values for DOLX-FRAXBP since it's on that vault
+            10_000 * 1e6,
+            25_000 * 1e6,
+            frax_booster,
+        )
         print("Successfully cloned")
 
         yield frax_template
@@ -579,6 +574,7 @@ if chain_used == 1:  # mainnet
         StrategyConvexFactoryClonable,
         StrategyCurveBoostedFactoryClonable,
         StrategyConvexFraxFactoryClonable,
+        StrategyProxy,
         new_trade_factory,
         test_vault,
         strategist,
@@ -587,13 +583,13 @@ if chain_used == 1:  # mainnet
         booster,
         convexToken,
         test_gauge,
-        proxy,
         accounts,
         pid,
         frax_booster,
         convex_template,
         curve_template,
         frax_template,
+        voter,
     ):
         # before we deploy our first vault, we need to update to the latest release (0.4.5)
         release_registry = Contract(new_registry.releaseRegistry())
@@ -620,6 +616,12 @@ if chain_used == 1:  # mainnet
 
         yield factory
 
+    @pytest.fixture(scope="module")
+    def proxy(StrategyProxy, gov):
+        # deploy our new strategy proxy
+        strategy_proxy = gov.deploy(StrategyProxy)
+        yield strategy_proxy
+
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
@@ -639,19 +641,36 @@ if chain_used == 1:  # mainnet
         chain,
         Contract,
         pid,
-        proxy,
         gasOracle,
         new_registry,
         strategist_ms,
         gauge,
         which_strategy,
+        proxy,
+        voter,
+        
     ):
 
         print("Factory address: ", curve_global)
         print("Gauge: ", gauge)
 
+        # update the strategy on our voter
+        voter.setStrategy(proxy.address, {"from": gov})
+        
+        # set our factory address on the strategy proxy
+        proxy.setFactory(curve_global.address, {"from": gov})
+
+        # check if our current gauge has a strategy for it, but mostly just do this to update our proxy
+        print("Here is our strategy for the gauge:", proxy.strategies(gauge))
+        
+        # make sure we can create this vault permissionlessly
+        assert curve_global.canCreateVaultPermissionlessly(gauge)
+
         tx = curve_global.createNewVaultsAndStrategies(gauge, {"from": strategist})
         print("Vault endorsed!")
+        info = tx.events["NewAutomatedVault"]
+
+        print("Here's our new vault created event:", info)
 
         if which_strategy == 0:  # convex
             strat = tx.events["NewAutomatedVault"]["convexStrategy"]
