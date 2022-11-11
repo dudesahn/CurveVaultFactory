@@ -2,15 +2,15 @@
 
 pragma solidity ^0.6.12;
 
-import "IERC20.sol";
-import "SafeMath.sol";
-import "Address.sol";
-import "SafeERC20.sol";
+import "@openzeppelinLegacy/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelinLegacy/contracts/utils/Address.sol";
+import "@openzeppelinLegacy/contracts/math/Math.sol";
+import "@openzeppelinLegacy/contracts/token/ERC20/SafeERC20.sol";
 
-import "IProxy.sol";
-import "Mintr.sol";
-import "FeeDistribution.sol";
-import "Gauge.sol";
+import "./interfaces/IProxy.sol";
+import "./interfaces/Mintr.sol";
+import "./interfaces/FeeDistribution.sol";
+import "./interfaces/Gauge.sol";
 
 library SafeProxy {
     function safeExecute(
@@ -356,10 +356,10 @@ contract StrategyProxy {
     /// @notice Claim non-CRV token incentives from the gauge and transfer to strategy
     /// @param _gauge The gauge which this strategy is claiming rewards
     /// @param _tokens The token(s) to be claimed to the approved strategy
-    function claimRewards(address _gauge, address[] _tokens) external {
+    function claimRewards(address _gauge, address[] memory _tokens) external {
         require(strategies[_gauge] == msg.sender, "!strategy");
         Gauge(_gauge).claim_rewards(address(proxy));
-        for (uint256 i; i < _tokens; ++i) {
+        for (uint256 i; i < _tokens.length; ++i) {
             address _token = _tokens[i];
             proxy.safeExecute(
                 _token,
