@@ -558,6 +558,19 @@ if chain_used == 1:  # mainnet
 
         print("Frax Template:", frax_template)
 
+        cloned_strategy = frax_template.cloneStrategyConvexFrax(
+                test_vault,
+                test_vault.management(),
+                test_vault.rewards(),
+                frax_template.keeper(),
+                new_trade_factory,
+                27,
+                "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab",
+                10_000 * 1e6,
+                25_000 * 1e6,
+                frax_booster)
+        print("Successfully cloned")
+
         yield frax_template
 
     @pytest.fixture(scope="module")
@@ -662,7 +675,6 @@ if chain_used == 1:  # mainnet
         if vault.withdrawalQueue(1) != ZERO_ADDRESS:
             vault.updateStrategyDebtRatio(vault.withdrawalQueue(1), 0, {"from": gov})
         if vault.withdrawalQueue(2) != ZERO_ADDRESS:
-            vault.updateStrategyDebtRatio(vault.withdrawalQueue(1), 0, {"from": gov})
             vault.updateStrategyDebtRatio(vault.withdrawalQueue(2), 0, {"from": gov})
         vault.updateStrategyDebtRatio(strategy, 10_000, {"from": gov})
 
