@@ -319,10 +319,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         lockTime = 604800; // default to minimum of 1 week
 
-        //         if (address(lptoken) != address(want)) {
-        //             revert();
-        //         }
-
         tradeFactory = _tradeFactory;
 
         _updateRewards();
@@ -332,9 +328,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         stratName = string(
             abi.encodePacked(
                 IDetails(address(want)).name(),
-                " Auto-Compounding ",
-                IDetails(address(convexToken)).symbol(),
-                " Strategy"
+                " Auto-Compounding Convex Frax Strategy"
             )
         );
     }
