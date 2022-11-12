@@ -906,40 +906,40 @@ contract CurveGlobal {
         uint256 _fraxPid,
         address _stakingAddress
     ) internal returns (address convexFraxStrategy) {
-//         convexFraxStrategy = IStrategy(convexFraxStratImplementation)
-//             .cloneStrategyConvexFrax(
-//                 _vault,
-//                 management,
-//                 treasury,
-//                 keeper,
-//                 tradeFactory,
-//                 _fraxPid,
-//                 _stakingAddress,
-//                 harvestProfitMinInUsdt,
-//                 harvestProfitMaxInUsdt,
-//                 address(fraxBooster)
-//             );
-//         IStrategy(convexFraxStrategy).setHealthCheck(healthCheck);
-// 
-//         if (keepCRV > 0 || keepCVX > 0 || keepFXS > 0) {
-//             IStrategy(convexFraxStrategy).updateVoters(
-//                 voterCRV,
-//                 voterCVX,
-//                 voterFXS
-//             );
-//             IStrategy(convexFraxStrategy).updateLocalKeepCrvs(
-//                 keepCRV,
-//                 keepCVX,
-//                 keepFXS
-//             );
-//         }
-// 
-//         Vault(_vault).addStrategy(
-//             convexFraxStrategy,
-//             0,
-//             0,
-//             type(uint256).max,
-//             0
-//         );
+        convexFraxStrategy = IStrategy(convexFraxStratImplementation)
+            .cloneStrategyConvexFrax(
+                _vault,
+                management,
+                treasury,
+                keeper,
+                tradeFactory,
+                _fraxPid,
+                _stakingAddress,
+                harvestProfitMinInUsdt,
+                harvestProfitMaxInUsdt,
+                address(fraxBooster)
+            );
+        IStrategy(convexFraxStrategy).setHealthCheck(healthCheck);
+
+        if (keepCRV > 0 || keepCVX > 0 || keepFXS > 0) {
+            IStrategy(convexFraxStrategy).updateVoters(
+                voterCRV,
+                voterCVX,
+                voterFXS
+            );
+            IStrategy(convexFraxStrategy).updateLocalKeepCrvs(
+                keepCRV,
+                keepCVX,
+                keepFXS
+            );
+        }
+
+        Vault(_vault).addStrategy(
+            convexFraxStrategy,
+            0,
+            0,
+            type(uint256).max,
+            0
+        );
     }
 }
