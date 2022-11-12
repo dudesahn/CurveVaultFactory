@@ -648,7 +648,6 @@ if chain_used == 1:  # mainnet
         which_strategy,
         proxy,
         voter,
-        
     ):
 
         print("Factory address: ", curve_global)
@@ -656,18 +655,25 @@ if chain_used == 1:  # mainnet
 
         # update the strategy on our voter
         voter.setStrategy(proxy.address, {"from": gov})
-        
+
         # set our factory address on the strategy proxy
         proxy.setFactory(curve_global.address, {"from": gov})
 
         # check if our current gauge has a strategy for it, but mostly just do this to update our proxy
-        print("Here is our strategy for the gauge:", proxy.strategies(gauge))
-        
+        print(
+            "Here is our strategy for the gauge (likely 0x000):",
+            proxy.strategies(gauge),
+        )
+
         # make sure we can create this vault permissionlessly
         assert curve_global.canCreateVaultPermissionlessly(gauge)
 
         tx = curve_global.createNewVaultsAndStrategies(gauge, {"from": strategist})
-        print("Vault endorsed!")
+        vault_address = tx.events["NewAutomatedVault"]["vault"]
+        vault = Contract(vault_address)
+        print("Vault name:", vault.name())
+
+        print("Vault endorsed:", vault_address)
         info = tx.events["NewAutomatedVault"]
 
         print("Here's our new vault created event:", info)
@@ -681,9 +687,6 @@ if chain_used == 1:  # mainnet
         else:  # frax
             strat = tx.events["NewAutomatedVault"]["convexFraxStrategy"]
             strategy = StrategyConvexFraxFactoryClonable.at(strat)
-
-        vault_address = tx.events["NewAutomatedVault"]["vault"]
-        vault = Contract(vault_address)
 
         # daddy needs to accept gov on all new vaults
         vault.acceptGovernance({"from": gov})
