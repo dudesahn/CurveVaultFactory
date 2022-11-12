@@ -480,7 +480,7 @@ if chain_used == 1:  # mainnet
             booster,
             convexToken,
         )
-        print("Convex Template:", convex_template)
+        print("\nConvex Template:", convex_template)
 
         yield convex_template
 
@@ -676,7 +676,7 @@ if chain_used == 1:  # mainnet
         print("Vault endorsed:", vault_address)
         info = tx.events["NewAutomatedVault"]
 
-        print("Here's our new vault created event:", info)
+        print("Here's our new vault created event:", info, "\n")
 
         if which_strategy == 0:  # convex
             strat = tx.events["NewAutomatedVault"]["convexStrategy"]
