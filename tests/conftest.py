@@ -48,7 +48,7 @@ chain_used = 1
 # put our test pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 25  # 115 DOLA FRAXBP, 100 FRAX-USDC, 25 stETH
+    pid = 100  # 115 DOLA FRAXBP, 100 FRAX-USDC, 25 stETH
     yield pid
 
 
@@ -98,14 +98,14 @@ def which_strategy():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 400e18  # 500k for FRAX-USDC, 400 for stETH
+    amount = 500_000e18  # 500k for FRAX-USDC, 400 for stETH
     yield amount
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def profit_amount():
-    profit_amount = 2e18 # 5k for FRAX-USDC, 2 for stETH
+    profit_amount = 5_000e18 # 5k for FRAX-USDC, 2 for stETH
     yield profit_amount
 
 
@@ -115,7 +115,7 @@ def profit_whale(accounts, profit_amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     profit_whale = accounts.at(
-        "0x43378368D84D4bA00D1C8E97EC2E6016A82fC062", force=True
+        "0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190", force=True
     )  # 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, stETH: 0x43378368D84D4bA00D1C8E97EC2E6016A82fC062, 730 tokens
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
@@ -130,7 +130,7 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     whale = accounts.at(
-        "0x13e382dfe53207E9ce2eeEab330F69da2794179E", force=True
+        "0xE57180685E3348589E9521aa53Af0BCD497E884d", force=True
     )  # 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens, stETH: 0x13e382dfe53207E9ce2eeEab330F69da2794179E, 900 tokens
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(

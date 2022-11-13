@@ -24,6 +24,7 @@ def test_keepers(
     profit_whale,
     profit_amount,
     which_strategy,
+    rewards_token,
 ):
     rando = accounts[5]
     ## deposit to the vault after approving
@@ -101,4 +102,10 @@ def test_keepers(
 
     # update again
     strategy.updateTradeFactory(new_trade_factory, {"from": gov})
+    
+    # update rewards
+    strategy.updateRewards([rewards_token.address], {"from": gov})
+    
+    # set trade factory to zero
     strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})
+    
