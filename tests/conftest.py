@@ -677,7 +677,7 @@ if chain_used == 1:  # mainnet
         strategist_ms,
         gauge,
         which_strategy,
-        old_proxy,
+        new_proxy,
         voter,
         new_trade_factory,
         convexToken,
@@ -704,11 +704,13 @@ if chain_used == 1:  # mainnet
                 StrategyCurveBoostedFactoryClonable,
                 vault,
                 new_trade_factory,
-                old_proxy,
+                new_proxy,
                 gauge,
                 10_000 * 1e6,
                 25_000 * 1e6,
             )
+            voter.setStrategy(new_proxy.address, {"from": gov})   
+            print("New Strategy Proxy setup")         
         else:  # frax
             strategy = strategist.deploy(
                 StrategyConvexFraxFactoryClonable,
@@ -747,9 +749,9 @@ if chain_used == 1:  # mainnet
             chain.mine(1)
 
             # approve our new strategy on the proxy
-            old_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
-            assert old_proxy.strategies(gauge.address) == strategy.address
-            assert voter.strategy() == old_proxy.address
+            new_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
+            assert new_proxy.strategies(gauge.address) == strategy.address
+            assert voter.strategy() == new_proxy.address
         else: # frax
             vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
             print("New Vault, Frax Strategy")

@@ -87,7 +87,7 @@ def test_simple_harvest(
 
     # simulate some profits if we don't have any to make sure everything else works
     if which_strategy != 1:
-        if is_convex:
+        if which_strategy == 0:
             # have our crv whale donate directly to the rewards contract to make sure our triggers work
             crv_whale = accounts.at(
                 "0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True
