@@ -20,7 +20,6 @@ def test_simple_harvest(
     sleep_time,
     is_slippery,
     no_profit,
-    is_convex,
     crv,
     accounts,
     booster,

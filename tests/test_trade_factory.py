@@ -25,6 +25,7 @@ def test_keepers(
     profit_amount,
     which_strategy,
     rewards_token,
+    has_rewards,
 ):
     rando = accounts[5]
     ## deposit to the vault after approving
@@ -104,7 +105,21 @@ def test_keepers(
     strategy.updateTradeFactory(new_trade_factory, {"from": gov})
     
     # update rewards
-    strategy.updateRewards([rewards_token.address], {"from": gov})
+    if which_strategy == 1:
+        strategy.updateRewards([rewards_token.address], {"from": gov})
+    else:
+        strategy.updateRewards({"from": gov})
+
+    # simulate profits
+    chain.sleep(sleep_time)
+    chain.mine(1)
+
+    # harvest, store new asset amount
+    if has_rewards:
+        chain.sleep(1)
+        token.transfer(strategy, profit_amount, {"from": profit_whale})
+        tx = strategy.harvest({"from": gov})
+        chain.sleep(1)
     
     # set trade factory to zero
     strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})

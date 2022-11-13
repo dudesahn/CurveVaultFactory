@@ -163,8 +163,8 @@ def strategy_name():
 # this is the address of our rewards token
 @pytest.fixture(scope="session")
 def rewards_token():  # OGN 0x8207c1FfC5B6804F6024322CcF34F29c3541Ae26, SPELL 0x090185f2135308BaD17527004364eBcC2D37e5F6
-    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F, ANGLE 0x31429d1856aD1377A8A0079410B297e1a9e214c2
-    yield Contract("0x31429d1856aD1377A8A0079410B297e1a9e214c2")
+    # SNX 0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F, ANGLE 0x31429d1856aD1377A8A0079410B297e1a9e214c2, LDO 0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32
+    yield Contract("0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32")
 
 
 # sUSD gauge uses blocks instead of seconds to determine rewards, so this needs to be true for that to test if we're earning
@@ -218,13 +218,6 @@ def rewards_template():
 def has_rewards():
     has_rewards = False
     yield has_rewards
-
-
-# this is whether our strategy is convex or not
-@pytest.fixture(scope="session")
-def is_convex():
-    is_convex = True
-    yield is_convex
 
 
 # if our curve gauge deposits aren't tokenized (older pools), we can't as easily do some tests and we skip them
