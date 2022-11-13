@@ -305,7 +305,7 @@ def test_cloning(
 
     # harvest, store asset amount
     if which_strategy == 1:  # make sure to update our proxy if a curve strategy
-        proxy.approveStrategy(strategy.gauge(), newStrategy, {"from": gov})
+        old_proxy.approveStrategy(strategy.gauge(), newStrategy, {"from": gov})
     newStrategy.harvest({"from": gov})
     chain.sleep(1)
     old_assets = vault.totalAssets()

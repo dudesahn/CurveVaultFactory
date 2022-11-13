@@ -26,6 +26,7 @@ def test_odds_and_ends(
     pid,
     gauge,
     amount,
+    voter,
     pool,
     strategy_name,
     profit_amount,
@@ -38,6 +39,7 @@ def test_odds_and_ends(
     crv,
     has_rewards,
     accounts,
+    gauge_is_not_tokenized,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
@@ -141,7 +143,7 @@ def test_odds_and_ends(
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     if which_strategy == 1:
-        proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
+        old_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -172,14 +174,14 @@ def test_odds_and_ends(
     zero_eth_in_want = strategy.ethToWant(0)
 
     # check our views
-    strategy.apiVersion()
-    strategy.isActive()
+    new_strategy.apiVersion()
+    new_strategy.isActive()
 
     # tend stuff
     chain.sleep(1)
-    strategy.tend({"from": gov})
+    new_strategy.tend({"from": gov})
     chain.sleep(1)
-    strategy.tendTrigger(0, {"from": gov})
+    new_strategy.tendTrigger(0, {"from": gov})
 
 
 def test_odds_and_ends_2(
@@ -326,7 +328,7 @@ def test_odds_and_ends_migration(
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     if which_strategy == 1:
-        proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
+        old_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -378,7 +380,6 @@ def test_odds_and_ends_liquidatePosition(
     amount,
     is_slippery,
     no_profit,
-    is_convex,
     sleep_time,
     profit_amount,
     profit_whale,
@@ -468,7 +469,6 @@ def test_odds_and_ends_rekt(
     crv,
     convexToken,
     amount,
-    is_convex,
     gauge,
     has_rewards,
     rewards_token,
@@ -545,7 +545,6 @@ def test_odds_and_ends_liquidate_rekt(
     cvxDeposit,
     amount,
     gauge,
-    is_convex,
     gauge_is_not_tokenized,
     profit_amount,
     profit_whale,
@@ -629,7 +628,6 @@ def test_odds_and_ends_empty_strat(
     sleep_time,
     is_slippery,
     no_profit,
-    is_convex,
     gauge,
     gauge_is_not_tokenized,
     profit_amount,
@@ -704,7 +702,6 @@ def test_odds_and_ends_no_profit(
     sleep_time,
     is_slippery,
     no_profit,
-    is_convex,
     profit_amount,
     profit_whale,
     which_strategy,
@@ -728,7 +725,7 @@ def test_odds_and_ends_no_profit(
         assert profit > 0
     chain.mine(1)
     chain.sleep(1)
-    if is_convex:
+    if which_strategy == 0:
         assert strategy.needsEarmarkReward()
 
     # sleep to try and generate profit, but it shouldn't (if convex). we should still be able to harvest though.
@@ -763,10 +760,10 @@ def test_odds_and_ends_keep(
     strategist_ms,
     voter,
     cvxDeposit,
+    crv,
     amount,
     sleep_time,
     convexToken,
-    is_convex,
     no_profit,
     profit_amount,
     profit_whale,
@@ -784,16 +781,6 @@ def test_odds_and_ends_keep(
     if which_strategy == 0:
         strategy.updateLocalKeepCrvs(1000, 1000, {"from": gov})
         strategy.updateVoters(gov, gov, {"from": gov})
-    elif which_strategy == 1:
-        strategy.updateLocalKeepCrvs(1000, {"from": gov})
-        strategy.updateVoter(gov, {"from": gov})
-    else:
-        strategy.updateLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
-        strategy.updateVoters(gov, gov, gov, {"from": gov})
-
-
-    if which_strategy == 0:
-        strategy.updateLocalKeepCrvs(1000, 1000, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         treasury_before = convexToken.balanceOf(strategy.convexVoter())
@@ -803,17 +790,18 @@ def test_odds_and_ends_keep(
         if not no_profit:
             assert treasury_after > treasury_before
     elif which_strategy == 1:
-        strategy.updateLocalKeepCrvs(1000, {"from": gov})
+        strategy.updateLocalKeepCrv(1000, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = crv.balanceOf(strategy.curveVoter())
+        treasury_before = crv.balanceOf(strategy.voter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = crv.balanceOf(strategy.curveVoter())
+        treasury_after = crv.balanceOf(strategy.voter())
         if not no_profit:
             assert treasury_after > treasury_before
     else:
         strategy.updateLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        strategy.updateVoters(gov, gov, gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         treasury_before = fxs.balanceOf(strategy.fxsVoter())

@@ -130,10 +130,10 @@ def test_emergency_exit_with_loss(
     no_profit,
     booster,
     pid,
-    is_convex,
     gauge_is_not_tokenized,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -144,7 +144,7 @@ def test_emergency_exit_with_loss(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    if is_convex:
+    if which_strategy != 1:
         # send away all funds, will need to alter this based on strategy
         strategy.withdrawToConvexDepositTokens({"from": gov})
         to_send = cvxDeposit.balanceOf(strategy)
@@ -203,10 +203,10 @@ def test_emergency_exit_with_no_loss(
     no_profit,
     booster,
     pid,
-    is_convex,
     gauge_is_not_tokenized,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -218,7 +218,7 @@ def test_emergency_exit_with_no_loss(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    if is_convex:
+    if which_strategy != 1:
         # send away all funds, will need to alter this based on strategy
         strategy.withdrawToConvexDepositTokens({"from": gov})
         to_send = cvxDeposit.balanceOf(strategy)
@@ -290,8 +290,9 @@ def test_emergency_withdraw_method_0(
     is_convex,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
-    if not is_convex:
+    if which_strategy == 1:
         return
 
     ## deposit to the vault after approving
@@ -348,8 +349,9 @@ def test_emergency_withdraw_method_1(
     is_convex,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
-    if not is_convex:
+    if which_strategy == 1:
         return
 
     ## deposit to the vault after approving

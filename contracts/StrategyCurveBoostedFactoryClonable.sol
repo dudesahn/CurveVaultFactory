@@ -240,6 +240,10 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
         // set our curve gauge contract
         gauge = address(_gauge);
+        
+        // set up our min and max delays
+        minReportDelay = 21 days;
+        maxReportDelay = 365 days;
 
         // our factory checks the latest proxy from curve voter and passes it here
         proxy = ICurveStrategyProxy(_proxy);

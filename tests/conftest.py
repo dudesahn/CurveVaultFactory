@@ -91,7 +91,7 @@ def test_staking_address():
 @pytest.fixture(scope="session")
 def which_strategy():
     # must be 0, 1, or 2 for convex, curve, and frax
-    which_strategy = 0
+    which_strategy = 1
     yield which_strategy
 
 
@@ -652,7 +652,7 @@ if chain_used == 1:  # mainnet
 
     @pytest.fixture(scope="session")
     def old_proxy():
-        yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
+        yield Contract("0x4694507Ca1023194eA3Ca4428F99EDEd7Ab2b919")
 
     @pytest.fixture(scope="module")
     def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
@@ -734,7 +734,7 @@ if chain_used == 1:  # mainnet
         vault.setManagementFee(0, {"from": gov})
 
         # we will be migrating on our live vault instead of adding it directly
-        if which_strategy == 0:
+        if which_strategy == 0: # convex
             # earmark rewards if we are using a convex strategy
             booster.earmarkRewards(pid, {"from": gov})
             chain.sleep(1)
@@ -747,7 +747,7 @@ if chain_used == 1:  # mainnet
 
             # this is the same for new or existing vaults
             strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
-        elif which_strategy == 1:
+        elif which_strategy == 1: # Curve
             vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
             print("New Vault, Curve Strategy")
             chain.sleep(1)
@@ -755,6 +755,17 @@ if chain_used == 1:  # mainnet
 
             # approve our new strategy on the proxy
             old_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
+            assert old_proxy.strategies(gauge.address) == strategy.address
+            assert voter.strategy() == old_proxy.address
+        else: # frax
+            vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+            print("New Vault, Frax Strategy")
+            chain.sleep(1)
+            chain.mine(1)
+
+            # this is the same for new or existing vaults
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
+        
 
         # turn our oracle into testing mode by setting the provider to 0x00, should default to true
         strategy.setBaseFeeOracle(gasOracle, {"from": strategist_ms})
