@@ -40,6 +40,7 @@ def test_odds_and_ends(
     has_rewards,
     accounts,
     gauge_is_not_tokenized,
+    rewards_token,
 ):
 
     ## deposit to the vault after approving. turn off health check before each harvest since we're doing weird shit
