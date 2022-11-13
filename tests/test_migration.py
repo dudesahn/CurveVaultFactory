@@ -3,27 +3,37 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test migrating a strategy
 def test_migration(
     StrategyConvexFactoryClonable,
+    StrategyCurveBoostedFactoryClonable,
+    StrategyConvexFraxFactoryClonable,
     gov,
     token,
     vault,
     guardian,
     strategist,
+    sleep_time,
     whale,
     strategy,
     chain,
-    proxy,
+    old_proxy,
     strategist_ms,
     new_trade_factory,
     booster,
     convexToken,
     healthCheck,
     pid,
+    gauge,
     amount,
     pool,
     strategy_name,
+    profit_amount,
+    profit_whale,
+    which_strategy,
+    staking_address,
+    frax_pid,
+    frax_booster,
 ):
 
     ## deposit to the vault after approving
@@ -33,31 +43,62 @@ def test_migration(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    # deploy our new strategy
-    new_strategy = strategist.deploy(
-        StrategyConvexFactoryClonable,
-        vault,
-        new_trade_factory,
-        pid,
-        10_000 * 1e6,
-        25_000 * 1e6,
-        booster,
-        convexToken,
-    )
+    if which_strategy == 0:  # convex
+        new_strategy = strategist.deploy(
+            StrategyConvexFactoryClonable,
+            vault,
+            new_trade_factory,
+            pid,
+            10_000 * 1e6,
+            25_000 * 1e6,
+            booster,
+            convexToken,
+        )
+
+        # can we harvest an unactivated strategy? should be no
+        tx = new_strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be False.", tx)
+        assert tx == False
+    elif which_strategy == 1:  # curve
+        new_strategy = strategist.deploy(
+            StrategyCurveBoostedFactoryClonable,
+            vault,
+            new_trade_factory,
+            old_proxy,
+            gauge,
+            10_000 * 1e6,
+            25_000 * 1e6,
+        )
+    else:  # frax
+        new_strategy = strategist.deploy(
+            StrategyConvexFraxFactoryClonable,
+            vault,
+            new_trade_factory,
+            frax_pid,
+            staking_address,
+            10_000 * 1e6,
+            25_000 * 1e6,
+            frax_booster,
+        )
+
+        # can we harvest an unactivated strategy? should be no
+        tx = new_strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be False.", tx)
+        assert tx == False
+
     total_old = strategy.estimatedTotalAssets()
 
-    # can we harvest an unactivated strategy? should be no
-    tx = new_strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be False.", tx)
-    assert tx == False
-
-    # sleep for a week to build up some rewards
-    chain.sleep(86400 * 7)
+    # sleep to collect earnings
+    chain.sleep(sleep_time)
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     new_strategy.setHealthCheck(healthCheck, {"from": gov})
     new_strategy.setDoHealthCheck(True, {"from": gov})
+
+    # if a curve strat, whitelist on our strategy proxy
+    if which_strategy == 1:
+        old_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -76,11 +117,12 @@ def test_migration(
     startingVault = vault.totalAssets()
     print("\nVault starting assets with new strategy: ", startingVault)
 
-    # simulate one day of earnings
-    chain.sleep(86400)
+    # simulate earnings
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     # Test out our migrated strategy, confirm we're making a profit
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     new_strategy.harvest({"from": gov})
     vaultAssets_2 = vault.totalAssets()
     # confirm we made money, or at least that we have about the same

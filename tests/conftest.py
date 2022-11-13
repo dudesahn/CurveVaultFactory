@@ -13,7 +13,7 @@ def isolation(fn_isolation):
 
 
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
-use_tenderly = True
+use_tenderly = False
 
 
 ################################################## TENDERLY DEBUGGING ##################################################
@@ -52,6 +52,20 @@ def pid():
     yield pid
 
 
+# put our pool's frax pid here
+@pytest.fixture(scope="session")
+def frax_pid():
+    frax_pid = 9  # 27 DOLA-FRAXBP, 9 FRAX-USDC
+    yield frax_pid
+
+
+# put our pool's staking address here
+@pytest.fixture(scope="session")
+def staking_address():
+    staking_address = "0x963f487796d54d2f27bA6F3Fbe91154cA103b199"  # 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC, 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP
+    yield staking_address
+
+
 # put our test pool's convex pid here
 @pytest.fixture(scope="session")
 def test_pid():
@@ -86,6 +100,28 @@ def which_strategy():
 def amount():
     amount = 500_000e18  #
     yield amount
+
+
+# this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
+@pytest.fixture(scope="session")
+def profit_amount():
+    profit_amount = 5_000e18
+    yield profit_amount
+
+
+@pytest.fixture(scope="session")
+def profit_whale(accounts, profit_amount, token):
+    # Totally in it for the tech
+    # Update this with a large holder of your want token (the largest EOA holder of LP)
+    # use the FRAX-USDC pool for now
+    profit_whale = accounts.at(
+        "0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190", force=True
+    )  # 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens
+    if token.balanceOf(profit_whale) < 5 * profit_amount:
+        raise ValueError(
+            "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
+        )
+    yield profit_whale
 
 
 @pytest.fixture(scope="session")
@@ -166,7 +202,7 @@ def rewards_amount():
 # whether or not a strategy is clonable. if true, don't forget to update what our cloning function is called in test_cloning.py
 @pytest.fixture(scope="session")
 def is_clonable():
-    is_clonable = False
+    is_clonable = True
     yield is_clonable
 
 
@@ -201,7 +237,7 @@ def gauge_is_not_tokenized():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = True
+    no_profit = False
     yield no_profit
 
 
@@ -498,7 +534,7 @@ if chain_used == 1:  # mainnet
         booster,
         convexToken,
         test_gauge,
-        proxy,
+        new_proxy,
         accounts,
         pid,
         frax_booster,
@@ -509,7 +545,7 @@ if chain_used == 1:  # mainnet
             StrategyCurveBoostedFactoryClonable,
             test_vault,
             new_trade_factory,
-            proxy,
+            new_proxy,
             test_gauge,
             10_000 * 1e6,
             25_000 * 1e6,
@@ -564,32 +600,24 @@ if chain_used == 1:  # mainnet
             25_000 * 1e6,
             frax_booster,
         )
-        print("Successfully cloned")
+        print("Successfully cloned", cloned_strategy.return_value)
+        clone_contract = StrategyConvexFraxFactoryClonable.at(
+            cloned_strategy.return_value
+        )
+        print("Cloned strategy:", clone_contract.name())
 
         yield frax_template
 
     @pytest.fixture(scope="module")
     def curve_global(
         CurveGlobal,
-        StrategyConvexFactoryClonable,
-        StrategyCurveBoostedFactoryClonable,
-        StrategyConvexFraxFactoryClonable,
-        StrategyProxy,
-        new_trade_factory,
-        test_vault,
         strategist,
         new_registry,
         gov,
-        booster,
-        convexToken,
-        test_gauge,
         accounts,
-        pid,
-        frax_booster,
         convex_template,
         curve_template,
         frax_template,
-        voter,
     ):
         # before we deploy our first vault, we need to update to the latest release (0.4.5)
         release_registry = Contract(new_registry.releaseRegistry())
@@ -617,14 +645,132 @@ if chain_used == 1:  # mainnet
         yield factory
 
     @pytest.fixture(scope="module")
-    def proxy(StrategyProxy, gov):
+    def new_proxy(StrategyProxy, gov):
         # deploy our new strategy proxy
         strategy_proxy = gov.deploy(StrategyProxy)
         yield strategy_proxy
 
+    @pytest.fixture(scope="session")
+    def old_proxy():
+        yield Contract("0xA420A63BbEFfbda3B147d0585F1852C358e2C152")
+
+    @pytest.fixture(scope="module")
+    def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
+        Vault = pm(config["dependencies"][0]).Vault
+        vault = guardian.deploy(Vault)
+        vault.initialize(token, gov, rewards, "", "", guardian)
+        vault.setDepositLimit(2**256 - 1, {"from": gov})
+        vault.setManagement(management, {"from": gov})
+        chain.sleep(1)
+        chain.mine(1)
+        yield vault
+
     # replace the first value with the name of your strategy
     @pytest.fixture(scope="module")
     def strategy(
+        StrategyConvexFactoryClonable,
+        StrategyCurveBoostedFactoryClonable,
+        StrategyConvexFraxFactoryClonable,
+        strategist,
+        keeper,
+        gov,
+        accounts,
+        token,
+        healthCheck,
+        chain,
+        Contract,
+        pid,
+        gasOracle,
+        strategist_ms,
+        gauge,
+        which_strategy,
+        old_proxy,
+        voter,
+        new_trade_factory,
+        convexToken,
+        booster,
+        frax_booster,
+        frax_pid,
+        staking_address,
+        vault,
+    ):
+
+        if which_strategy == 0:  # convex
+            strategy = strategist.deploy(
+                StrategyConvexFactoryClonable,
+                vault,
+                new_trade_factory,
+                pid,
+                10_000 * 1e6,
+                25_000 * 1e6,
+                booster,
+                convexToken,
+            )
+        elif which_strategy == 1:  # curve
+            strategy = strategist.deploy(
+                StrategyCurveBoostedFactoryClonable,
+                vault,
+                new_trade_factory,
+                old_proxy,
+                gauge,
+                10_000 * 1e6,
+                25_000 * 1e6,
+            )
+        else:  # frax
+            strategy = strategist.deploy(
+                StrategyConvexFraxFactoryClonable,
+                vault,
+                new_trade_factory,
+                frax_pid,
+                staking_address,
+                10_000 * 1e6,
+                25_000 * 1e6,
+                frax_booster,
+            )
+
+        strategy.setKeeper(keeper, {"from": gov})
+
+        # set our management fee to zero so it doesn't mess with our profit checking
+        vault.setManagementFee(0, {"from": gov})
+
+        # we will be migrating on our live vault instead of adding it directly
+        if which_strategy == 0:
+            # earmark rewards if we are using a convex strategy
+            booster.earmarkRewards(pid, {"from": gov})
+            chain.sleep(1)
+            chain.mine(1)
+
+            vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+            print("New Vault, Convex Strategy")
+            chain.sleep(1)
+            chain.mine(1)
+
+            # this is the same for new or existing vaults
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
+        elif which_strategy == 1:
+            vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
+            print("New Vault, Curve Strategy")
+            chain.sleep(1)
+            chain.mine(1)
+
+            # approve our new strategy on the proxy
+            old_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
+
+        # turn our oracle into testing mode by setting the provider to 0x00, should default to true
+        strategy.setBaseFeeOracle(gasOracle, {"from": strategist_ms})
+        gasOracle = Contract(strategy.baseFeeOracle())
+        oracle_gov = accounts.at(gasOracle.governance(), force=True)
+        gasOracle.setBaseFeeProvider(ZERO_ADDRESS, {"from": oracle_gov})
+        strategy.setHealthCheck(healthCheck, {"from": gov})
+        assert strategy.isBaseFeeAcceptable() == True
+
+        # set up custom params and setters
+        strategy.setMaxReportDelay(86400 * 21, {"from": gov})
+
+        yield strategy
+
+    @pytest.fixture(scope="module")
+    def factory_vault(
         StrategyConvexFactoryClonable,
         StrategyCurveBoostedFactoryClonable,
         StrategyConvexFraxFactoryClonable,
@@ -707,13 +853,3 @@ if chain_used == 1:  # mainnet
         gasOracle.setBaseFeeProvider(ZERO_ADDRESS, {"from": oracle_gov})
         strategy.setHealthCheck(healthCheck, {"from": gov})
         assert strategy.isBaseFeeAcceptable() == True
-
-        chain.sleep(1)
-        strategy.harvest({"from": strategist_ms})
-        chain.sleep(1)
-        yield strategy
-
-    @pytest.fixture(scope="module")
-    def vault(strategy):
-        vault_address = strategy.vault()
-        yield Contract(vault_address)

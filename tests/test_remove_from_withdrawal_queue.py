@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test removing a strategy from the withdrawal queue
 def test_remove_from_withdrawal_queue(
     gov,
     token,
@@ -12,6 +12,8 @@ def test_remove_from_withdrawal_queue(
     strategy,
     chain,
     amount,
+    profit_amount,
+    profit_whale,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -24,6 +26,7 @@ def test_remove_from_withdrawal_queue(
     # simulate one day of earnings
     chain.sleep(86400)
     chain.mine(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     chain.sleep(1)
     before = strategy.estimatedTotalAssets()
