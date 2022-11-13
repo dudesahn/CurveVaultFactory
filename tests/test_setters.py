@@ -75,7 +75,7 @@ def test_setters(
             strategy.updateLocalKeepCrvs(1000000, 0, {"from": gov})
         with brownie.reverts():
             strategy.updateLocalKeepCrvs(0, 100000000, {"from": gov})
-    if which_strategy == 1:
+    elif which_strategy == 1:
         strategy.updateLocalKeepCrv(10, {"from": gov})
         
         # test our reverts as well
