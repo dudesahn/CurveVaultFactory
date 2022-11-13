@@ -17,7 +17,6 @@ def test_triggers(
     strategist_ms,
     is_slippery,
     no_profit,
-    is_convex,
     sleep_time,
     profit_amount,
     profit_whale,

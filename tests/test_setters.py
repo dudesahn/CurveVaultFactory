@@ -14,7 +14,6 @@ def test_setters(
     amount,
     gasOracle,
     strategist_ms,
-    is_convex,
     profit_amount,
     profit_whale,
     which_strategy,
