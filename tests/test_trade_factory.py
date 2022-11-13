@@ -23,6 +23,7 @@ def test_keepers(
     sleep_time,
     profit_whale,
     profit_amount,
+    which_strategy,
 ):
     rando = accounts[5]
     ## deposit to the vault after approving
@@ -46,33 +47,40 @@ def test_keepers(
     chain.sleep(1)
 
     assert crv.balanceOf(strategy) > 0
-    assert convexToken.balanceOf(strategy) > 0
+    if which_strategy != 1:
+        assert convexToken.balanceOf(strategy) > 0
 
     # rando cant sweep
     with brownie.reverts():
         crv.transferFrom(strategy, rando, crv.balanceOf(strategy) / 2, {"from": rando})
-    with brownie.reverts():
-        convexToken.transferFrom(strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": rando})
+    if which_strategy != 1:
+        with brownie.reverts():
+            convexToken.transferFrom(strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": rando})
 
     crv.transferFrom(
         strategy, rando, crv.balanceOf(strategy) / 2, {"from": new_trade_factory}
     )
-    convexToken.transferFrom(
-        strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
-    )
+    
+    if which_strategy != 1:
+        convexToken.transferFrom(
+            strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
+        )
 
     strategy.removeTradeFactoryPermissions({"from": gov})
     assert crv.balanceOf(strategy) > 0
-    assert convexToken.balanceOf(strategy) > 0
-    # trae factory now cant sweep
+    if which_strategy != 1:
+        assert convexToken.balanceOf(strategy) > 0
+    
+    # trade factory now cant sweep
     with brownie.reverts():
         crv.transferFrom(
             strategy, rando, crv.balanceOf(strategy) / 2, {"from": new_trade_factory}
         )
-    with brownie.reverts():
-        convexToken.transferFrom(
-            strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
-        )
+    if which_strategy != 1:
+        with brownie.reverts():
+            convexToken.transferFrom(
+                strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
+            )
 
     # cahnge permissions
     strategy.updateTradeFactory(new_trade_factory, {"from": gov})
@@ -80,6 +88,9 @@ def test_keepers(
     crv.transferFrom(
         strategy, rando, crv.balanceOf(strategy) / 2, {"from": new_trade_factory}
     )
-    convexToken.transferFrom(
-        strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
-    )
+    if which_strategy != 1:
+        convexToken.transferFrom(
+            strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
+        )
+
+    

@@ -132,11 +132,12 @@ def test_triggers(
     chain.sleep(sleep_time)
     chain.mine(1)
 
-    # harvest should trigger false due to high gas price
-    gasOracle.setMaxAcceptableBaseFee(1 * 1e9, {"from": strategist_ms})
+    # harvest should trigger false because of oracle
+    gasOracle.setManualBaseFeeBool(False, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
+    gasOracle.setManualBaseFeeBool(True, {"from": gov})
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
