@@ -240,11 +240,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
         // set our curve gauge contract
         gauge = address(_gauge);
-        
+
         // set up our min and max delays
         minReportDelay = 21 days;
         maxReportDelay = 365 days;
-        
+
         // setup our voter
         curveVoter = 0xF147b8125d2ef93FB6965Db97D6746952a133934;
 
@@ -521,9 +521,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         }
     }
 
-    function updateVoter(
-        address _curveVoter
-    ) external onlyGovernance {
+    function updateVoter(address _curveVoter) external onlyGovernance {
         curveVoter = _curveVoter;
     }
 
