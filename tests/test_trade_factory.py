@@ -1,5 +1,5 @@
 import brownie
-from brownie import Contract
+from brownie import Contract, ZERO_ADDRESS
 from brownie import config
 import math
 
@@ -67,6 +67,11 @@ def test_keepers(
         )
 
     strategy.removeTradeFactoryPermissions({"from": gov})
+    assert strategy.tradeFactory() == ZERO_ADDRESS
+    
+    # do it twice to hit both arms of the if statement
+    strategy.removeTradeFactoryPermissions({"from": gov})
+    
     assert crv.balanceOf(strategy) > 0
     if which_strategy != 1:
         assert convexToken.balanceOf(strategy) > 0
@@ -82,15 +87,18 @@ def test_keepers(
                 strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
             )
 
-    # cahnge permissions
+    # change permissions
     strategy.updateTradeFactory(new_trade_factory, {"from": gov})
 
     crv.transferFrom(
         strategy, rando, crv.balanceOf(strategy) / 2, {"from": new_trade_factory}
     )
+
     if which_strategy != 1:
         convexToken.transferFrom(
             strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
         )
 
-    
+    # update again
+    strategy.updateTradeFactory(new_trade_factory, {"from": gov})
+    strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})

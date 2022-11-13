@@ -551,7 +551,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     // Use to turn off extra rewards claiming and selling.
-    //  ******************************************** DOES THE TRADE FACTORY ALWAYS CHECK REWARDS[] TO SEE WHAT ELSE IT SHOULD TRANSFER?!?!
     function turnOffRewards() external onlyGovernance {
         delete rewardsTokens;
     }

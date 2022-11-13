@@ -56,6 +56,9 @@ def test_odds_and_ends(
         # set claim rewards to true and send away CRV and CVX so we don't have dust leftover, this is a problem with uni v3
         strategy.setClaimRewards(True, {"from": gov})
         strategy.withdrawToConvexDepositTokens({"from": gov})
+        chain.sleep(1)
+        # call this again to hit both sides of the if statement
+        strategy.withdrawToConvexDepositTokens({"from": gov})
         to_send = cvxDeposit.balanceOf(strategy)
         print("cvxToken Balance of Strategy", to_send)
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
