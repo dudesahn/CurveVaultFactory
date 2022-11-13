@@ -57,27 +57,32 @@ def test_keepers(
         crv.transferFrom(strategy, rando, crv.balanceOf(strategy) / 2, {"from": rando})
     if which_strategy != 1:
         with brownie.reverts():
-            convexToken.transferFrom(strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": rando})
+            convexToken.transferFrom(
+                strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": rando}
+            )
 
     crv.transferFrom(
         strategy, rando, crv.balanceOf(strategy) / 2, {"from": new_trade_factory}
     )
-    
+
     if which_strategy != 1:
         convexToken.transferFrom(
-            strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
+            strategy,
+            rando,
+            convexToken.balanceOf(strategy) / 2,
+            {"from": new_trade_factory},
         )
 
     strategy.removeTradeFactoryPermissions({"from": gov})
     assert strategy.tradeFactory() == ZERO_ADDRESS
-    
+
     # do it twice to hit both arms of the if statement
     strategy.removeTradeFactoryPermissions({"from": gov})
-    
+
     assert crv.balanceOf(strategy) > 0
     if which_strategy != 1:
         assert convexToken.balanceOf(strategy) > 0
-    
+
     # trade factory now cant sweep
     with brownie.reverts():
         crv.transferFrom(
@@ -86,7 +91,10 @@ def test_keepers(
     if which_strategy != 1:
         with brownie.reverts():
             convexToken.transferFrom(
-                strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
+                strategy,
+                rando,
+                convexToken.balanceOf(strategy) / 2,
+                {"from": new_trade_factory},
             )
 
     # change permissions
@@ -98,12 +106,15 @@ def test_keepers(
 
     if which_strategy != 1:
         convexToken.transferFrom(
-            strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": new_trade_factory}
+            strategy,
+            rando,
+            convexToken.balanceOf(strategy) / 2,
+            {"from": new_trade_factory},
         )
 
     # update again
     strategy.updateTradeFactory(new_trade_factory, {"from": gov})
-    
+
     # update rewards
     if which_strategy == 1:
         strategy.updateRewards([rewards_token.address], {"from": gov})
@@ -120,7 +131,6 @@ def test_keepers(
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
         chain.sleep(1)
-    
+
     # set trade factory to zero
     strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})
-    

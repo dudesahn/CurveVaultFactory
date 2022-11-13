@@ -46,13 +46,13 @@ def test_triggers(
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
     strategy.setCreditThreshold(1e24, {"from": gov})
-    
+
     # harvest the credit
     chain.sleep(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    
+
     # should trigger false, nothing is ready yet
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)

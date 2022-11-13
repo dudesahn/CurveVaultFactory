@@ -74,6 +74,7 @@ def test_change_debt_with_profit(
         abs_tol=1e18,
     )
 
+
 # test changing the debtRatio on a strategy, donating some assets, and then harvesting it
 def test_change_debt_with_profit_some_lost(
     gov,
@@ -116,7 +117,7 @@ def test_change_debt_with_profit_some_lost(
     if which_strategy == 0:
         # set claim rewards to true and send away CRV and CVX so we don't have dust leftover
         strategy.setClaimRewards(True, {"from": gov})
-        
+
         # impersonate strategy to manually unwrap the funds and send back to strategy
         to_withdraw = amount / 11
         rewardsContract.withdraw(to_withdraw, True, {"from": strategy})
@@ -163,7 +164,7 @@ def test_change_debt_with_profit_some_lost(
 
     # check that we've recorded a gain
     assert profit > 0
-    
+
     # check the difference between our loss (manual withdrawal) and donation
     to_check = donation - to_withdraw
     assert to_check > 0
@@ -191,6 +192,7 @@ def test_change_debt_with_profit_some_lost(
         strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
         abs_tol=1e18,
     )
+
 
 # test changing the debtRatio on a strategy, donating some assets, and then harvesting it
 def test_change_debt_with_profit_all_lost(
@@ -285,6 +287,6 @@ def test_change_debt_with_profit_all_lost(
 
     # check that we had a big loss
     assert new_params["totalLoss"] > prev_params["totalLoss"]
-    
+
     # check that we have some assets left
     assert strategy.estimatedTotalAssets() > 0

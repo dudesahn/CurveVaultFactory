@@ -107,7 +107,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     address public gauge; // Curve gauge contract, most are tokenized, held by Yearn's voter
     uint256 public localKeepCRV;
 
-    address public constant voter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter
+    address public curveVoter; // Yearn's veCRV voter
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
     IConvexRewards public rewardsContract; // This is unique to each curve pool
 
@@ -244,6 +244,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         // set up our min and max delays
         minReportDelay = 21 days;
         maxReportDelay = 365 days;
+        
+        // setup our voter
+        curveVoter = 0xF147b8125d2ef93FB6965Db97D6746952a133934;
 
         // our factory checks the latest proxy from curve voter and passes it here
         proxy = ICurveStrategyProxy(_proxy);
@@ -302,7 +305,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
                 uint256 _sendToVoter = (_crvBalance * _localKeepCRV) /
                     FEE_DENOMINATOR;
                 if (_sendToVoter > 0) {
-                    crv.safeTransfer(voter, _sendToVoter);
+                    crv.safeTransfer(curveVoter, _sendToVoter);
                 }
             }
         }
@@ -516,6 +519,12 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         if (_newTradeFactory != address(0)) {
             _setUpTradeFactory();
         }
+    }
+
+    function updateVoter(
+        address _curveVoter
+    ) external onlyGovernance {
+        curveVoter = _curveVoter;
     }
 
     // once this is called setupTradefactory must be called to get things working again
