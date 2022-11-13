@@ -3,7 +3,7 @@ from brownie import Contract
 from brownie import config
 import math
 
-
+# test revoking a strategy from the vault
 def test_revoke_strategy_from_vault(
     gov,
     token,
@@ -12,6 +12,11 @@ def test_revoke_strategy_from_vault(
     chain,
     strategy,
     amount,
+    is_slippery,
+    no_profit,
+    sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -21,8 +26,8 @@ def test_revoke_strategy_from_vault(
     chain.sleep(1)
     strategy.harvest({"from": gov})
 
-    # wait a day
-    chain.sleep(86400)
+    # sleep to earn some yield
+    chain.sleep(sleep_time)
     chain.mine(1)
 
     vaultAssets_starting = vault.totalAssets()
@@ -31,6 +36,7 @@ def test_revoke_strategy_from_vault(
     vault.revokeStrategy(strategy.address, {"from": gov})
 
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     chain.sleep(1)
     vaultAssets_after_revoke = vault.totalAssets()
@@ -46,6 +52,12 @@ def test_revoke_strategy_from_vault(
     chain.sleep(86400)
     chain.mine(1)
 
-    # withdraw and confirm we made money
+    # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    assert token.balanceOf(whale) >= startingWhale
+    if is_slippery and no_profit:
+        assert (
+            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
+            or token.balanceOf(whale) >= startingWhale
+        )
+    else:
+        assert token.balanceOf(whale) >= startingWhale
