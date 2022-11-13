@@ -18,7 +18,7 @@ def test_cloning(
     whale,
     strategy,
     chain,
-    old_proxy,
+    new_proxy,
     strategist_ms,
     new_trade_factory,
     rewardsContract,
@@ -41,6 +41,7 @@ def test_cloning(
     no_profit,
     rewards_token,
     is_clonable,
+    has_rewards,
 ):
 
     # skip this test if we don't clone
@@ -70,7 +71,7 @@ def test_cloning(
                 rewards,
                 keeper,
                 new_trade_factory,
-                old_proxy,
+                new_proxy,
                 gauge,
                 10_000 * 1e6,
                 25_000 * 1e6,
@@ -165,7 +166,7 @@ def test_cloning(
                     rewards,
                     keeper,
                     new_trade_factory,
-                    old_proxy,
+                    new_proxy,
                     gauge,
                     10_000 * 1e6,
                     25_000 * 1e6,
@@ -177,7 +178,7 @@ def test_cloning(
                 rewards,
                 keeper,
                 new_trade_factory,
-                old_proxy,
+                new_proxy,
                 gauge,
                 10_000 * 1e6,
                 25_000 * 1e6,
@@ -194,7 +195,7 @@ def test_cloning(
                     rewards,
                     keeper,
                     new_trade_factory,
-                    old_proxy,
+                    new_proxy,
                     gauge,
                     10_000 * 1e6,
                     25_000 * 1e6,
@@ -209,7 +210,7 @@ def test_cloning(
                     rewards,
                     keeper,
                     new_trade_factory,
-                    old_proxy,
+                    new_proxy,
                     gauge,
                     10_000 * 1e6,
                     25_000 * 1e6,
@@ -291,11 +292,11 @@ def test_cloning(
     assert vault.strategies(strategy)["debtRatio"] == 0
 
     # add rewards token if needed
-    #     if has_rewards:
-    #         if which_strategy == 1:
-    #             newStrategy.updateRewards(True, 0, {"from": gov})
-    #         else:
-    #             newStrategy.updateRewards(True, rewards_token, {"from": gov})
+    if has_rewards:
+        if which_strategy == 1:
+            newStrategy.updateRewards([rewards_token], {"from": gov})
+        else:
+            newStrategy.updateRewards({"from": gov})
 
     ## deposit to the vault after approving; this is basically just our simple_harvest test
     before_pps = vault.pricePerShare()
@@ -305,7 +306,7 @@ def test_cloning(
 
     # harvest, store asset amount
     if which_strategy == 1:  # make sure to update our proxy if a curve strategy
-        old_proxy.approveStrategy(strategy.gauge(), newStrategy, {"from": gov})
+        new_proxy.approveStrategy(strategy.gauge(), newStrategy, {"from": gov})
     newStrategy.harvest({"from": gov})
     chain.sleep(1)
     old_assets = vault.totalAssets()
@@ -327,7 +328,7 @@ def test_cloning(
     chain.mine(1)
 
     # harvest after a day, store new asset amount
-    token.transfer(strategy, profit_amount, {"from": profit_whale})
+    token.transfer(newStrategy, profit_amount, {"from": profit_whale})
     newStrategy.harvest({"from": gov})
     new_assets = vault.totalAssets()
 

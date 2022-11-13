@@ -17,7 +17,7 @@ def test_odds_and_ends(
     whale,
     strategy,
     chain,
-    old_proxy,
+    new_proxy,
     strategist_ms,
     new_trade_factory,
     booster,
@@ -114,7 +114,7 @@ def test_odds_and_ends(
             StrategyCurveBoostedFactoryClonable,
             vault,
             new_trade_factory,
-            old_proxy,
+            new_proxy,
             gauge,
             10_000 * 1e6,
             25_000 * 1e6,
@@ -143,7 +143,7 @@ def test_odds_and_ends(
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     if which_strategy == 1:
-        old_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
+        new_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -255,7 +255,7 @@ def test_odds_and_ends_migration(
     whale,
     strategy,
     chain,
-    old_proxy,
+    new_proxy,
     strategist_ms,
     new_trade_factory,
     booster,
@@ -298,7 +298,7 @@ def test_odds_and_ends_migration(
             StrategyCurveBoostedFactoryClonable,
             vault,
             new_trade_factory,
-            old_proxy,
+            new_proxy,
             gauge,
             10_000 * 1e6,
             25_000 * 1e6,
@@ -328,7 +328,7 @@ def test_odds_and_ends_migration(
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
     if which_strategy == 1:
-        old_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
+        new_proxy.approveStrategy(strategy.gauge(), new_strategy, {"from": gov})
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
