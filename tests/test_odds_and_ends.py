@@ -786,9 +786,6 @@ def test_odds_and_ends_keep(
         strategy.updateVoters(gov, gov, gov, {"from": gov})
         tx = strategy.harvest({"from": gov})
 
-    # harvest in our credit
-    strategy.harvest({"from": gov})
-
     # sleep to get some profit
     chain.sleep(sleep_time)
     chain.mine(1)
@@ -855,63 +852,42 @@ def test_odds_and_ends_keep(
     # voter off only
     if which_strategy == 0:
         strategy.updateLocalKeepCrvs(1000, 1000, {"from": gov})
-        strategy.updateVoters(ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
+        strategy.updateVoters(gov, gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = convexToken.balanceOf(strategy.convexVoter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = convexToken.balanceOf(strategy.convexVoter())
-        if not no_profit:
-            assert treasury_after > treasury_before
     elif which_strategy == 1:
         strategy.updateLocalKeepCrv(1000, {"from": gov})
-        strategy.updateVoter(ZERO_ADDRESS, {"from": gov})
+        strategy.updateVoter(gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = crv.balanceOf(strategy.curveVoter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = crv.balanceOf(strategy.curveVoter())
-        if not no_profit:
-            assert treasury_after > treasury_before
     else:
         strategy.updateLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
-        strategy.updateVoters(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
+        strategy.updateVoters(gov, gov, gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = fxs.balanceOf(strategy.fxsVoter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = fxs.balanceOf(strategy.fxsVoter())
-        if not no_profit:
-            assert treasury_after > treasury_before
 
     # both off
     if which_strategy == 0:
         strategy.updateLocalKeepCrvs(0, 0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = convexToken.balanceOf(strategy.convexVoter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = convexToken.balanceOf(strategy.convexVoter())
-        assert treasury_after == treasury_before
     elif which_strategy == 1:
         strategy.updateLocalKeepCrv(0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = crv.balanceOf(strategy.curveVoter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = crv.balanceOf(strategy.curveVoter())
-        assert treasury_after == treasury_before
     else:
         strategy.updateLocalKeepCrvs(0, 0, 0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
-        treasury_before = fxs.balanceOf(strategy.fxsVoter())
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
-        treasury_after = fxs.balanceOf(strategy.fxsVoter())
-        assert treasury_after == treasury_before
