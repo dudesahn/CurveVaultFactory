@@ -24,15 +24,14 @@ def test_triggers(
     which_strategy,
 ):
 
-    # convex inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
+    # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
     gasOracle.setMaxAcceptableBaseFee(10000 * 1e9, {"from": strategist_ms})
     currentDebtRatio = vault.strategies(strategy)["debtRatio"]
     vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-    if is_convex:
-        strategy.harvest({"from": gov})
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be false.", tx)
-        assert tx == False
+    strategy.harvest({"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
     vault.updateStrategyDebtRatio(strategy, currentDebtRatio, {"from": gov})
 
     ## deposit to the vault after approving
@@ -42,30 +41,23 @@ def test_triggers(
     newWhale = token.balanceOf(whale)
     starting_assets = vault.totalAssets()
 
-    if which_strategy != 1:
-        # update our min credit so harvest triggers true
-        strategy.setCreditThreshold(1, {"from": gov})
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be true.", tx)
-        assert tx == True
-        strategy.setCreditThreshold(1e24, {"from": gov})
-
-        # harvest the credit
-        chain.sleep(1)
-        strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
-
-        # should trigger false, nothing is ready yet
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be false.", tx)
-        assert tx == False
-    else:
-        # harvest the credit
-        chain.sleep(1)
-        strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
+    # update our min credit so harvest triggers true
+    strategy.setCreditThreshold(1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+    strategy.setCreditThreshold(1e24, {"from": gov})
+    
+    # harvest the credit
+    chain.sleep(1)
+    strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    
+    # should trigger false, nothing is ready yet
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
 
     # simulate earnings
     chain.sleep(sleep_time)
