@@ -25,6 +25,9 @@ def test_simple_harvest(
     accounts,
     booster,
     pid,
+    which_strategy,
+    profit_amount,
+    profit_whale,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -35,7 +38,7 @@ def test_simple_harvest(
     chain.mine(1)
 
     # this is part of our check into the staking contract balance
-    if is_convex:
+    if which_strategy == 0:
         stakingBeforeHarvest = rewardsContract.balanceOf(strategy)
     else:
         stakingBeforeHarvest = strategy.stakedBalance()
@@ -52,7 +55,7 @@ def test_simple_harvest(
     print("Starting Assets: ", old_assets / 1e18)
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
-    if is_convex:
+    if which_strategy == 0:
         stakingBeforeHarvest < rewardsContract.balanceOf(strategy)
     else:
         stakingBeforeHarvest < strategy.stakedBalance()
@@ -63,6 +66,7 @@ def test_simple_harvest(
 
     # harvest, store new asset amount
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     new_assets = vault.totalAssets()
@@ -72,7 +76,7 @@ def test_simple_harvest(
 
     # Display estimated APR
     print(
-        "\nEstimated agEUR APR: ",
+        "\nEstimated APR: ",
         "{:.2%}".format(
             ((new_assets - old_assets) * (365 * 86400 / sleep_time))
             / (strategy.estimatedTotalAssets())
@@ -83,7 +87,7 @@ def test_simple_harvest(
         assert tx.events["Harvested"]["profit"] > 0
 
     # simulate some profits if we don't have any to make sure everything else works
-    if no_profit:
+    if which_strategy != 1:
         if is_convex:
             # have our crv whale donate directly to the rewards contract to make sure our triggers work
             crv_whale = accounts.at(
@@ -96,11 +100,11 @@ def test_simple_harvest(
             booster.earmarkRewards(pid, {"from": gov})
             chain.sleep(1)
             chain.mine(1)
-            assert strategy.claimableProfitInUsdt() > 0
+            assert strategy.claimableProfitInUsdc() > 0
 
             # update our minProfit so our harvest triggers true
             strategy.setHarvestTriggerParams(
-                1, 1000000000e6, 1e24, False, {"from": gov}
+                1, 1000000000e6, False, {"from": gov}
             )
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
@@ -108,7 +112,7 @@ def test_simple_harvest(
 
             # update our maxProfit so harvest triggers true
             strategy.setHarvestTriggerParams(
-                1000000000e6, 1, 1e24, False, {"from": gov}
+                1000000000e6, 1, False, {"from": gov}
             )
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
@@ -118,6 +122,7 @@ def test_simple_harvest(
             old_assets = vault.totalAssets()
             chain.sleep(sleep_time)
             chain.mine(1)
+            token.transfer(strategy, profit_amount, {"from": profit_whale})
             strategy.setDoHealthCheck(False, {"from": gov})
             tx = strategy.harvest({"from": gov})
             chain.sleep(1)
@@ -152,6 +157,7 @@ def test_simple_harvest(
             old_assets = vault.totalAssets()
             chain.sleep(1)
             chain.mine(1)
+            token.transfer(strategy, profit_amount, {"from": profit_whale})
             strategy.setDoHealthCheck(False, {"from": gov})
             tx = strategy.harvest({"from": gov})
             chain.sleep(1)
@@ -183,6 +189,7 @@ def test_simple_harvest(
             chain.sleep(1)
             chain.mine(1)
             strategy.setDoHealthCheck(False, {"from": gov})
+            token.transfer(strategy, profit_amount, {"from": profit_whale})
             tx = strategy.harvest({"from": gov})
             chain.sleep(1)
             chain.mine(1)
@@ -213,6 +220,7 @@ def test_simple_harvest(
         chain.sleep(1)
         chain.mine(1)
         strategy.setDoHealthCheck(False, {"from": gov})
+        token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
         chain.sleep(1)
         chain.mine(1)

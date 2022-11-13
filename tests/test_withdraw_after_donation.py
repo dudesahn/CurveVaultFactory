@@ -16,6 +16,8 @@ def test_withdraw_after_donation_1(
     is_slippery,
     no_profit,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -45,6 +47,7 @@ def test_withdraw_after_donation_1(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     tx = strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
@@ -92,6 +95,8 @@ def test_withdraw_after_donation_2(
     is_slippery,
     no_profit,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -120,6 +125,7 @@ def test_withdraw_after_donation_2(
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     chain.sleep(1)
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
@@ -168,6 +174,8 @@ def test_withdraw_after_donation_3(
     is_slippery,
     no_profit,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -201,6 +209,7 @@ def test_withdraw_after_donation_3(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
@@ -248,6 +257,8 @@ def test_withdraw_after_donation_4(
     is_slippery,
     no_profit,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -281,6 +292,7 @@ def test_withdraw_after_donation_4(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
@@ -331,6 +343,8 @@ def test_withdraw_after_donation_5(
     is_slippery,
     no_profit,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -360,6 +374,7 @@ def test_withdraw_after_donation_5(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
@@ -407,6 +422,8 @@ def test_withdraw_after_donation_6(
     is_slippery,
     no_profit,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -432,6 +449,7 @@ def test_withdraw_after_donation_6(
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
@@ -480,6 +498,8 @@ def test_withdraw_after_donation_7(
     no_profit,
     vault_address,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -518,6 +538,7 @@ def test_withdraw_after_donation_7(
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
 
     # check everywhere to make sure we emptied out the strategy
@@ -581,6 +602,8 @@ def test_withdraw_after_donation_8(
     no_profit,
     vault_address,
     sleep_time,
+    profit_amount,
+    profit_whale,
 ):
 
     ## deposit to the vault after approving
@@ -619,6 +642,7 @@ def test_withdraw_after_donation_8(
 
     # turn off health check since we just took big profit
     strategy.setDoHealthCheck(False, {"from": gov})
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
 
     # check everywhere to make sure we emptied out the strategy
