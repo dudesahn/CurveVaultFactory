@@ -17,6 +17,7 @@ def test_revoke_strategy_from_vault(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -34,6 +35,11 @@ def test_revoke_strategy_from_vault(
     vault_holdings_starting = token.balanceOf(vault)
     strategy_starting = strategy.estimatedTotalAssets()
     vault.revokeStrategy(strategy.address, {"from": gov})
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     chain.sleep(1)
     token.transfer(strategy, profit_amount, {"from": profit_whale})
@@ -51,6 +57,11 @@ def test_revoke_strategy_from_vault(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})

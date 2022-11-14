@@ -52,6 +52,12 @@ def test_simple_harvest(
     assert token.balanceOf(strategy) == 0
     assert strategy.estimatedTotalAssets() > 0
     print("Starting Assets: ", old_assets / 1e18)
+    
+    if which_strategy == 2:
+        staking_address = Contract(strategy.stakingAddress())
+        liq = staking_address.lockedLiquidityOf(strategy.userVault())
+        print("Locked stakes:", liq)
+        print("Next kek:", strategy.nextKek())
 
     # try and include custom logic here to check that funds are in the staking contract (if needed)
     if which_strategy == 0:
@@ -72,6 +78,12 @@ def test_simple_harvest(
     # confirm we made money, or at least that we have about the same
     assert new_assets >= old_assets
     print("\nAssets after 1 day: ", new_assets / 1e18)
+
+    if which_strategy == 2:
+        staking_address = Contract(strategy.stakingAddress())
+        liq = staking_address.lockedLiquidityOf(strategy.userVault())
+        print("Locked stakes:", liq)
+        print("Next kek:", strategy.nextKek())
 
     # Display estimated APR
     print(
@@ -238,9 +250,14 @@ def test_simple_harvest(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
-    vault.withdraw({"from": whale})
+    tx = vault.withdraw({"from": whale})
     if is_slippery and no_profit:
         assert (
             math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)

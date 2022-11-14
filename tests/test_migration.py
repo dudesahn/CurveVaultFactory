@@ -90,6 +90,11 @@ def test_migration(
 
     # sleep to collect earnings
     chain.sleep(sleep_time)
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     # migrate our old strategy
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})

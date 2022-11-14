@@ -18,6 +18,7 @@ def test_change_debt(
     no_profit,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -36,6 +37,10 @@ def test_change_debt(
     vault.updateStrategyDebtRatio(strategy, currentDebt / 2, {"from": gov})
     chain.sleep(sleep_time)
     token.transfer(strategy, profit_amount, {"from": profit_whale})
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
@@ -61,6 +66,11 @@ def test_change_debt(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
