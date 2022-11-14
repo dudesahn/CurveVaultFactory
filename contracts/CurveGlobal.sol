@@ -587,7 +587,7 @@ contract CurveGlobal {
         }
     }
 
-    function getFraxPid(
+    function getFraxInfo(
         uint256 _convexPid
     )
         public
@@ -813,12 +813,12 @@ contract CurveGlobal {
         }
 
         // check if we can add a convex frax strategy
-        (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxPid(
+        (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
             _pid
         );
         if (hasPool) {
             if (convexFraxStratImplementation == address(0)) {
-                // revert(); // dev: must set convex frax implementation first
+                revert(); // dev: must set convex frax implementation first
             } else {
                 convexFraxStrategy = _addConvexFraxStrategy(
                     _vault,
