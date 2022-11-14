@@ -280,16 +280,16 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             proxy.harvest(gauge);
-            uint256 _crvBalance = crv.balanceOf(address(this));
             uint256 _localKeepCRV = localKeepCRV;
-            if (_crvBalance > 0 && _localKeepCRV > 0) {
-                // keep some of our CRV to increase our boost
+            address _curveVoter = curveVoter;
+            if (_localKeepCRV > 0 && _curveVoter != address(0)) {
+                uint256 crvBalance = crv.balanceOf(address(this));
                 uint256 _sendToVoter;
                 unchecked {
-                    _sendToVoter = (_crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
+                    _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
                 }
                 if (_sendToVoter > 0) {
-                    crv.safeTransfer(curveVoter, _sendToVoter);
+                    crv.safeTransfer(_curveVoter, _sendToVoter);
                 }
             }
         }
@@ -338,11 +338,15 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     // migrate our want token to a new strategy if needed
     // also send over any CRV that is claimed; for migrations we definitely want to claim
     function prepareMigration(address _newStrategy) internal override {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            proxy.withdraw(gauge, address(want), _stakedBal);
+        uint256 stakedBal = stakedBalance();
+        if (stakedBal > 0) {
+            proxy.withdraw(gauge, address(want), stakedBal);
         }
-        crv.safeTransfer(_newStrategy, crv.balanceOf(address(this)));
+        uint256 crvBal = crv.balanceOf(address(this));
+
+        if (crvBal > 0) {
+            crv.safeTransfer(_newStrategy, crvBal);
+        }
     }
 
     /* ========== KEEP3RS ========== */
