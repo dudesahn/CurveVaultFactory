@@ -48,7 +48,7 @@ chain_used = 1
 # put our test pool's convex pid here
 @pytest.fixture(scope="session")
 def pid():
-    pid = 100  # 115 DOLA FRAXBP, 100 FRAX-USDC, 25 stETH
+    pid = 100  # 115 DOLA FRAXBP, 100 FRAX-USDC (do for frax), 25 stETH
     yield pid
 
 
@@ -105,7 +105,7 @@ def amount():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def profit_amount():
-    profit_amount = 5_000e18 # 5k for FRAX-USDC, 2 for stETH
+    profit_amount = 5_000e18  # 5k for FRAX-USDC, 2 for stETH
     yield profit_amount
 
 
@@ -709,8 +709,8 @@ if chain_used == 1:  # mainnet
                 10_000 * 1e6,
                 25_000 * 1e6,
             )
-            voter.setStrategy(new_proxy.address, {"from": gov})   
-            print("New Strategy Proxy setup")         
+            voter.setStrategy(new_proxy.address, {"from": gov})
+            print("New Strategy Proxy setup")
         else:  # frax
             strategy = strategist.deploy(
                 StrategyConvexFraxFactoryClonable,
@@ -729,7 +729,7 @@ if chain_used == 1:  # mainnet
         vault.setManagementFee(0, {"from": gov})
 
         # we will be migrating on our live vault instead of adding it directly
-        if which_strategy == 0: # convex
+        if which_strategy == 0:  # convex
             # earmark rewards if we are using a convex strategy
             booster.earmarkRewards(pid, {"from": gov})
             chain.sleep(1)
@@ -742,7 +742,7 @@ if chain_used == 1:  # mainnet
 
             # this is the same for new or existing vaults
             strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
-        elif which_strategy == 1: # Curve
+        elif which_strategy == 1:  # Curve
             vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
             print("New Vault, Curve Strategy")
             chain.sleep(1)
@@ -752,15 +752,14 @@ if chain_used == 1:  # mainnet
             new_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
             assert new_proxy.strategies(gauge.address) == strategy.address
             assert voter.strategy() == new_proxy.address
-        else: # frax
+        else:  # frax
             vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 1_000, {"from": gov})
             print("New Vault, Frax Strategy")
             chain.sleep(1)
             chain.mine(1)
 
             # this is the same for new or existing vaults
-            strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
-        
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
         # turn our oracle into testing mode by setting the provider to 0x00, should default to true
         strategy.setBaseFeeOracle(gasOracle, {"from": strategist_ms})
