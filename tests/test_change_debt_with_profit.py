@@ -137,7 +137,7 @@ def test_change_debt_with_profit_some_lost(
         if has_rewards:
             to_send = rewards_token.balanceOf(strategy)
             rewards_token.transfer(gov, to_send, {"from": strategy})
-    else:
+    elif which_strategy == 1:
         if gauge_is_not_tokenized:
             return
         # send all funds out of the gauge
@@ -149,6 +149,23 @@ def test_change_debt_with_profit_some_lost(
         if has_rewards:
             to_send = rewards_token.balanceOf(strategy)
             rewards_token.transfer(gov, to_send, {"from": strategy})
+    else:
+        if which_strategy == 2:
+            # wait another week so our frax LPs are unlocked
+            chain.sleep(86400 * 7)
+            chain.mine(1)
+        
+        # impersonate strategy to manually unwrap the funds and send back to strategy
+        to_withdraw = amount / 11
+        rewardsContract.withdraw(to_withdraw, True, {"from": strategy})
+        chain.sleep(1)
+        to_send = cvxDeposit.balanceOf(strategy)
+        print("cvxToken Balance of Strategy", to_send)
+        cvxDeposit.transfer(gov, to_send, {"from": strategy})
+        to_send = crv.balanceOf(strategy)
+        crv.transfer(gov, to_send, {"from": strategy})
+        to_send = convexToken.balanceOf(strategy)
+        convexToken.transfer(gov, to_send, {"from": strategy})
 
     # our whale donates dust to the vault, what a nice person!
     donation = amount / 10
