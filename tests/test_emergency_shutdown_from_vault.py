@@ -17,6 +17,7 @@ def test_emergency_shutdown_from_vault(
     no_profit,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -39,6 +40,12 @@ def test_emergency_shutdown_from_vault(
     # set emergency and exit, then confirm that the strategy has no funds
     vault.setEmergencyShutdown(True, {"from": gov})
     chain.sleep(1)
+
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+
     token.transfer(strategy, profit_amount, {"from": profit_whale})
     strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -47,11 +54,6 @@ def test_emergency_shutdown_from_vault(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-
-    if which_strategy == 2:
-        # wait another week so our frax LPs are unlocked
-        chain.sleep(86400 * 7)
-        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
