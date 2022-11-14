@@ -45,7 +45,7 @@ def test_emergency_exit(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
@@ -107,7 +107,7 @@ def test_emergency_exit_with_profit(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
@@ -185,7 +185,7 @@ def test_emergency_exit_with_loss(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
@@ -272,7 +272,7 @@ def test_emergency_exit_with_no_loss(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
@@ -311,7 +311,7 @@ def test_emergency_withdraw_method_0(
     profit_whale,
     which_strategy,
 ):
-    if which_strategy == 1:
+    if which_strategy != 0:
         return
 
     ## deposit to the vault after approving
@@ -369,7 +369,7 @@ def test_emergency_withdraw_method_1(
     profit_whale,
     which_strategy,
 ):
-    if which_strategy == 1:
+    if which_strategy != 0:
         return
 
     ## deposit to the vault after approving

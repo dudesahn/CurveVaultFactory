@@ -353,7 +353,7 @@ def test_cloning(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)

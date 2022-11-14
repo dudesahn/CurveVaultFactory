@@ -52,7 +52,7 @@ def test_simple_harvest(
     assert token.balanceOf(strategy) == 0
     assert strategy.estimatedTotalAssets() > 0
     print("Starting Assets: ", old_assets / 1e18)
-    
+
     if which_strategy == 2:
         staking_address = Contract(strategy.stakingAddress())
         liq = staking_address.lockedLiquidityOf(strategy.userVault())
@@ -250,7 +250,7 @@ def test_simple_harvest(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)

@@ -18,8 +18,8 @@ def test_vault_deployment(
 ):
     # deploying curve global with frax strategies doesn't work unless with tenderly
     if pid != 25:
-       if not tests_using_tenderly:
-           return
+        if not tests_using_tenderly:
+            return
 
     _pid = curve_global.getPid(gauge)
     assert _pid == pid

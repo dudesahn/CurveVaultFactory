@@ -109,11 +109,25 @@ def test_triggers(
         )
         assert tx == False
         strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
-    else:  # curve uses minDelay as well
+    elif which_strategy == 1:  # curve uses minDelay as well
         strategy.setMinReportDelay(sleep_time - 1)
         tx = strategy.harvestTrigger(0, {"from": gov})
         print("\nShould we harvest? Should be True.", tx)
         assert tx == True
+    else:
+        if not (is_slippery and no_profit):
+            # update our minProfit so our harvest triggers true
+            strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+            tx = strategy.harvestTrigger(0, {"from": gov})
+            print("\nShould we harvest? Should be true.", tx)
+            assert tx == True
+
+            # update our maxProfit so harvest triggers true
+            strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+            tx = strategy.harvestTrigger(0, {"from": gov})
+            print("\nShould we harvest? Should be true.", tx)
+            assert tx == True
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
     # harvest, wait
     chain.sleep(1)
@@ -129,6 +143,11 @@ def test_triggers(
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
     gasOracle.setManualBaseFeeBool(True, {"from": gov})
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})

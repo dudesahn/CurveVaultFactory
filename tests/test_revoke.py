@@ -35,7 +35,7 @@ def test_revoke_strategy_from_vault(
     vault_holdings_starting = token.balanceOf(vault)
     strategy_starting = strategy.estimatedTotalAssets()
     vault.revokeStrategy(strategy.address, {"from": gov})
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
@@ -57,7 +57,7 @@ def test_revoke_strategy_from_vault(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
