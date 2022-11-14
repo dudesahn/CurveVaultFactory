@@ -14,24 +14,6 @@ interface ITradeFactory {
     function disable(address, address) external;
 }
 
-interface IFeedRegistry {
-    function getFeed(address, address) external view returns (address);
-
-    function latestRoundData(
-        address,
-        address
-    )
-        external
-        view
-        returns (
-            uint80 roundId,
-            int256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        );
-}
-
 interface IConvexRewards {
     // strategy's staked balance in the synthetix staking contract
     function balanceOf(address account) external view returns (uint256);
@@ -302,8 +284,10 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             uint256 _localKeepCRV = localKeepCRV;
             if (_crvBalance > 0 && _localKeepCRV > 0) {
                 // keep some of our CRV to increase our boost
-                uint256 _sendToVoter = (_crvBalance * _localKeepCRV) /
-                    FEE_DENOMINATOR;
+                uint256 _sendToVoter;
+                unchecked {
+                    _sendToVoter = (_crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
+                }
                 if (_sendToVoter > 0) {
                     crv.safeTransfer(curveVoter, _sendToVoter);
                 }
@@ -322,7 +306,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
         // if assets are greater than debt, things are working great!
         if (assets >= debt) {
-            _profit = assets - debt;
+            unchecked {
+                _profit = assets - debt;
+            }
             _debtPayment = _debtOutstanding;
 
             uint256 toFree = _profit + _debtPayment;
@@ -335,13 +321,17 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
                     _debtPayment = freed;
                     _profit = 0;
                 } else {
-                    _profit = freed - _debtPayment;
+                    unchecked {
+                        _profit = freed - _debtPayment;
+                    }
                 }
             }
         }
         // if assets are less than debt, we are in trouble. should never happen. dont worry about withdrawing here just report profit
         else {
-            _loss = debt - assets;
+            unchecked {
+                _loss = debt - assets;
+            }
         }
     }
 
@@ -471,15 +461,21 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             // check if we have enough free funds to cover the withdrawal
             uint256 _stakedBal = stakedBalance();
             if (_stakedBal > 0) {
+                uint256 _neededFromStaked;
+                unchecked {
+                    _neededFromStaked = _amountNeeded - _wantBal;
+                }
                 proxy.withdraw(
                     gauge,
                     address(want),
-                    Math.min(_stakedBal, _amountNeeded - _wantBal)
+                    Math.min(_stakedBal, _neededFromStaked)
                 );
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
-            _loss = _amountNeeded - _liquidatedAmount;
+            unchecked {
+                _loss = _amountNeeded - _liquidatedAmount;
+            }
         } else {
             // we have enough balance to cover the liquidation available
             return (_amountNeeded, 0);
