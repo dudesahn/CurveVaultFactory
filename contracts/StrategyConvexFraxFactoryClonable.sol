@@ -182,9 +182,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     uint256 public lockTime;
     //A new "kek" is created each time we stake the LP token and a whole kek must be withdrawn during any withdraws
     //This is the max amount of Keks, we will allow the strat to have open at one time to limit withdraw loops
-    uint256 public maxKeks = 5;
+    uint256 public maxKeks;
     //The index of the next kek to be deposited for deposit/withdraw tracking
     uint256 public nextKek;
+    
+    uint256 public minToInvest;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -314,10 +316,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         harvestProfitMax = _harvestProfitMax;
 
         stakingAddress = IConvexFrax(_stakingAddress);
+        
+        maxKeks = 5;
 
         fraxPid = _fraxPid;
 
         lockTime = 604800; // default to minimum of 1 week
+        
+        minToInvest = 100e18;
 
         tradeFactory = _tradeFactory;
 
@@ -621,13 +627,18 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
+        
+        // don't bother with dust or no assets
+        if (_toInvest < minToInvest) {
+            return;
+        }
 
         // If we have already locked the max amount of keks, we need to withdraw the oldest one
         // and reinvest that alongside the new funds
         if (nextKek >= maxKeks && _toInvest > minDeposit) {
             //Get the oldest kek that could have funds in it
             IConvexFrax.LockedStake memory stake = stakingAddress
-                .lockedStakesOf(address(this))[nextKek - maxKeks];
+                .lockedStakesOf(address(userVault))[nextKek - maxKeks];
             //Make sure it hasnt already been withdrawn
             if (stake.amount > 0) {
                 //Withdraw funds and add them to the amount to deposit
@@ -637,9 +648,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 }
             }
         }
-
+        
+        
         userVault.stakeLockedCurveLp(_toInvest, lockTime);
-
         lastDeposit = block.timestamp;
         lastDepositAmount = _toInvest;
         nextKek++;
@@ -683,7 +694,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (_amount == 0) return;
 
         IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
-            address(this)
+            address(userVault)
         );
 
         uint256 i = nextKek > maxKeks ? nextKek - maxKeks : 0;
@@ -735,14 +746,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Returns the total amount that cannot yet be withdrawn from the staking contract
     function stillLockedStake() public view returns (uint256 stillLocked) {
         IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
-            address(this)
+            address(userVault)
         );
+        
         IConvexFrax.LockedStake memory stake;
         uint256 time = block.timestamp;
         uint256 _nextKek = nextKek;
         uint256 _maxKeks = maxKeks;
         uint256 i = _nextKek > _maxKeks ? _nextKek - _maxKeks : 0;
-        for (i; i < _nextKek; i++) {
+        
+        for (i; i < _nextKek; ++i) {
             stake = stakes[i];
 
             if (stake.ending_timestamp > time) {
@@ -758,7 +771,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Pass the index of the kek to withdraw as the param
     function manualWithdraw(uint256 index) external onlyEmergencyAuthorized {
         userVault.withdrawLockedAndUnwrap(
-            stakingAddress.lockedStakesOf(address(this))[index].kek_id
+            stakingAddress.lockedStakesOf(address(userVault))[index].kek_id
         );
     }
 
@@ -769,9 +782,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (_maxKeks < maxKeks && nextKek > _maxKeks) {
             uint256 toWithdraw = maxKeks - _maxKeks;
             IConvexFrax.LockedStake[] memory stakes = stakingAddress
-                .lockedStakesOf(address(this));
+                .lockedStakesOf(address(userVault));
             IConvexFrax.LockedStake memory stake;
-            for (uint256 i; i < toWithdraw; i++) {
+            for (uint256 i; i < toWithdraw; ++i) {
                 stake = stakes[nextKek - maxKeks + i];
 
                 //Need to make sure the kek can be withdrawn and is > 0

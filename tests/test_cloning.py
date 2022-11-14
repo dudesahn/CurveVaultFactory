@@ -225,9 +225,12 @@ def test_cloning(
                     strategist,
                     rewards,
                     keeper,
-                    pid,
-                    pool,
-                    strategy_name,
+                    new_trade_factory,
+                    frax_pid,
+                    staking_address,
+                    10_000 * 1e6,
+                    25_000 * 1e6,
+                    frax_booster,
                     {"from": gov},
                 )
 
@@ -254,6 +257,7 @@ def test_cloning(
                     strategist,
                     rewards,
                     keeper,
+                    new_trade_factory,
                     frax_pid,
                     staking_address,
                     10_000 * 1e6,
@@ -264,11 +268,12 @@ def test_cloning(
 
             ## shouldn't be able to clone a clone
             with brownie.reverts():
-                newStrategy.cloneConvexFraxBpRewards(
+                newStrategy.cloneStrategyConvexFrax(
                     vault,
                     strategist,
                     rewards,
                     keeper,
+                    new_trade_factory,
                     frax_pid,
                     staking_address,
                     10_000 * 1e6,
@@ -348,6 +353,11 @@ def test_cloning(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
+    
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})

@@ -18,6 +18,7 @@ def test_withdraw_after_donation_1(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -38,6 +39,10 @@ def test_withdraw_after_donation_1(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     vault.withdraw(donation / 2, {"from": whale})
 
     # simulate some earnings
@@ -97,6 +102,7 @@ def test_withdraw_after_donation_2(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -117,6 +123,10 @@ def test_withdraw_after_donation_2(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraw half of his donation, this ensures that we test withdrawing without pulling from the staked balance
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     vault.withdraw(donation / 2, {"from": whale})
 
     # simulate some earnings
@@ -176,6 +186,7 @@ def test_withdraw_after_donation_3(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -196,6 +207,10 @@ def test_withdraw_after_donation_3(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
@@ -259,6 +274,7 @@ def test_withdraw_after_donation_4(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -279,6 +295,10 @@ def test_withdraw_after_donation_4(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
@@ -345,6 +365,7 @@ def test_withdraw_after_donation_5(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -361,6 +382,10 @@ def test_withdraw_after_donation_5(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     withdrawal = donation + amount / 4
 
     # convert since our PPS isn't 1 (live vault!)
@@ -424,6 +449,7 @@ def test_withdraw_after_donation_6(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -440,6 +466,10 @@ def test_withdraw_after_donation_6(
     token.transfer(strategy, donation, {"from": whale})
 
     # have our whale withdraws more than his donation, ensuring we pull from strategy
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     vault.withdraw(donation / 2, {"from": whale})
 
     # simulate some earnings
@@ -500,6 +530,7 @@ def test_withdraw_after_donation_7(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -527,6 +558,10 @@ def test_withdraw_after_donation_7(
 
     # convert since our PPS isn't 1 (live vault!)
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
     # simulate some earnings
@@ -604,6 +639,7 @@ def test_withdraw_after_donation_8(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -631,6 +667,10 @@ def test_withdraw_after_donation_8(
 
     # convert since our PPS isn't 1 (live vault!)
     withdrawal_in_shares = withdrawal * 1e18 / vault.pricePerShare()
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     vault.withdraw(withdrawal_in_shares, {"from": whale})
 
     # simulate some earnings

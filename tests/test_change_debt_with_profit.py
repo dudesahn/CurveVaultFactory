@@ -15,6 +15,7 @@ def test_change_debt_with_profit(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
 
     ## deposit to the vault after approving
@@ -38,6 +39,10 @@ def test_change_debt_with_profit(
     strategy.setDoHealthCheck(False, {"from": gov})
     chain.sleep(1)
     chain.mine(1)
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     strategy.harvest({"from": gov})
     new_params = vault.strategies(strategy)
 
