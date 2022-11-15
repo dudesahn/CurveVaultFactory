@@ -892,9 +892,7 @@ contract CurveGlobal {
                 keeper,
                 tradeFactory,
                 address(proxy),
-                _gauge,
-                harvestProfitMinInUsdc,
-                harvestProfitMaxInUsdc
+                _gauge
             );
         IStrategy(curveStrategy).setHealthCheck(healthCheck);
 
