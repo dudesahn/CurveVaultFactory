@@ -513,7 +513,7 @@ if chain_used == 1:  # mainnet
             booster,
             convexToken,
         )
-        print("\nConvex Template:", convex_template)
+        print("\nConvex Template deployed:", convex_template)
 
         yield convex_template
 
@@ -544,10 +544,8 @@ if chain_used == 1:  # mainnet
             new_trade_factory,
             new_proxy,
             test_gauge,
-            10_000 * 1e6,
-            25_000 * 1e6,
         )
-        print("Curve Template:", curve_template)
+        print("Curve Template deployed:", curve_template)
 
         yield curve_template
 
@@ -583,25 +581,7 @@ if chain_used == 1:  # mainnet
             frax_booster,
         )
 
-        print("Frax Template:", frax_template)
-
-        cloned_strategy = frax_template.cloneStrategyConvexFrax(
-            test_vault,
-            test_vault.management(),
-            test_vault.rewards(),
-            frax_template.keeper(),
-            new_trade_factory,
-            27,  # this is using values for DOLX-FRAXBP since it's on that vault
-            "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab",  # this is using values for DOLX-FRAXBP since it's on that vault
-            10_000 * 1e6,
-            25_000 * 1e6,
-            frax_booster,
-        )
-        print("Successfully cloned", cloned_strategy.return_value)
-        clone_contract = StrategyConvexFraxFactoryClonable.at(
-            cloned_strategy.return_value
-        )
-        print("Cloned strategy:", clone_contract.name())
+        print("Frax Template deployed:", frax_template)
 
         yield frax_template
 
@@ -615,17 +595,11 @@ if chain_used == 1:  # mainnet
         convex_template,
         curve_template,
         frax_template,
+        voter,
+        new_proxy,
     ):
-        # before we deploy our first vault, we need to update to the latest release (0.4.5)
-        release_registry = Contract(new_registry.releaseRegistry())
-        template_vault_045 = "0xBb1988ab99d4839Af8b6c94853B890307770E48B"
-        release_registry_owner = accounts.at(release_registry.owner(), force=True)
-        release_registry.newRelease(
-            template_vault_045, {"from": release_registry_owner}
-        )
-
-        # then, deploy our factory
-        factory = strategist.deploy(
+        # deploy our factory
+        curve_global = strategist.deploy(
             CurveGlobal,
             new_registry,
             convex_template,
@@ -634,17 +608,15 @@ if chain_used == 1:  # mainnet
             gov,
         )
 
-        # once our factory is deployed, setup the factory from gov
-        registry_owner = accounts.at(new_registry.owner(), force=True)
-        new_registry.setApprovedVaultsOwner(factory, True, {"from": registry_owner})
-        new_registry.setRole(factory, False, True, {"from": registry_owner})
+        print("Curve factory deployed:", curve_global)
 
-        yield factory
+        yield curve_global
 
     @pytest.fixture(scope="module")
     def new_proxy(StrategyProxy, gov):
         # deploy our new strategy proxy
         strategy_proxy = gov.deploy(StrategyProxy)
+        print("New Strategy Proxy deployed:", strategy_proxy)
         yield strategy_proxy
 
     @pytest.fixture(scope="session")
@@ -710,8 +682,6 @@ if chain_used == 1:  # mainnet
                 new_trade_factory,
                 new_proxy,
                 gauge,
-                10_000 * 1e6,
-                25_000 * 1e6,
             )
             voter.setStrategy(new_proxy.address, {"from": gov})
             print("New Strategy Proxy setup")
