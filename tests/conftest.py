@@ -91,7 +91,7 @@ def test_staking_address():
 @pytest.fixture(scope="session")
 def which_strategy():
     # must be 0, 1, or 2 for convex, curve, and frax
-    which_strategy = 1
+    which_strategy = 2
     yield which_strategy
 
 
@@ -105,7 +105,7 @@ def amount():
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def profit_amount():
-    profit_amount = 5_000e18  # 5k for FRAX-USDC, 2 for stETH
+    profit_amount = 2_500e18  # 2.5k for FRAX-USDC, 2 for stETH
     yield profit_amount
 
 
