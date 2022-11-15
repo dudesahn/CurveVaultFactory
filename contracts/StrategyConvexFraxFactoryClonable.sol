@@ -154,8 +154,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     string internal stratName; // we use this to be able to adjust our strategy's name
 
     // convex-specific variables
-    uint256 public harvestProfitMin; // minimum size in USDC that we want to harvest
-    uint256 public harvestProfitMax; // maximum size in USDC that we want to harvest
+    uint256 public harvestProfitMinInUsdc; // minimum size in USDC that we want to harvest
+    uint256 public harvestProfitMaxInUsdc; // maximum size in USDC that we want to harvest
 
     // ySwaps stuff
     address public tradeFactory;
@@ -176,6 +176,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Most recent amount deposited
     uint256 public lastDepositAmount;
     uint256 public minDeposit;
+    uint256 public maxSingleDeposit;
 
     //This is the time the tokens are locked for when staked
     //Inititally set to the min time, 24hours, can be updated later if desired
@@ -185,7 +186,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     uint256 public maxKeks;
     //The index of the next kek to be deposited for deposit/withdraw tracking
     uint256 public nextKek;
-    
     uint256 public minToInvest;
 
     /* ========== CONSTRUCTOR ========== */
@@ -195,16 +195,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) BaseStrategy(_vault) {
         _initializeStrat(
             _tradeFactory,
             _fraxPid,
             _stakingAddress,
-            _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMinInUsdc,
+            _harvestProfitMaxInUsdc,
             _booster
         );
     }
@@ -222,8 +222,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) external returns (address newStrategy) {
         if (!isOriginal) {
@@ -255,8 +255,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             _tradeFactory,
             _fraxPid,
             _stakingAddress,
-            _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMinInUsdc,
+            _harvestProfitMaxInUsdc,
             _booster
         );
 
@@ -272,8 +272,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
@@ -281,8 +281,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             _tradeFactory,
             _fraxPid,
             _stakingAddress,
-            _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMinInUsdc,
+            _harvestProfitMaxInUsdc,
             _booster
         );
     }
@@ -292,8 +292,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) internal {
         // make sure that we haven't initialized this before
@@ -312,8 +312,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(userVault), type(uint256).max);
 
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
 
         stakingAddress = IConvexFrax(_stakingAddress);
         
@@ -324,8 +324,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         lockTime = 604800; // default to minimum of 1 week
         
         minToInvest = 100e18;
+        
+        maxSingleInvest = 500_000e18;
 
         tradeFactory = _tradeFactory;
+
+        // set up our min and max delays
+        minReportDelay = 21 days;
+        maxReportDelay = 365 days;
 
         _updateRewards();
         _setUpTradeFactory();
@@ -480,7 +486,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
         uint256 claimableProfit = claimableProfitInUsdc();
-        if (claimableProfit > harvestProfitMax) {
+        if (claimableProfit > harvestProfitMaxInUsdc) {
             return true;
         }
 
@@ -495,7 +501,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
 
         // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfit > harvestProfitMin) {
+        if (claimableProfit > harvestProfitMinInUsdc) {
             return true;
         }
 
@@ -632,6 +638,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (_toInvest < minToInvest) {
             return;
         }
+
+        if (_toInvest > maxSingleDeposit) {
+            _toInvest = maxSingleDeposit;
+        }
+        
 
         // If we have already locked the max amount of keks, we need to withdraw the oldest one
         // and reinvest that alongside the new funds
@@ -811,6 +822,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         lockTime = _lockTime;
     }
 
+    // min prevents us from harvesting in dust for a kek
+    // Max is how big we allow one kek to be
+    function setDepositParams(uint256 _minDeposit, uint256 _maxSingleDeposit) external onlyVaultManagers {
+        require(_maxSingleDeposit > _minDeposit, "Max must be greater than min");
+        minDeposit = _minDeposit;
+        maxSingleDeposit = _maxSingleDeposit;
+    }
+
     function updateTradeFactory(
         address _newTradeFactory
     ) external onlyGovernance {
@@ -874,16 +893,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /**
      * @notice
      * Here we set various parameters to optimize our harvestTrigger.
-     * @param _harvestProfitMin The amount of profit (in USDC, 6 decimals)
+     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
      * that will trigger a harvest if gas price is acceptable.
-     * @param _harvestProfitMax The amount of profit in USDC that
+     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
      * will trigger a harvest regardless of gas price.
      */
     function setHarvestTriggerParams(
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc
     ) external onlyVaultManagers {
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
     }
 }

@@ -168,8 +168,6 @@ def test_cloning(
                     new_trade_factory,
                     new_proxy,
                     gauge,
-                    10_000 * 1e6,
-                    25_000 * 1e6,
                     {"from": gov},
                 )
             tx = strategy.cloneStrategyCurveBoosted(
@@ -180,8 +178,6 @@ def test_cloning(
                 new_trade_factory,
                 new_proxy,
                 gauge,
-                10_000 * 1e6,
-                25_000 * 1e6,
                 {"from": gov},
             )
 
@@ -197,8 +193,6 @@ def test_cloning(
                     new_trade_factory,
                     new_proxy,
                     gauge,
-                    10_000 * 1e6,
-                    25_000 * 1e6,
                     {"from": gov},
                 )
 
@@ -212,8 +206,6 @@ def test_cloning(
                     new_trade_factory,
                     new_proxy,
                     gauge,
-                    10_000 * 1e6,
-                    25_000 * 1e6,
                     {"from": gov},
                 )
 
