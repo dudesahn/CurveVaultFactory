@@ -1,6 +1,5 @@
 import brownie
 from brownie import Contract, ZERO_ADDRESS
-from brownie import config
 
 # test the setters on our strategy
 def test_setters(
@@ -18,36 +17,65 @@ def test_setters(
     profit_whale,
     which_strategy,
 ):
+    # frax strategy gets stuck on these views, so we call them instead
+    if which_strategy == 2:
+        # test our manual harvest trigger
+        strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
 
-    # test our manual harvest trigger
-    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
+        # shouldn't manually harvest when gas is high
+        gasOracle.setManualBaseFeeBool(False, {"from": strategist_ms})
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+        gasOracle.setManualBaseFeeBool(True, {"from": strategist_ms})
 
-    # shouldn't manually harvest when gas is high
-    gasOracle.setManualBaseFeeBool(False, {"from": strategist_ms})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
-    gasOracle.setManualBaseFeeBool(True, {"from": strategist_ms})
+        strategy.setForceHarvestTriggerOnce(False, {"from": gov})
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
 
-    strategy.setForceHarvestTriggerOnce(False, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
+        # test our manual harvest trigger, and that a harvest turns it off
+        strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
+        strategy.harvest({"from": gov})
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+    else:
+        # test our manual harvest trigger
+        strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
 
-    # test our manual harvest trigger, and that a harvest turns it off
-    strategy.setForceHarvestTriggerOnce(True, {"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be true.", tx)
-    assert tx == True
-    strategy.harvest({"from": gov})
-    tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
+        # shouldn't manually harvest when gas is high
+        gasOracle.setManualBaseFeeBool(False, {"from": strategist_ms})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+        gasOracle.setManualBaseFeeBool(True, {"from": strategist_ms})
 
-    ## deposit to the vault after approving
+        strategy.setForceHarvestTriggerOnce(False, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+
+        # test our manual harvest trigger, and that a harvest turns it off
+        strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
+        strategy.harvest({"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+
+    # deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
@@ -60,7 +88,6 @@ def test_setters(
     strategy.setMetadataURI(0, {"from": gov})
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
-    # strategy.updateRewards({"from": gov})
     strategy.turnOffRewards({"from": gov})
 
     if which_strategy == 0:

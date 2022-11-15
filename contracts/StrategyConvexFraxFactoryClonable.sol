@@ -186,7 +186,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     uint256 public maxKeks;
     //The index of the next kek to be deposited for deposit/withdraw tracking
     uint256 public nextKek;
-    uint256 public minToInvest;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -323,9 +322,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         lockTime = 604800; // default to minimum of 1 week
         
-        minToInvest = 100e18;
-        
-        maxSingleInvest = 500_000e18;
+        maxSingleDeposit = 500_000e18;
+        minDeposit = 10_000e18;
 
         tradeFactory = _tradeFactory;
 
@@ -634,8 +632,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
         
-        // don't bother with dust or no assets
-        if (_toInvest < minToInvest) {
+        // don't bother with dust
+        if (_toInvest < minDeposit) {
             return;
         }
 
@@ -646,20 +644,19 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // If we have already locked the max amount of keks, we need to withdraw the oldest one
         // and reinvest that alongside the new funds
-        if (nextKek >= maxKeks && _toInvest > minDeposit) {
-            //Get the oldest kek that could have funds in it
+        if (nextKek >= maxKeks) {
+            // Get the oldest kek that could have funds in it
             IConvexFrax.LockedStake memory stake = stakingAddress
                 .lockedStakesOf(address(userVault))[nextKek - maxKeks];
-            //Make sure it hasnt already been withdrawn
+            // Make sure it hasn't already been withdrawn
             if (stake.amount > 0) {
-                //Withdraw funds and add them to the amount to deposit
+                // Withdraw funds and add them to the amount to deposit
                 userVault.withdrawLockedAndUnwrap(stake.kek_id);
                 unchecked {
                     _toInvest += stake.amount;
                 }
             }
         }
-        
         
         userVault.stakeLockedCurveLp(_toInvest, lockTime);
         lastDeposit = block.timestamp;
@@ -735,7 +732,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
     }
 
-    //Will liquidate as much as possible at the time. May not be able to liquidate all if anything has been deposited in the last day
+    // Will liquidate as much as possible at the time. May not be able to liquidate all if anything has been deposited in the last day
     // Would then have to be called again after locked period has expired
     function liquidateAllPositions() internal override returns (uint256) {
         withdrawSome(type(uint256).max);

@@ -90,6 +90,8 @@ def test_migration(
     chain.sleep(sleep_time)
 
     if which_strategy == 2:
+        with brownie.reverts():
+            vault.migrateStrategy(strategy, new_strategy, {"from": gov})
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
         chain.mine(1)
