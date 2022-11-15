@@ -116,8 +116,6 @@ def test_odds_and_ends(
             new_trade_factory,
             new_proxy,
             gauge,
-            10_000 * 1e6,
-            25_000 * 1e6,
         )
     else:  # frax
         new_strategy = strategist.deploy(
@@ -300,8 +298,6 @@ def test_odds_and_ends_migration(
             new_trade_factory,
             new_proxy,
             gauge,
-            10_000 * 1e6,
-            25_000 * 1e6,
         )
     else:  # frax
         new_strategy = strategist.deploy(

@@ -110,8 +110,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     // convex-specific variables
     bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
-    uint256 public harvestProfitMin; // minimum size in USDC that we want to harvest
-    uint256 public harvestProfitMax; // maximum size in USDC that we want to harvest
+    uint256 public harvestProfitMinInUsdc; // minimum size in USDC that we want to harvest
+    uint256 public harvestProfitMaxInUsdc; // maximum size in USDC that we want to harvest
     bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
 
     // ySwaps stuff
@@ -127,16 +127,16 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _vault,
         address _tradeFactory,
         uint256 _pid,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster,
         address _convexToken
     ) BaseStrategy(_vault) {
         _initializeStrat(
             _tradeFactory,
             _pid,
-            _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMinInUsdc,
+            _harvestProfitMaxInUsdc,
             _booster,
             _convexToken
         );
@@ -154,8 +154,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _keeper,
         address _tradeFactory,
         uint256 _pid,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster,
         address _convexToken
     ) external returns (address newStrategy) {
@@ -187,8 +187,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             _keeper,
             _tradeFactory,
             _pid,
-            _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMinInUsdc,
+            _harvestProfitMaxInUsdc,
             _booster,
             _convexToken
         );
@@ -204,8 +204,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _keeper,
         address _tradeFactory,
         uint256 _pid,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster,
         address _convexToken
     ) public {
@@ -213,8 +213,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         _initializeStrat(
             _tradeFactory,
             _pid,
-            _harvestProfitMin,
-            _harvestProfitMax,
+            _harvestProfitMinInUsdc,
+            _harvestProfitMaxInUsdc,
             _booster,
             _convexToken
         );
@@ -224,8 +224,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     function _initializeStrat(
         address _tradeFactory,
         uint256 _pid,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster,
         address _convexToken
     ) internal {
@@ -240,8 +240,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(_booster), type(uint256).max);
 
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
 
         IConvexDeposit dp = IConvexDeposit(_booster);
         crv = IERC20(dp.crv());
@@ -404,7 +404,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
         uint256 claimableProfit = claimableProfitInUsdc();
-        if (claimableProfit > harvestProfitMax) {
+        if (claimableProfit > harvestProfitMaxInUsdc) {
             return true;
         }
 
@@ -419,7 +419,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
 
         // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfit > harvestProfitMin) {
+        if (claimableProfit > harvestProfitMinInUsdc) {
             return true;
         }
 
@@ -718,20 +718,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /**
      * @notice
      * Here we set various parameters to optimize our harvestTrigger.
-     * @param _harvestProfitMin The amount of profit (in USDC, 6 decimals)
+     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
      * that will trigger a harvest if gas price is acceptable.
-     * @param _harvestProfitMax The amount of profit in USDC that
+     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
      * will trigger a harvest regardless of gas price.
      * @param _checkEarmark Whether or not we should check Convex's
      * booster to see if we need to earmark before harvesting.
      */
     function setHarvestTriggerParams(
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         bool _checkEarmark
     ) external onlyVaultManagers {
-        harvestProfitMin = _harvestProfitMin;
-        harvestProfitMax = _harvestProfitMax;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
         checkEarmark = _checkEarmark;
     }
 }

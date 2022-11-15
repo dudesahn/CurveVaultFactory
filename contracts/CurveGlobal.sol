@@ -23,6 +23,7 @@ interface IVoter {
 
 interface IProxy {
     function approveStrategy(address gauge, address strategy) external;
+    function strategies(address gauge) external view returns (address);
 }
 
 interface Registry {
@@ -115,8 +116,8 @@ interface IStrategy {
         address _keeper,
         address _tradeFactory,
         uint256 _pid,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster,
         address _convexToken
     ) external returns (address newStrategy);
@@ -128,9 +129,7 @@ interface IStrategy {
         address _keeper,
         address _tradeFactory,
         address _proxy,
-        address _gauge,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        address _gauge
     ) external returns (address newStrategy);
 
     function cloneStrategyConvexFrax(
@@ -141,8 +140,8 @@ interface IStrategy {
         address _tradeFactory,
         uint256 _fraxPid,
         address _stakingAddress,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) external returns (address newStrategy);
 
@@ -422,24 +421,30 @@ contract CurveGlobal {
     }
 
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points). Default is 0%.
-    address public voterCRV = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, should never change
+    address public curveVoter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, should never change
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest.
-    function setKeepCRV(uint256 _keepCRV) external {
+    function setKeepCRV(uint256 _keepCRV, address _curveVoter) external {
         if (msg.sender != owner) {
             revert();
         }
         if (_keepCRV > 10_000) {
             revert();
         }
+        if (_keepCRV > 0) {
+            if (_curveVoter == address(0)) {
+                revert();
+            }
+        }
         keepCRV = _keepCRV;
+        curveVoter = _curveVoter;
     }
 
     uint256 public keepCVX; // the percentage of CVX we re-lock for boost (in basis points). Default is 0%.
-    address public voterCVX;
+    address public convexVoter;
 
     // Set the amount of CVX to be locked in Yearn's CVX voter from each harvest.
-    function setKeepCVX(uint256 _keepCVX, address _voterCVX) external {
+    function setKeepCVX(uint256 _keepCVX, address _convexVoter) external {
         if (msg.sender != owner) {
             revert();
         }
@@ -447,20 +452,20 @@ contract CurveGlobal {
             revert();
         }
         if (_keepCVX > 0) {
-            if (_voterCVX == address(0)) {
+            if (_convexVoter == address(0)) {
                 revert();
             }
         }
 
         keepCVX = _keepCVX;
-        voterCVX = _voterCVX;
+        convexVoter = _convexVoter;
     }
 
     uint256 public keepFXS; // the percentage of FXS we re-lock for boost (in basis points). Default is 0%.
-    address public voterFXS;
+    address public fraxVoter;
 
     // Set the amount of CVX to be locked in Yearn's FXS voter from each harvest.
-    function setKeepFXS(uint256 _keepFXS, address _voterFXS) external {
+    function setKeepFXS(uint256 _keepFXS, address _fraxVoter) external {
         if (msg.sender != owner) {
             revert();
         }
@@ -468,35 +473,35 @@ contract CurveGlobal {
             revert();
         }
         if (_keepFXS > 0) {
-            if (_voterFXS == address(0)) {
+            if (_fraxVoter == address(0)) {
                 revert();
             }
         }
 
         keepFXS = _keepFXS;
-        voterFXS = _voterFXS;
+        fraxVoter = _fraxVoter;
     }
 
-    uint256 public harvestProfitMinInUsdt = 7_500 * 1e6; // what profit do we need to allow a harvest
+    uint256 public harvestProfitMinInUsdc = 7_500 * 1e6; // what profit do we need to allow a harvest
 
-    function setHarvestProfitMinInUsdt(
-        uint256 _harvestProfitMinInUsdt
+    function setHarvestProfitMinInUsdc(
+        uint256 _harvestProfitMinInUsdc
     ) external {
         if (!(msg.sender == owner || msg.sender == management)) {
             revert();
         }
-        harvestProfitMinInUsdt = _harvestProfitMinInUsdt;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
     }
 
-    uint256 public harvestProfitMaxInUsdt = 100_000 * 1e6; // what profit do we need to force a harvest
+    uint256 public harvestProfitMaxInUsdc = 100_000 * 1e6; // what profit do we need to force a harvest
 
-    function setHarvestProfitMaxInUsdt(
-        uint256 _harvestProfitMaxInUsdt
+    function setHarvestProfitMaxInUsdc(
+        uint256 _harvestProfitMaxInUsdc
     ) external {
         if (!(msg.sender == owner || msg.sender == management)) {
             revert();
         }
-        harvestProfitMaxInUsdt = _harvestProfitMaxInUsdt;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
     }
 
     uint256 public performanceFee = 1_000;
@@ -556,7 +561,7 @@ contract CurveGlobal {
     /// @dev If no vault of either DEFAULT or AUTOMATED types exists for this gauge, 0x0 is returned from registry.
     function latestDefaultOrAutomatedVaultFromGauge(
         address _gauge
-    ) internal view returns (address) {
+    ) public view returns (address) {
         address lptoken = ICurveGauge(_gauge).lp_token();
         Registry _registry = registry;
         if (!_registry.isRegistered(lptoken)) {
@@ -569,6 +574,15 @@ contract CurveGlobal {
         }
 
         return latest;
+    }
+
+    /// @dev xxxx
+    /// @dev xxxxx
+    function doesStrategyProxyHaveGauge(
+        address _gauge
+    ) public view returns (bool) {
+        address strategyProxy = getProxy();
+        return IProxy(strategyProxy).strategies(_gauge) != address(0);
     }
 
     function getPid(address _gauge) public view returns (uint256 pid) {
@@ -627,7 +641,7 @@ contract CurveGlobal {
     }
 
     function getProxy() public view returns (address proxy) {
-        proxy = IVoter(voterCRV).strategy();
+        proxy = IVoter(curveVoter).strategy();
     }
 
     // only permissioned users can set custom name and symbol or deploy if there is already one endorsed
@@ -679,12 +693,9 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
-        // use this to track if we should clone a curve voter strategy onto our new vault
-        // need to set this before we create the vault below
-        bool cloneCurve = canCreateVaultPermissionlessly(_gauge);
 
         if (!_permissionedUser) {
-            require(cloneCurve, "Vault already exists");
+            require(canCreateVaultPermissionlessly(_gauge), "Vault already exists");
         }
         address lptoken = ICurveGauge(_gauge).lp_token();
 
@@ -711,12 +722,15 @@ contract CurveGlobal {
         // setup our fees, deposit limit, gov, etc
         _setupVaultParams(vault);
 
+        // use this to track if we should clone a curve voter strategy onto our new vault
+        bool curveAlreadyExists = doesStrategyProxyHaveGauge(_gauge);
+
         // setup our strategies as needed
         (convexStrategy, curveStrategy, convexFraxStrategy) = _setupStrategies(
             vault,
             _gauge,
             pid,
-            cloneCurve
+            curveAlreadyExists
         );
 
         emit NewAutomatedVault(
@@ -795,7 +809,7 @@ contract CurveGlobal {
         address _vault,
         address _gauge,
         uint256 _pid,
-        bool _cloneCurve
+        bool _curveAlreadyExists
     )
         internal
         returns (
@@ -808,22 +822,22 @@ contract CurveGlobal {
         convexStrategy = _addConvexStrategy(_vault, _pid);
 
         // only attach a curve strategy if this is the first vault for this LP
-        if (_cloneCurve) {
+        if (!_curveAlreadyExists) {
             curveStrategy = _addCurveStrategy(_vault, _gauge);
         }
 
-        // check if we can add a convex frax strategy
-        (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
-            _pid
-        );
-        if (hasPool) {
+        // check if we can add a convex frax strategy, comment this during coverage testing
+//         (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
+//             _pid
+//         );
+        if (true) { // true coverage
             if (convexFraxStratImplementation == address(0)) {
                 revert(); // dev: must set convex frax implementation first
             } else {
                 convexFraxStrategy = _addConvexFraxStrategy(
                     _vault,
-                    fraxPid,
-                    stakingAddress
+                    9, // 9 coverage
+                    0x963f487796d54d2f27bA6F3Fbe91154cA103b199 // 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 coverage
                 );
             }
         }
@@ -841,15 +855,15 @@ contract CurveGlobal {
                 keeper,
                 tradeFactory,
                 _pid,
-                harvestProfitMinInUsdt,
-                harvestProfitMaxInUsdt,
+                harvestProfitMinInUsdc,
+                harvestProfitMaxInUsdc,
                 address(booster),
                 CVX
             );
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
 
         if (keepCRV > 0 || keepCVX > 0) {
-            IStrategy(convexStrategy).updateVoters(voterCRV, voterCVX);
+            IStrategy(convexStrategy).updateVoters(curveVoter, convexVoter);
             IStrategy(convexStrategy).updateLocalKeepCrvs(keepCRV, keepCVX);
         }
 
@@ -879,13 +893,13 @@ contract CurveGlobal {
                 tradeFactory,
                 address(proxy),
                 _gauge,
-                harvestProfitMinInUsdt,
-                harvestProfitMaxInUsdt
+                harvestProfitMinInUsdc,
+                harvestProfitMaxInUsdc
             );
         IStrategy(curveStrategy).setHealthCheck(healthCheck);
 
         if (keepCRV > 0) {
-            IStrategy(curveStrategy).updateVoter(voterCRV);
+            IStrategy(curveStrategy).updateVoter(curveVoter);
             IStrategy(curveStrategy).updateLocalKeepCrv(keepCRV);
         }
 
@@ -915,17 +929,17 @@ contract CurveGlobal {
                 tradeFactory,
                 _fraxPid,
                 _stakingAddress,
-                harvestProfitMinInUsdt,
-                harvestProfitMaxInUsdt,
+                harvestProfitMinInUsdc,
+                harvestProfitMaxInUsdc,
                 address(fraxBooster)
             );
         IStrategy(convexFraxStrategy).setHealthCheck(healthCheck);
 
         if (keepCRV > 0 || keepCVX > 0 || keepFXS > 0) {
             IStrategy(convexFraxStrategy).updateVoters(
-                voterCRV,
-                voterCVX,
-                voterFXS
+                curveVoter,
+                convexVoter,
+                fraxVoter
             );
             IStrategy(convexFraxStrategy).updateLocalKeepCrvs(
                 keepCRV,

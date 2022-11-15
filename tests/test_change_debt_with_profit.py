@@ -154,7 +154,7 @@ def test_change_debt_with_profit_some_lost(
             # wait another week so our frax LPs are unlocked
             chain.sleep(86400 * 7)
             chain.mine(1)
-        
+
         # impersonate strategy to manually unwrap the funds and send back to strategy
         to_withdraw = amount / 11
         rewardsContract.withdraw(to_withdraw, True, {"from": strategy})

@@ -117,16 +117,12 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _vault,
         address _tradeFactory,
         address _proxy,
-        address _gauge,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        address _gauge
     ) BaseStrategy(_vault) {
         _initializeStrat(
             _tradeFactory,
             _proxy,
-            _gauge,
-            _harvestProfitMin,
-            _harvestProfitMax
+            _gauge
         );
     }
 
@@ -142,9 +138,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _keeper,
         address _tradeFactory,
         address _proxy,
-        address _gauge,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        address _gauge
     ) external returns (address newStrategy) {
         if (!isOriginal) {
             revert();
@@ -174,9 +168,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             _keeper,
             _tradeFactory,
             _proxy,
-            _gauge,
-            _harvestProfitMin,
-            _harvestProfitMax
+            _gauge
         );
 
         emit Cloned(newStrategy);
@@ -190,17 +182,13 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _keeper,
         address _tradeFactory,
         address _proxy,
-        address _gauge,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        address _gauge
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
             _tradeFactory,
             _proxy,
-            _gauge,
-            _harvestProfitMin,
-            _harvestProfitMax
+            _gauge
         );
     }
 
@@ -208,9 +196,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     function _initializeStrat(
         address _tradeFactory,
         address _proxy,
-        address _gauge,
-        uint256 _harvestProfitMin,
-        uint256 _harvestProfitMax
+        address _gauge
     ) internal {
         // make sure that we haven't initialized this before
         if (address(tradeFactory) != address(0)) {

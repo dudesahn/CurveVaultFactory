@@ -143,7 +143,7 @@ def test_triggers(
     print("\nShould we harvest? Should be false.", tx)
     assert tx == False
     gasOracle.setManualBaseFeeBool(True, {"from": gov})
-    
+
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
