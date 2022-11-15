@@ -305,6 +305,10 @@ if chain_used == 1:  # mainnet
         yield Contract("0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D")
 
     @pytest.fixture(scope="session")
+    def fxs(Contract):
+        yield Contract("0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0")
+
+    @pytest.fixture(scope="session")
     def curve_zapper(Contract):
         yield Contract("0xA79828DF1850E8a3A3064576f380D90aECDD3359")
 
@@ -773,88 +777,3 @@ if chain_used == 1:  # mainnet
         strategy.setMaxReportDelay(86400 * 21, {"from": gov})
 
         yield strategy
-
-    @pytest.fixture(scope="module")
-    def factory_vault(
-        StrategyConvexFactoryClonable,
-        StrategyCurveBoostedFactoryClonable,
-        StrategyConvexFraxFactoryClonable,
-        strategist,
-        keeper,
-        ymechs_safe,
-        curve_global,
-        gov,
-        accounts,
-        CurveGlobal,
-        guardian,
-        token,
-        healthCheck,
-        chain,
-        Contract,
-        pid,
-        gasOracle,
-        new_registry,
-        strategist_ms,
-        gauge,
-        which_strategy,
-        proxy,
-        voter,
-    ):
-
-        print("Factory address: ", curve_global)
-        print("Gauge: ", gauge)
-
-        # update the strategy on our voter
-        voter.setStrategy(proxy.address, {"from": gov})
-
-        # set our factory address on the strategy proxy
-        proxy.setFactory(curve_global.address, {"from": gov})
-
-        # check if our current gauge has a strategy for it, but mostly just do this to update our proxy
-        print(
-            "Here is our strategy for the gauge (likely 0x000):",
-            proxy.strategies(gauge),
-        )
-
-        # make sure we can create this vault permissionlessly
-        assert curve_global.canCreateVaultPermissionlessly(gauge)
-
-        tx = curve_global.createNewVaultsAndStrategies(gauge, {"from": strategist})
-        vault_address = tx.events["NewAutomatedVault"]["vault"]
-        vault = Contract(vault_address)
-        print("Vault name:", vault.name())
-
-        print("Vault endorsed:", vault_address)
-        info = tx.events["NewAutomatedVault"]
-
-        print("Here's our new vault created event:", info, "\n")
-
-        if which_strategy == 0:  # convex
-            strat = tx.events["NewAutomatedVault"]["convexStrategy"]
-            strategy = StrategyConvexFactoryClonable.at(strat)
-        elif which_strategy == 1:  # curve
-            strat = tx.events["NewAutomatedVault"]["curveStrategy"]
-            strategy = StrategyCurveBoostedFactoryClonable.at(strat)
-        else:  # frax
-            strat = tx.events["NewAutomatedVault"]["convexFraxStrategy"]
-            strategy = StrategyConvexFraxFactoryClonable.at(strat)
-
-        # daddy needs to accept gov on all new vaults
-        vault.acceptGovernance({"from": gov})
-        assert vault.governance() == gov.address
-
-        # set all debtRatios to zero, then set to 10k for our strategy we want to test
-        vault.updateStrategyDebtRatio(vault.withdrawalQueue(0), 0, {"from": gov})
-        if vault.withdrawalQueue(1) != ZERO_ADDRESS:
-            vault.updateStrategyDebtRatio(vault.withdrawalQueue(1), 0, {"from": gov})
-        if vault.withdrawalQueue(2) != ZERO_ADDRESS:
-            vault.updateStrategyDebtRatio(vault.withdrawalQueue(2), 0, {"from": gov})
-        vault.updateStrategyDebtRatio(strategy, 10_000, {"from": gov})
-
-        # turn our oracle into testing mode by setting the provider to 0x00, should default to true
-        strategy.setBaseFeeOracle(gasOracle, {"from": strategist_ms})
-        gasOracle = Contract(strategy.baseFeeOracle())
-        oracle_gov = accounts.at(gasOracle.governance(), force=True)
-        gasOracle.setBaseFeeProvider(ZERO_ADDRESS, {"from": oracle_gov})
-        strategy.setHealthCheck(healthCheck, {"from": gov})
-        assert strategy.isBaseFeeAcceptable() == True
