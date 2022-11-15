@@ -17,6 +17,7 @@ def test_emergency_exit(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -38,18 +39,19 @@ def test_emergency_exit(
     strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
     token.transfer(strategy, profit_amount, {"from": profit_whale})
-    strategy.harvest({"from": gov})
+
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+
+    tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
 
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-
-    if which_strategy == 2:
-        # wait another week so our frax LPs are unlocked
-        chain.sleep(86400 * 7)
-        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
@@ -76,6 +78,7 @@ def test_emergency_exit_with_profit(
     sleep_time,
     profit_amount,
     profit_whale,
+    which_strategy,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -100,6 +103,12 @@ def test_emergency_exit_with_profit(
     strategy.setDoHealthCheck(False, {"from": gov})
     strategy.setEmergencyExit({"from": gov})
     chain.sleep(1)
+
+    if which_strategy == 2:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+
     strategy.harvest({"from": gov})
     chain.sleep(1)
     assert strategy.estimatedTotalAssets() == 0
@@ -107,11 +116,6 @@ def test_emergency_exit_with_profit(
     # simulate a day of waiting for share price to bump back up
     chain.sleep(86400)
     chain.mine(1)
-
-    if which_strategy == 2:
-        # wait another week so our frax LPs are unlocked
-        chain.sleep(86400 * 7)
-        chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
@@ -144,6 +148,7 @@ def test_emergency_exit_with_loss(
     profit_amount,
     profit_whale,
     which_strategy,
+    staking_address,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -154,20 +159,36 @@ def test_emergency_exit_with_loss(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    if which_strategy != 1:
+    if which_strategy == 0:
         # send away all funds, will need to alter this based on strategy
         strategy.withdrawToConvexDepositTokens({"from": gov})
         to_send = cvxDeposit.balanceOf(strategy)
         print("cvxToken Balance of Strategy", to_send)
         cvxDeposit.transfer(gov, to_send, {"from": strategy})
         assert strategy.estimatedTotalAssets() == 0
-    else:
+    elif which_strategy == 1:
         if gauge_is_not_tokenized:
             return
         # send all funds out of the gauge
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
+        assert strategy.estimatedTotalAssets() == 0
+    else:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+
+        # try and make the staking pool send away assets to simulate losses
+        user_vault = Contract(strategy.userVault())
+        staking_contract = Contract(staking_address)
+        staking_token = Contract(staking_contract.stakingToken())
+        stake = staking_contract.lockedStakesOf(user_vault)[0]
+        kek = stake[0]
+        user_vault.withdrawLocked(kek, {"from": strategy})
+        staking_token.transfer(
+            gov, staking_token.balanceOf(strategy), {"from": strategy}
+        )
         assert strategy.estimatedTotalAssets() == 0
 
     # our whale donates 1 wei to the vault so we don't divide by zero (0.3.2 vault, errors in vault._reportLoss)
@@ -222,6 +243,7 @@ def test_emergency_exit_with_no_loss(
     profit_amount,
     profit_whale,
     which_strategy,
+    staking_address,
 ):
     ## deposit to the vault after approving. turn off health check since we're doing weird shit
     strategy.setDoHealthCheck(False, {"from": gov})
@@ -233,7 +255,7 @@ def test_emergency_exit_with_no_loss(
     strategy.harvest({"from": gov})
     chain.sleep(1)
 
-    if which_strategy != 1:
+    if which_strategy == 0:
         # send away all funds, will need to alter this based on strategy
         strategy.withdrawToConvexDepositTokens({"from": gov})
         to_send = cvxDeposit.balanceOf(strategy)
@@ -245,7 +267,7 @@ def test_emergency_exit_with_no_loss(
         booster.withdrawAll(pid, {"from": gov})
         token.transfer(strategy, to_send, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
-    else:
+    elif which_strategy == 1:
         if gauge_is_not_tokenized:
             return
         # send all funds out of the gauge
@@ -257,6 +279,27 @@ def test_emergency_exit_with_no_loss(
         # gov unwraps and sends it back, glad someone was watching!
         gauge.withdraw(to_send, {"from": gov})
         token.transfer(strategy, to_send, {"from": gov})
+        assert strategy.estimatedTotalAssets() > 0
+    else:
+        # wait another week so our frax LPs are unlocked
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+
+        # try and make the staking pool send away assets to simulate losses
+        user_vault = Contract(strategy.userVault())
+        staking_contract = Contract(staking_address)
+        staking_token = Contract(staking_contract.stakingToken())
+        stake = staking_contract.lockedStakesOf(user_vault)[0]
+        kek = stake[0]
+        user_vault.withdrawLocked(kek, {"from": strategy})
+        staking_token.transfer(
+            gov, staking_token.balanceOf(strategy), {"from": strategy}
+        )
+
+        # gov unwraps and sends it back, glad someone was watching!
+        to_unwrap = staking_token.balanceOf(gov)
+        staking_token.withdrawAndUnwrap(to_unwrap, {"from": gov})
+        token.transfer(strategy, to_unwrap, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
 
     # set emergency and exit, then confirm that the strategy has no funds
