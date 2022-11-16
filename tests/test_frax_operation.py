@@ -4,7 +4,7 @@ from brownie import config
 import math
 
 # test the our strategy's ability to deposit, harvest, and withdraw, with different optimal deposit tokens if we have them
-def test_simple_harvest(
+def test_frax_operation(
     gov,
     token,
     vault,
@@ -30,6 +30,11 @@ def test_simple_harvest(
 ):
     if which_strategy != 2:
         return
+    
+    # to 4 keks
+    with brownie.reverts():
+        strategy.setMaxKeks(4, {"from": gov})
+        print("Can't lower if we haven't maxed out yet")
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -44,7 +49,7 @@ def test_simple_harvest(
 
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -52,21 +57,50 @@ def test_simple_harvest(
 
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
 
-    print("First 3 harvests down")
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
 
-    # check how much locked stake we have
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    
+    print("First 5 harvests down")
+    print("Max keks:", strategy.maxKeks())
+    print("Next kek:", strategy.nextKek())
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
+    # can't harvest again as funds are locked, but only if we have something to harvest in
+    with brownie.reverts():
+        vault.deposit(amount / 20, {"from": whale})
+        strategy.harvest({"from": gov})
+        
+    # sleep for 4 more days to fully unlock our first two keks
+    chain.sleep(86400)
+    with brownie.reverts():
+        strategy.setMaxKeks(4, {"from": gov})
+        print("Wait for more unlock to lower the number of keks we have")
+    chain.sleep(86400 * 3)
+    strategy.setMaxKeks(4, {"from": gov})
+
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -74,7 +108,7 @@ def test_simple_harvest(
 
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -82,7 +116,7 @@ def test_simple_harvest(
 
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
@@ -90,72 +124,32 @@ def test_simple_harvest(
 
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
+    chain.sleep(86400)
     chain.mine(1)
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-
-    print("Four more harvests down")
-
-    # check how much locked stake we have
+    
     locked = strategy.stillLockedStake() / 1e18
-    print("Locked stake:", locked)
-
-    # try to decrease our keks with locked funds, won't work
+    print("Locked stake:", locked)    
+    print("Max keks:", strategy.maxKeks())
+    print("Next kek:", strategy.nextKek())
+    
+    # try to decrease our max keks again
     with brownie.reverts():
         strategy.setMaxKeks(2, {"from": gov})
+        print("Wait for unlock to lower the number of keks we have")
 
     # wait another week so our frax LPs are unlocked
     chain.sleep(86400 * 7)
     chain.mine(1)
 
-    # check how much locked stake we have
+    # check how much locked stake we have (should be zero)
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    # seems to be getting stuck somewhere after here
-
-    # decrease our max keks
-    strategy.setMaxKeks(2, {"from": gov})
-    print("Lowered our keks to 2")
-
-    # deposit and harvest multiple separate times to increase our nextKek
-    vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
-    chain.mine(1)
-    tx = strategy.harvest({"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-
-    # increase it again, deposit more to fill our keks back up
-    strategy.setMaxKeks(5, {"from": gov})
-
-    # deposit and harvest multiple separate times to increase our nextKek
-    vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
-    chain.mine(1)
-    tx = strategy.harvest({"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-
-    # deposit and harvest multiple separate times to increase our nextKek
-    vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
-    chain.mine(1)
-    tx = strategy.harvest({"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-
-    # deposit and harvest multiple separate times to increase our nextKek
-    vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
-    chain.mine(1)
-    tx = strategy.harvest({"from": gov})
-    chain.sleep(1)
-    chain.mine(1)
-
-    # deposit and harvest multiple separate times to increase our nextKek
-    vault.deposit(amount / 20, {"from": whale})
-    chain.sleep(86400 * 2)
-    chain.mine(1)
-    tx = strategy.harvest({"from": gov})
+    print("Max keks:", strategy.maxKeks())
+    print("Next kek:", strategy.nextKek())
+    
+    # lower now
+    strategy.setMaxKeks(3, {"from": gov})
+    print("Keks successfullly lowered to 3")
