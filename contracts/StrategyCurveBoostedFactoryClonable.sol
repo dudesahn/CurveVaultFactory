@@ -119,11 +119,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _proxy,
         address _gauge
     ) BaseStrategy(_vault) {
-        _initializeStrat(
-            _tradeFactory,
-            _proxy,
-            _gauge
-        );
+        _initializeStrat(_tradeFactory, _proxy, _gauge);
     }
 
     /* ========== CLONING ========== */
@@ -185,11 +181,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _gauge
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(
-            _tradeFactory,
-            _proxy,
-            _gauge
-        );
+        _initializeStrat(_tradeFactory, _proxy, _gauge);
     }
 
     // this is called by our original strategy, as well as any clones
@@ -272,7 +264,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
                 uint256 crvBalance = crv.balanceOf(address(this));
                 uint256 _sendToVoter;
                 unchecked {
-                    _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
+                    _sendToVoter =
+                        (crvBalance * _localKeepCRV) /
+                        FEE_DENOMINATOR;
                 }
                 if (_sendToVoter > 0) {
                     crv.safeTransfer(_curveVoter, _sendToVoter);

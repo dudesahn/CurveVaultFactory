@@ -315,13 +315,13 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
 
         stakingAddress = IConvexFrax(_stakingAddress);
-        
+
         maxKeks = 5;
 
         fraxPid = _fraxPid;
 
         lockTime = 604800; // default to minimum of 1 week
-        
+
         maxSingleDeposit = 500_000e18;
         minDeposit = 10_000e18;
 
@@ -631,7 +631,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
-        
+
         // don't bother with dust
         if (_toInvest < minDeposit) {
             return;
@@ -640,7 +640,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (_toInvest > maxSingleDeposit) {
             _toInvest = maxSingleDeposit;
         }
-        
 
         // If we have already locked the max amount of keks, we need to withdraw the oldest one
         // and reinvest that alongside the new funds
@@ -657,7 +656,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 }
             }
         }
-        
+
         userVault.stakeLockedCurveLp(_toInvest, lockTime);
         lastDeposit = block.timestamp;
         lastDepositAmount = _toInvest;
@@ -756,13 +755,13 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
             address(userVault)
         );
-        
+
         IConvexFrax.LockedStake memory stake;
         uint256 time = block.timestamp;
         uint256 _nextKek = nextKek;
         uint256 _maxKeks = maxKeks;
         uint256 i = _nextKek > _maxKeks ? _nextKek - _maxKeks : 0;
-        
+
         for (i; i < _nextKek; ++i) {
             stake = stakes[i];
 
@@ -821,8 +820,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     // min prevents us from harvesting in dust for a kek
     // Max is how big we allow one kek to be
-    function setDepositParams(uint256 _minDeposit, uint256 _maxSingleDeposit) external onlyVaultManagers {
-        require(_maxSingleDeposit > _minDeposit, "Max must be greater than min");
+    function setDepositParams(
+        uint256 _minDeposit,
+        uint256 _maxSingleDeposit
+    ) external onlyVaultManagers {
+        require(
+            _maxSingleDeposit > _minDeposit,
+            "Max must be greater than min"
+        );
         minDeposit = _minDeposit;
         maxSingleDeposit = _maxSingleDeposit;
     }
