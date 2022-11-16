@@ -293,10 +293,6 @@ if chain_used == 1:  # mainnet
         yield Contract("0x6B175474E89094C44Da98b954EedeAC495271d0F")
 
     @pytest.fixture(scope="session")
-    def new_registry(interface):
-        yield interface.IRegistry("0x78f73705105A63e06B932611643E0b210fAE93E9")
-
-    @pytest.fixture(scope="session")
     def weth(interface):
         yield interface.ERC20("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 
@@ -485,22 +481,13 @@ if chain_used == 1:  # mainnet
 
     @pytest.fixture(scope="module")
     def convex_template(
-        CurveGlobal,
         StrategyConvexFactoryClonable,
-        StrategyCurveBoostedFactoryClonable,
-        StrategyConvexFraxFactoryClonable,
         new_trade_factory,
         test_vault,
         strategist,
-        new_registry,
-        gov,
         booster,
         convexToken,
-        test_gauge,
-        accounts,
         test_pid,
-        frax_booster,
-        which_strategy,
     ):
         # deploy our convex template
         convex_template = strategist.deploy(
@@ -519,23 +506,12 @@ if chain_used == 1:  # mainnet
 
     @pytest.fixture(scope="module")
     def curve_template(
-        CurveGlobal,
-        StrategyConvexFactoryClonable,
         StrategyCurveBoostedFactoryClonable,
-        StrategyConvexFraxFactoryClonable,
         new_trade_factory,
         test_vault,
         strategist,
-        new_registry,
-        gov,
-        booster,
-        convexToken,
         test_gauge,
         new_proxy,
-        accounts,
-        pid,
-        frax_booster,
-        which_strategy,
     ):
         # deploy our curve template
         curve_template = strategist.deploy(
@@ -551,22 +527,11 @@ if chain_used == 1:  # mainnet
 
     @pytest.fixture(scope="module")
     def frax_template(
-        CurveGlobal,
-        StrategyConvexFactoryClonable,
-        StrategyCurveBoostedFactoryClonable,
         StrategyConvexFraxFactoryClonable,
         new_trade_factory,
         test_vault,
         strategist,
-        new_registry,
-        gov,
-        booster,
-        convexToken,
-        test_gauge,
-        accounts,
-        test_pid,
         frax_booster,
-        which_strategy,
         test_staking_address,
         test_frax_pid,
     ):
@@ -582,7 +547,6 @@ if chain_used == 1:  # mainnet
         )
 
         print("Frax Template deployed:", frax_template)
-
         yield frax_template
 
     @pytest.fixture(scope="module")
@@ -591,12 +555,9 @@ if chain_used == 1:  # mainnet
         strategist,
         new_registry,
         gov,
-        accounts,
         convex_template,
         curve_template,
         frax_template,
-        voter,
-        new_proxy,
     ):
         # deploy our factory
         curve_global = strategist.deploy(
@@ -609,19 +570,42 @@ if chain_used == 1:  # mainnet
         )
 
         print("Curve factory deployed:", curve_global)
-
         yield curve_global
 
     @pytest.fixture(scope="module")
     def new_proxy(StrategyProxy, gov):
         # deploy our new strategy proxy
         strategy_proxy = gov.deploy(StrategyProxy)
+
         print("New Strategy Proxy deployed:", strategy_proxy)
         yield strategy_proxy
+
+    @pytest.fixture(scope="module")
+    def new_registry(VaultRegistry, ReleaseRegistry, old_registry, gov, accounts):
+        # deploy our new release registry first
+        release_registry = gov.deploy(ReleaseRegistry)
+        print("New Release Registry deployed:", release_registry)
+
+        # deploy our new vault registry, point it to our old vault registry and release registry
+        new_registry = gov.deploy(VaultRegistry, release_registry, old_registry)
+        print("New Vault Registry deployed:", new_registry)
+
+        # before we deploy our first vault, we need to update to the latest release (0.4.5)
+        template_vault_045 = "0xBb1988ab99d4839Af8b6c94853B890307770E48B"
+        release_registry_owner = accounts.at(release_registry.owner(), force=True)
+        release_registry.newRelease(
+            template_vault_045, {"from": release_registry_owner}
+        )
+
+        yield new_registry
 
     @pytest.fixture(scope="session")
     def old_proxy():
         yield Contract("0x4694507Ca1023194eA3Ca4428F99EDEd7Ab2b919")
+
+    @pytest.fixture(scope="session")
+    def old_registry():
+        yield Contract("0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804")
 
     @pytest.fixture(scope="module")
     def vault(pm, gov, rewards, guardian, management, token, chain, vault_address):
@@ -647,7 +631,6 @@ if chain_used == 1:  # mainnet
         token,
         healthCheck,
         chain,
-        Contract,
         pid,
         gasOracle,
         strategist_ms,

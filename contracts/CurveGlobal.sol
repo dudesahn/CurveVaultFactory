@@ -23,6 +23,7 @@ interface IVoter {
 
 interface IProxy {
     function approveStrategy(address gauge, address strategy) external;
+
     function strategies(address gauge) external view returns (address);
 }
 
@@ -35,7 +36,7 @@ interface Registry {
         string calldata _name,
         string calldata _symbol,
         uint256 _releaseDelta,
-        VaultType _type
+        uint256 _type
     ) external returns (address);
 
     function isRegistered(address token) external view returns (bool);
@@ -44,13 +45,13 @@ interface Registry {
 
     function latestVault(
         address token,
-        VaultType _type
+        uint256 _type
     ) external view returns (address);
 
     function endorseVault(
         address _vault,
         uint256 _releaseDelta,
-        VaultType _type
+        uint256 _type
     ) external;
 }
 
@@ -235,7 +236,7 @@ contract CurveGlobal {
     }
 
     address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
-    uint256 public constant CATEGORY = 0; // 0 for curve
+    uint256 public constant CATEGORY = 2; // 2 for curve, ******NEED TO RECONCILE THIS WITH DEFAULT VAULT TYPES ON REGISTRY
 
     // always owned by ychad
     address public owner;
@@ -431,11 +432,12 @@ contract CurveGlobal {
         if (_keepCRV > 10_000) {
             revert();
         }
-        if (_keepCRV > 0) {
-            if (_curveVoter == address(0)) {
-                revert();
-            }
+
+        // since we use the voter to pull our strategyProxy, can't be zero address
+        if (_curveVoter == address(0)) {
+            revert();
         }
+
         keepCRV = _keepCRV;
         curveVoter = _curveVoter;
     }
@@ -557,7 +559,7 @@ contract CurveGlobal {
         return latestDefaultOrAutomatedVaultFromGauge(_gauge) == address(0);
     }
 
-    /// @dev Returns only the latest vault address for any DEFAULT/AUTOMATED type vaults
+    /// @dev Returns only the latest vault address for any DEFAULT/AUTOMATED type vaults ***********DOESN'T ACTUALLY DO THIS WTF
     /// @dev If no vault of either DEFAULT or AUTOMATED types exists for this gauge, 0x0 is returned from registry.
     function latestDefaultOrAutomatedVaultFromGauge(
         address _gauge
@@ -570,14 +572,17 @@ contract CurveGlobal {
 
         address latest = _registry.latestVault(lptoken);
         if (latest == address(0)) {
-            return _registry.latestVault(lptoken, VaultType.AUTOMATED);
+            return _registry.latestVault(lptoken, 2);
         }
 
         return latest;
     }
 
-    /// @dev xxxx
-    /// @dev xxxxx
+    /// @notice Check if our strategy proxy has already approved a strategy for a given gauge.
+    /// @param _gauge The gauge address to check on our strategy proxy.
+    /// @return bool If true, gauge already has a curve voter strategy setup.
+    /// @dev Because this pulls our latest proxy from the voter, be careful if ever updating our curve voter,
+    ///  though in reality our curve voter should always stay the same.
     function doesStrategyProxyHaveGauge(
         address _gauge
     ) public view returns (bool) {
@@ -693,9 +698,11 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
-
         if (!_permissionedUser) {
-            require(canCreateVaultPermissionlessly(_gauge), "Vault already exists");
+            require(
+                canCreateVaultPermissionlessly(_gauge),
+                "Vault already exists"
+            );
         }
         address lptoken = ICurveGauge(_gauge).lp_token();
 
@@ -757,7 +764,7 @@ contract CurveGlobal {
             _name,
             _symbol,
             0,
-            VaultType.AUTOMATED
+            CATEGORY
         );
     }
 
@@ -783,7 +790,7 @@ contract CurveGlobal {
                 )
             ),
             0,
-            VaultType.AUTOMATED
+            CATEGORY
         );
     }
 
@@ -818,26 +825,43 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
-        // first we create the convex strat, all vaults will at least have this
-        convexStrategy = _addConvexStrategy(_vault, _pid);
-
-        // only attach a curve strategy if this is the first vault for this LP
-        if (!_curveAlreadyExists) {
-            curveStrategy = _addCurveStrategy(_vault, _gauge);
+        // check if we can add a convex frax strategy, comment this during coverage testing
+        //         (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
+        //             _pid
+        //         );
+        // curveType determines our debtRatios
+        // 0 = CVX only, 1 = CVX+CRV, 2 = CVX + FRAX, 3 = CVX + CRV + FRAX
+        uint256 curveType;
+        // this means this is a frax curve pool
+        if (true) {
+            // true coverage, should be hasPool
+            // only attach a curve strategy if this is the first vault for this LP
+            if (!_curveAlreadyExists) {
+                curveType = 3;
+            } else {
+                curveType = 2;
+            }
+        } else {
+            // only attach a curve strategy if this is the first vault for this LP
+            if (!_curveAlreadyExists) {
+                curveType = 1;
+            }
+            // otherwise, this is just a lonely Convex-only vault :(
         }
 
-        // check if we can add a convex frax strategy, comment this during coverage testing
-//         (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
-//             _pid
-//         );
-        if (true) { // true coverage
-            if (convexFraxStratImplementation == address(0)) {
-                revert(); // dev: must set convex frax implementation first
-            } else {
+        // attach our strategies in our preferred order
+        // all vaults at least have a convex strategy, and it should be position 0 in the queue
+        convexStrategy = _addConvexStrategy(_vault, _pid, curveType);
+        if (curveType != 0) {
+            if (curveType != 2) {
+                curveStrategy = _addCurveStrategy(_vault, _gauge);
+            }
+            if (curveType != 1) {
+                // we attach a frax strategy here since this is a frax pool, whether we also attach curve or not
                 convexFraxStrategy = _addConvexFraxStrategy(
                     _vault,
-                    9, // 9 coverage
-                    0x963f487796d54d2f27bA6F3Fbe91154cA103b199 // 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 coverage
+                    9, // 9 coverage, fraxPid
+                    0x963f487796d54d2f27bA6F3Fbe91154cA103b199 // 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 coverage, stakingAddress
                 );
             }
         }
@@ -845,7 +869,8 @@ contract CurveGlobal {
 
     function _addConvexStrategy(
         address _vault,
-        uint256 _pid
+        uint256 _pid,
+        uint256 _curveType
     ) internal returns (address convexStrategy) {
         convexStrategy = IStrategy(convexStratImplementation)
             .cloneStrategyConvex(
@@ -867,9 +892,23 @@ contract CurveGlobal {
             IStrategy(convexStrategy).updateLocalKeepCrvs(keepCRV, keepCVX);
         }
 
+        // curveType determines our debtRatios
+        // 0 = CVX only, 1 = CVX+CRV, 2 = CVX + FRAX, 3 = CVX + CRV + FRAX
+        uint256 convexDebtRatio;
+        if (_curveType == 0) {
+            convexDebtRatio = 10_000;
+        } else if (_curveType == 1) {
+            convexDebtRatio = 8_000;
+        } else if (_curveType == 2) {
+            convexDebtRatio = 2_000;
+        } else {
+            // curveType 3
+            convexDebtRatio = 0;
+        }
+
         Vault(_vault).addStrategy(
             convexStrategy,
-            5_000,
+            convexDebtRatio,
             0,
             type(uint256).max,
             0
@@ -901,9 +940,10 @@ contract CurveGlobal {
             IStrategy(curveStrategy).updateLocalKeepCrv(keepCRV);
         }
 
+        // curveType 1 or 3 are the only ones with curve, start with 20% DR
         Vault(_vault).addStrategy(
             curveStrategy,
-            5_000,
+            2_000,
             0,
             type(uint256).max,
             0
@@ -946,9 +986,10 @@ contract CurveGlobal {
             );
         }
 
+        // curveType 2 or 3 are the only ones with curve, start with 80% DR
         Vault(_vault).addStrategy(
             convexFraxStrategy,
-            0,
+            8_000,
             0,
             type(uint256).max,
             0

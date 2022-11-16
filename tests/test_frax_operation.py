@@ -57,7 +57,7 @@ def test_simple_harvest(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    
+
     print("First 3 harvests down")
 
     # check how much locked stake we have
@@ -95,7 +95,7 @@ def test_simple_harvest(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    
+
     print("Four more harvests down")
 
     # check how much locked stake we have
