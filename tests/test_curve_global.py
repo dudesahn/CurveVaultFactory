@@ -32,12 +32,9 @@ def test_vault_deployment(
 ):
     # deploying curve global with frax strategies doesn't work unless with tenderly;
     # ganache crashes because of the try-catch in the fraxPid function
-    # comment this out when doing hacky coverage testing (commenting out section in curveGlobal)
-    #     if pid != 25:
-    #         if not tests_using_tenderly:
-    #             return
+    # however, I usually do hacky coverage testing (commenting out section in curveGlobal)
 
-    # for most pids below 100, we already have a vault
+    # for most pids below 100, we already have a vault, and any legacy vault will revert when trying to deploy permissionlessly
     if pid < 100:
         print("PID less than 100, skipping permissionless vault testing")
         return
@@ -250,7 +247,7 @@ def test_vault_deployment(
         with brownie.reverts():
             tx = curve_global.createNewVaultsAndStrategies(gauge, {"from": whale})
 
-        # we can't do a second stETH vault either
+        # we can't do a stETH vault either
         with brownie.reverts():
             tx = curve_global.createNewVaultsAndStrategies(
                 "0x182B723a58739a9c974cFDB385ceaDb237453c28", {"from": whale}
@@ -280,10 +277,7 @@ def test_permissioned_vault(
 ):
     # deploying curve global with frax strategies doesn't work unless with tenderly;
     # ganache crashes because of the try-catch in the fraxPid function
-    # comment this out when doing hacky coverage testing (commenting out section in curveGlobal)
-    #     if pid != 25:
-    #         if not tests_using_tenderly:
-    #             return
+    # however, I usually do hacky coverage testing (commenting out section in curveGlobal)
 
     # once our factory is deployed, setup the factory from gov
     registry_owner = accounts.at(new_registry.owner(), force=True)
@@ -443,40 +437,31 @@ def test_permissioned_vault(
     vault.acceptGovernance({"from": gov})
     assert vault.governance() == gov.address
 
-    # deploy another frax vault, this one shouldn't have any curve. ideally this wouldn't revert, but it is :(
-    with brownie.reverts():
-        tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-            gauge, "test2", "test2", {"from": gov}
-        )
-#     vault_address = tx.events["NewAutomatedVault"]["vault"]
-#     vault = Contract(vault_address)
-#     assert vault.withdrawalQueue(2) == ZERO_ADDRESS
-#     print("Second frax vault done")
-#     chain.sleep(1)
-#     chain.mine(1)
 
-    # THESE ARE REVERTING BECAUSE WE NEED TO DEPLOY THE NEW VERSION OF THE REGISTRY FROM PANDAf
 
-    # deploy a stETH vault, should be two long as well (Convex and Curve)
+    # deploy a stETH vault, should have convex and curve
     tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28", "test3", "test3", {"from": gov}
+        "0x182B723a58739a9c974cFDB385ceaDb237453c28", "stETH Vault", "yvCurve-stETH", {"from": gov}
     )
-#     vault_address = tx.events["NewAutomatedVault"]["vault"]
-#     vault = Contract(vault_address)
-#     assert vault.withdrawalQueue(2) == ZERO_ADDRESS
-#     print("First stETH vault done")
-#     chain.sleep(1)
-#     chain.mine(1)
+    vault_address = tx.events["NewAutomatedVault"]["vault"]
+    vault = Contract(vault_address)
+    assert vault.withdrawalQueue(2) == ZERO_ADDRESS
+    print("First stETH vault done")
+    chain.sleep(1)
+    chain.mine(1)
 
-    # deploy a second stETH vault, should only have convex. as-is this reverts, but ideally it wouldn't in case someone wants to deploy 
-    with brownie.reverts():
-        tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-            "0x182B723a58739a9c974cFDB385ceaDb237453c28", "test4", "test4", {"from": gov}
-        )
-#     vault_address = tx.events["NewAutomatedVault"]["vault"]
-#     vault = Contract(vault_address)
-#     assert vault.withdrawalQueue(1) == ZERO_ADDRESS
-#     print("Second stETH vault done")
+    if not tests_using_tenderly:
+        # we can't deploy another frax vault because we already have a strategy on our proxy for that gauge
+        with brownie.reverts():
+            tx = curve_global.createNewVaultsAndStrategiesPermissioned(
+                gauge, "test2", "test2", {"from": gov}
+            )
+        
+        # try to deploy a second stETH vault, should fail.
+        with brownie.reverts():
+            tx = curve_global.createNewVaultsAndStrategiesPermissioned(
+                "0x182B723a58739a9c974cFDB385ceaDb237453c28", "test4", "test4", {"from": gov}
+            )
 
 
 def test_curve_global_setters_and_views(
