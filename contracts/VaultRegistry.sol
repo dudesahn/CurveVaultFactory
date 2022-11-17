@@ -21,8 +21,8 @@ interface IReleaseRegistry {
 }
 
 contract VaultRegistry is Ownable {
-    uint256 constant DEFAULT_TYPE = 1;
-    address immutable LEGACY_REGISTRY;
+    uint256 constant DEFAULT_VAULT_TYPE = 1;
+    address immutable LEGACY_REGISTRY; // vaults read from the legacy registry are, by default, type 0
 
     address public releaseRegistry;
     // token => vaults
@@ -88,6 +88,11 @@ contract VaultRegistry is Ownable {
         if (length == 0) {
             return address(0);
         }
+        
+        if (_type == 0) {
+            return _fetchFromLegacy(_token);
+        }
+        
         uint256 i = length - 1;
         while (true) {
             address vault = vaults[_token][i];
@@ -226,11 +231,11 @@ contract VaultRegistry is Ownable {
     }
 
     function endorseVault(address _vault, uint256 _releaseDelta) external {
-        endorseVault(_vault, _releaseDelta, DEFAULT_TYPE);
+        endorseVault(_vault, _releaseDelta, DEFAULT_VAULT_TYPE);
     }
 
     function endorseVault(address _vault) external {
-        endorseVault(_vault, 0, DEFAULT_TYPE);
+        endorseVault(_vault, 0, DEFAULT_VAULT_TYPE);
     }
 
     function newVault(
@@ -250,7 +255,7 @@ contract VaultRegistry is Ownable {
                 _name,
                 _symbol,
                 _releaseDelta,
-                DEFAULT_TYPE
+                DEFAULT_VAULT_TYPE
             );
     }
 
