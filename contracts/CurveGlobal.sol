@@ -5,9 +5,7 @@ pragma experimental ABIEncoderV2;
 enum VaultType {
     LEGACY,
     DEFAULT,
-    AUTOMATED,
-    FIXED_TERM,
-    EXPERIMENTAL
+    AUTOMATED
 }
 
 interface IDetails {
@@ -37,7 +35,7 @@ interface Registry {
         string calldata _name,
         string calldata _symbol,
         uint256 _releaseDelta,
-        VaultType _type
+        uint256 _type
     ) external returns (address);
 
     function isRegistered(address token) external view returns (bool);
@@ -758,7 +756,7 @@ contract CurveGlobal {
             _name,
             _symbol,
             0,
-            VaultType.AUTOMATED
+            uint256(VaultType.AUTOMATED)
         );
     }
 
@@ -784,7 +782,7 @@ contract CurveGlobal {
                 )
             ),
             0,
-            VaultType.AUTOMATED
+            uint256(VaultType.AUTOMATED)
         );
     }
 
@@ -819,11 +817,15 @@ contract CurveGlobal {
         )
     {
         // check if we can add a convex frax strategy, comment this during coverage testing
-        //         (bool hasPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
+        //         (bool hasFraxPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
         //             _pid
         //         );
         // 0 = CVX+CRV, 1 = CVX + CRV + FRAX
-        bool hasFraxPool = true; // this is just for testing, delete this line for final contract
+        bool hasFraxPool;
+        if (_pid > 25) {
+            hasFraxPool = true; // this is just for testing, delete this section for final contract
+        }
+        
         
         // attach our strategies in our preferred order
         // all vaults at least have convex and curve, and we want them to be the first two strategies

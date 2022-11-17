@@ -135,6 +135,7 @@ contract VaultRegistry is Ownable {
     /**
      @notice Returns the latest deployed vault for the given token and type.
      @dev Return zero if no vault exists for both token and type.
+     @dev Currently defined types are 0: legacy, 1: default, 2: automated. More may be added.
      @param _token The token address to find the latest vault for.
      @param _type The vault type to find the latest vault for.
      @return The address of the latest vault found matching both token and type.
@@ -275,7 +276,7 @@ contract VaultRegistry is Ownable {
     @param _name Specify a custom Vault name. Set to empty string for DEFAULT_TYPE choice.
     @param _symbol Specify a custom Vault symbol name. Set to empty string for DEFAULT_TYPE choice.
     @param _releaseDelta Specify the number of releases prior to the latest to use as a target. DEFAULT_TYPE is latest.
-    @param _type Vault type
+    @param _type Vault type. Basic defined types are 0: legacy, 1: default, 2: automated, but more can be added.
     @return The address of the newly-deployed vault
      */
     function newVault(

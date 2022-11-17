@@ -536,7 +536,7 @@ def test_curve_global_setters_and_views(
     )
 
     # check our latest vault for stETH
-    latest = curve_global.latestDefaultOrAutomatedVaultFromGauge(
+    latest = curve_global.latestStandardVaultFromGauge(
         "0x182B723a58739a9c974cFDB385ceaDb237453c28"
     )
     print("Latest stETH vault:", latest)
