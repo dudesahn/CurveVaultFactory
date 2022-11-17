@@ -437,11 +437,12 @@ def test_permissioned_vault(
     vault.acceptGovernance({"from": gov})
     assert vault.governance() == gov.address
 
-
-
     # deploy a stETH vault, should have convex and curve
     tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28", "stETH Vault", "yvCurve-stETH", {"from": gov}
+        "0x182B723a58739a9c974cFDB385ceaDb237453c28",
+        "stETH Vault",
+        "yvCurve-stETH",
+        {"from": gov},
     )
     vault_address = tx.events["NewAutomatedVault"]["vault"]
     vault = Contract(vault_address)
@@ -456,11 +457,14 @@ def test_permissioned_vault(
             tx = curve_global.createNewVaultsAndStrategiesPermissioned(
                 gauge, "test2", "test2", {"from": gov}
             )
-        
+
         # try to deploy a second stETH vault, should fail.
         with brownie.reverts():
             tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-                "0x182B723a58739a9c974cFDB385ceaDb237453c28", "test4", "test4", {"from": gov}
+                "0x182B723a58739a9c974cFDB385ceaDb237453c28",
+                "test4",
+                "test4",
+                {"from": gov},
             )
 
 

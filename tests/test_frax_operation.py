@@ -30,7 +30,7 @@ def test_frax_operation(
 ):
     if which_strategy != 2:
         return
-    
+
     # to 4 keks
     with brownie.reverts():
         strategy.setMaxKeks(4, {"from": gov})
@@ -78,7 +78,7 @@ def test_frax_operation(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    
+
     print("First 5 harvests down")
     print("Max keks:", strategy.maxKeks())
     print("Next kek:", strategy.nextKek())
@@ -89,7 +89,7 @@ def test_frax_operation(
     with brownie.reverts():
         vault.deposit(amount / 20, {"from": whale})
         strategy.harvest({"from": gov})
-        
+
     # sleep for 4 more days to fully unlock our first two keks
     chain.sleep(86400)
     with brownie.reverts():
@@ -129,12 +129,12 @@ def test_frax_operation(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    
+
     locked = strategy.stillLockedStake() / 1e18
-    print("Locked stake:", locked)    
+    print("Locked stake:", locked)
     print("Max keks:", strategy.maxKeks())
     print("Next kek:", strategy.nextKek())
-    
+
     # try to decrease our max keks again
     with brownie.reverts():
         strategy.setMaxKeks(2, {"from": gov})
@@ -149,7 +149,7 @@ def test_frax_operation(
     print("Locked stake:", locked)
     print("Max keks:", strategy.maxKeks())
     print("Next kek:", strategy.nextKek())
-    
+
     # lower now
     strategy.setMaxKeks(3, {"from": gov})
     print("Keks successfullly lowered to 3")
