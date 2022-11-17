@@ -37,23 +37,17 @@ interface Registry {
         string calldata _name,
         string calldata _symbol,
         uint256 _releaseDelta,
-        uint256 _type
+        VaultType _type
     ) external returns (address);
 
     function isRegistered(address token) external view returns (bool);
 
     function latestVault(address token) external view returns (address);
 
-    function latestVault(
+    function latestVaultOfType(
         address token,
         uint256 _type
     ) external view returns (address);
-
-    function endorseVault(
-        address _vault,
-        uint256 _releaseDelta,
-        uint256 _type
-    ) external;
 }
 
 interface IPoolManager {
@@ -815,8 +809,7 @@ contract CurveGlobal {
     function _setupStrategies(
         address _vault,
         address _gauge,
-        uint256 _pid,
-        bool _curveAlreadyExists
+        uint256 _pid
     )
         internal
         returns (
@@ -830,19 +823,13 @@ contract CurveGlobal {
         //             _pid
         //         );
         // 0 = CVX+CRV, 1 = CVX + CRV + FRAX
-        uint256 isFrax;
-        
-        if (true) {
-            // true coverage, should be hasPool
-            // we have a frax pool
-            isFrax = 1;
-        }
+        bool hasFraxPool = true; // this is just for testing, delete this line for final contract
         
         // attach our strategies in our preferred order
         // all vaults at least have convex and curve, and we want them to be the first two strategies
-        convexStrategy = _addConvexStrategy(_vault, _pid, isFrax);
+        convexStrategy = _addConvexStrategy(_vault, _pid, hasFraxPool);
         curveStrategy = _addCurveStrategy(_vault, _gauge);
-        if (isFrax) {
+        if (hasFraxPool) {
                 // we attach a frax strategy here since this is a frax pool, whether we also attach curve or not
                 convexFraxStrategy = _addConvexFraxStrategy(
                     _vault,
@@ -855,7 +842,7 @@ contract CurveGlobal {
     function _addConvexStrategy(
         address _vault,
         uint256 _pid,
-        uint256 _isFrax
+        bool _isFrax
     ) internal returns (address convexStrategy) {
         convexStrategy = IStrategy(convexStratImplementation)
             .cloneStrategyConvex(
