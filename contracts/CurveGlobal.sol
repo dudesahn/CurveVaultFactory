@@ -702,6 +702,9 @@ contract CurveGlobal {
         }
         address lptoken = ICurveGauge(_gauge).lp_token();
 
+        // make sure we don't already have a curve strategy setup for this gauge
+        require(!doesStrategyProxyHaveGauge(_gauge), "Voter strategy already exists");
+
         // get convex pid. if no pid create one
         uint256 pid = getPid(_gauge);
         if (pid == type(uint256).max) {
@@ -884,9 +887,6 @@ contract CurveGlobal {
         address _vault,
         address _gauge
     ) internal returns (address curveStrategy) {
-        // make sure we don't already have a curve strategy setup for this gauge
-        require(!doesStrategyProxyHaveGauge(_gauge), "Voter strategy already exists");
-        
         // pull our strategyProxy from our voter
         IProxy proxy = IProxy(getProxy());
 
