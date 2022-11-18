@@ -438,12 +438,13 @@ def test_permissioned_vault(
     assert vault.governance() == gov.address
 
     # deploy a stETH vault, should have convex and curve
-    tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28",
-        "stETH Vault",
-        "yvCurve-stETH",
-        {"from": gov},
-    )
+    if pid != 25:
+        tx = curve_global.createNewVaultsAndStrategiesPermissioned(
+            "0x182B723a58739a9c974cFDB385ceaDb237453c28",
+            "stETH Vault",
+            "yvCurve-stETH",
+            {"from": gov},
+        )
     vault_address = tx.events["NewAutomatedVault"]["vault"]
     vault = Contract(vault_address)
     assert vault.withdrawalQueue(2) == ZERO_ADDRESS
@@ -479,7 +480,12 @@ def test_curve_global_setters_and_views(
     gauge,
     pid,
     frax_pid,
+    token,
 ):
+
+    if pid == 25:
+        stvault = new_registry.latestVault(token)
+        print("Here's our newest stETH Vault", stvault)
 
     # once our factory is deployed, setup the factory from gov
     registry_owner = accounts.at(new_registry.owner(), force=True)
