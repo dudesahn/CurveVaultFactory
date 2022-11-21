@@ -80,7 +80,6 @@ def test_setters(
     token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     chain.sleep(1)
-    strategy.harvest({"from": gov})
 
     # test our setters in baseStrategy and our main strategy
     strategy.setMaxReportDelay(0, {"from": gov})
@@ -89,7 +88,56 @@ def test_setters(
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
     strategy.turnOffRewards({"from": gov})
-
+    
+    # special setter for frax
+    if which_strategy == 2:
+        strategy.setLockTime(90000 * 7, {"from": gov})
+        
+        # whale can't call
+        with brownie.reverts():
+            strategy.setLockTime(90000, {"from": whale})
+        # can't be too short
+        with brownie.reverts():
+            strategy.setLockTime(100, {"from": gov})
+        # or too long
+        with brownie.reverts():
+            strategy.setLockTime(2 ** 256 - 1, {"from": gov})
+        
+        # set our deposit params
+        maxToStake = 1000
+        minToStake = 100
+        strategy.setDepositParams(minToStake, maxToStake, {"from": gov})
+        with brownie.reverts():
+            strategy.setDepositParams(maxToStake, minToStake, {"from": gov})
+    
+    # harvest our credit
+    strategy.harvest({"from": gov})
+    if which_strategy ==2:
+        total_staked = strategy.stakedBalance()
+        assert total_staked == maxToStake
+        assert strategy.estimatedTotalAssets() > total_staked
+        
+        # get the rest of our funds staked
+        chain.sleep(1)
+        chain.mine(1)
+        strategy.setDepositParams(1e21, 1e29, {"from": gov})
+        strategy.harvest({"from": gov})
+        assert strategy.estimatedTotalAssets() >= amount
+    
+    # check that we have claimable rewards, have to call for frax tho
+    if which_strategy == 2:
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+        profit = strategy.claimableProfitInUsdc.call()
+        assert profit > 0
+        print("Claimable Profit:", profit / 1e6)
+    elif which_strategy == 0:
+        chain.sleep(86400 * 7)
+        chain.mine(1)
+        profit = strategy.claimableProfitInUsdc()
+        assert profit > 0
+        print("Claimable Profit:", profit / 1e6)
+    
     if which_strategy == 0:
         strategy.setCheckEarmark(False, {"from": gov})
         strategy.updateVoters(ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})

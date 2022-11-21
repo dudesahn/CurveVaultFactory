@@ -3,8 +3,8 @@ from brownie import Contract
 from brownie import config
 import math
 
-# test the our strategy's ability to deposit, harvest, and withdraw, with different optimal deposit tokens if we have them
-def test_frax_operation(
+# lower our number of keks
+def test_lower_keks(
     gov,
     token,
     vault,
@@ -30,11 +30,6 @@ def test_frax_operation(
 ):
     if which_strategy != 2:
         return
-
-    # to 4 keks
-    with brownie.reverts():
-        strategy.setMaxKeks(4, {"from": gov})
-        print("Can't lower if we haven't maxed out yet")
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -153,3 +148,354 @@ def test_frax_operation(
     # lower now
     strategy.setMaxKeks(3, {"from": gov})
     print("Keks successfullly lowered to 3")
+
+# lower our number of keks after we get well above our maxKeks
+def test_lower_keks_part_two(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    gauge,
+    voter,
+    rewardsContract,
+    amount,
+    sleep_time,
+    is_slippery,
+    no_profit,
+    crv,
+    accounts,
+    booster,
+    pid,
+    which_strategy,
+    profit_amount,
+    profit_whale,
+):
+    if which_strategy != 2:
+        return
+        
+    # lower it immediately
+    strategy.setMaxKeks(3, {"from": gov})
+
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount / 20, {"from": whale})
+    newWhale = token.balanceOf(whale)
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # sleep since our 3 keks are full
+    chain.sleep(86400 * 7)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # sleep to free them all up
+    chain.sleep(86400 * 7)
+    
+    # lower down to 2, this should hit the other branch in our setMaxKeks
+    strategy.setMaxKeks(2, {"from": gov})
+
+# increase our number of keks
+def test_increase_keks(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    gauge,
+    voter,
+    rewardsContract,
+    amount,
+    sleep_time,
+    is_slippery,
+    no_profit,
+    crv,
+    accounts,
+    booster,
+    pid,
+    which_strategy,
+    profit_amount,
+    profit_whale,
+):
+    if which_strategy != 2:
+        return
+
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount / 20, {"from": whale})
+    newWhale = token.balanceOf(whale)
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    print("First 5 harvests down")
+    print("Max keks:", strategy.maxKeks())
+    print("Next kek:", strategy.nextKek())
+    locked = strategy.stillLockedStake() / 1e18
+    print("Locked stake:", locked)
+    
+    # increase our max keks to 7
+    strategy.setMaxKeks(7, {"from": gov})
+    print("successfully increased our keks")
+
+# withdraw from the only unlocked kek
+def test_withdraw_with_some_locked(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    gauge,
+    voter,
+    rewardsContract,
+    amount,
+    sleep_time,
+    is_slippery,
+    no_profit,
+    crv,
+    accounts,
+    booster,
+    pid,
+    which_strategy,
+    profit_amount,
+    profit_whale,
+):
+    if which_strategy != 2:
+        return
+
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount / 20, {"from": whale})
+    newWhale = token.balanceOf(whale)
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    print("First 5 harvests down")
+    print("Max keks:", strategy.maxKeks())
+    print("Next kek:", strategy.nextKek())
+    locked = strategy.stillLockedStake() / 1e18
+    print("Locked stake:", locked)
+
+    # sleep for 3 more days to fully unlock our first kek
+    chain.sleep(86400 * 3)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+    
+    # withdraw from our first kek
+    vault.withdraw(1e18, {"from": whale})
+
+
+
+# test manual withdrawals
+def test_manual_withdrawal(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    gauge,
+    voter,
+    rewardsContract,
+    amount,
+    sleep_time,
+    is_slippery,
+    no_profit,
+    crv,
+    accounts,
+    booster,
+    pid,
+    which_strategy,
+    profit_amount,
+    profit_whale,
+):
+    if which_strategy != 2:
+        return
+
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount / 20, {"from": whale})
+    newWhale = token.balanceOf(whale)
+    chain.sleep(1)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    # deposit and harvest multiple separate times to increase our nextKek
+    vault.deposit(amount / 20, {"from": whale})
+    chain.sleep(86400)
+    chain.mine(1)
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    chain.mine(1)
+
+    print("First 5 harvests down")
+    print("Max keks:", strategy.maxKeks())
+    print("Next kek:", strategy.nextKek())
+    locked = strategy.stillLockedStake() / 1e18
+    print("Locked stake:", locked)
+    
+    # test withdrawing 1 kek manually at a time
+    assert strategy.balanceOfWant() == 0
+    index_to_withdraw = strategy.nextKek() - 1
+    
+    # can't withdraw yet, need to wait
+    with brownie.reverts():
+        strategy.manualWithdraw(index_to_withdraw)
+        
+    chain.sleep(86400 * 7)
+    chain.mine(1)
+    strategy.manualWithdraw(index_to_withdraw)
+    assert strategy.balanceOfWant() > 0
+    
+    
+    
+

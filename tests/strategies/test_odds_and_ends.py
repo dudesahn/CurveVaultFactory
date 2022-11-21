@@ -699,6 +699,10 @@ def test_odds_and_ends_empty_strat(
     profit_whale,
     which_strategy,
     staking_address,
+    crv,
+    convexToken,
+    has_rewards,
+    rewards_token,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2**256 - 1, {"from": whale})

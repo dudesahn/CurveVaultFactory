@@ -29,6 +29,8 @@ def test_vault_deployment(
     interface,
     booster,
     staking_address,
+    steth_gauge,
+    steth_lp,
 ):
     # deploying curve global with frax strategies doesn't work unless with tenderly;
     # ganache crashes because of the try-catch in the fraxPid function
@@ -79,6 +81,8 @@ def test_vault_deployment(
     )
 
     # make sure we can create this vault permissionlessly
+    assert curve_global.latestStandardVaultFromGauge(steth_gauge) != ZERO_ADDRESS
+    assert not curve_global.canCreateVaultPermissionlessly(steth_gauge)
     assert curve_global.canCreateVaultPermissionlessly(gauge)
 
     # before we deploy, check our gauge. we shouldn't have added this to our proxy yet
@@ -101,6 +105,8 @@ def test_vault_deployment(
     )
 
     tx = curve_global.createNewVaultsAndStrategies(gauge, {"from": whale})
+    assert curve_global.latestStandardVaultFromGauge(gauge) != ZERO_ADDRESS
+
     vault_address = tx.events["NewAutomatedVault"]["vault"]
     vault = Contract(vault_address)
     print("Vault name:", vault.name())
@@ -219,28 +225,19 @@ def test_vault_deployment(
     chain.sleep(86400 * 7)
     chain.mine(1)
 
-    # force our funds out of frax, then sweep them away
-    user_vault = Contract(frax_strategy.userVault())
-    staking_contract = Contract(staking_address)
-    staking_token = Contract(staking_contract.stakingToken())
-    stake = staking_contract.lockedStakesOf(user_vault)[0]
-    kek = stake[0]
-    user_vault.withdrawLocked(kek, {"from": frax_strategy})
-    assert staking_token.balanceOf(frax_strategy) > 0
-    frax_strategy.sweep(staking_token, {"from": gov})
-
+    print("Check that anyone can harvest again to remove all funds")
+    vault.updateStrategyDebtRatio(frax_strategy, 0, {"from": gov})
     if not tests_using_tenderly:
         with brownie.reverts():
-            keeper_contract.harvestStrategy(frax_strategy, {"from": rando})
+            vault.updateStrategyDebtRatio(frax_strategy, 10, {"from": whale})
+    print("But only gov/management can adjust debt ratios")
 
-    # turn off healthcheck
-    frax_strategy.setDoHealthCheck(False, {"from": gov})
     keeper_contract.harvestStrategy(frax_strategy, {"from": rando})
+    assert frax_strategy.estimatedTotalAssets() == 0
 
-    # we can deploy another stETH vault since this is the first automated one
-    tx = curve_global.createNewVaultsAndStrategies(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28", {"from": whale}
-    )
+    assert not curve_global.canCreateVaultPermissionlessly(steth_gauge)
+    assert curve_global.latestStandardVaultFromGauge(steth_gauge) != ZERO_ADDRESS
+    print("Can't create another stETH vault permissionlessly")
 
     if not tests_using_tenderly:
         # can't deploy another frax vault permissionlessly
@@ -249,9 +246,7 @@ def test_vault_deployment(
 
         # we can't do a stETH vault either
         with brownie.reverts():
-            tx = curve_global.createNewVaultsAndStrategies(
-                "0x182B723a58739a9c974cFDB385ceaDb237453c28", {"from": whale}
-            )
+            tx = curve_global.createNewVaultsAndStrategies(steth_gauge, {"from": whale})
 
 
 def test_permissioned_vault(
@@ -274,6 +269,7 @@ def test_permissioned_vault(
     voter,
     whale,
     tests_using_tenderly,
+    steth_gauge,
 ):
     # deploying curve global with frax strategies doesn't work unless with tenderly;
     # ganache crashes because of the try-catch in the fraxPid function
@@ -340,7 +336,7 @@ def test_permissioned_vault(
             )
 
     tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-        gauge, "", "", {"from": gov}
+        gauge, "stuff", "stuff", {"from": gov}
     )
     vault_address = tx.events["NewAutomatedVault"]["vault"]
     vault = Contract(vault_address)
@@ -348,20 +344,6 @@ def test_permissioned_vault(
 
     print("Vault endorsed:", vault_address)
     info = tx.events["NewAutomatedVault"]
-
-    print("Here's our new vault created event:", info, "\n")
-
-    # print our addresses
-    cvx_strat = tx.events["NewAutomatedVault"]["convexStrategy"]
-    convex_strategy = StrategyConvexFactoryClonable.at(cvx_strat)
-
-    curve_strat = tx.events["NewAutomatedVault"]["curveStrategy"]
-    if curve_strat != ZERO_ADDRESS:
-        curve_strategy = StrategyCurveBoostedFactoryClonable.at(curve_strat)
-
-    frax_strat = tx.events["NewAutomatedVault"]["convexFraxStrategy"]
-    if frax_strat != ZERO_ADDRESS:
-        frax_strategy = StrategyConvexFraxFactoryClonable.at(frax_strat)
 
     # check that everything is setup properly for our vault
     assert vault.governance() == curve_global.address
@@ -372,9 +354,15 @@ def test_permissioned_vault(
     assert vault.rewards() == curve_global.treasury()
     assert vault.managementFee() == curve_global.managementFee()
     assert vault.performanceFee() == curve_global.performanceFee()
+    print("Asserts good for our vault")
 
-    # check that things are good on our strategies
+    print("Here's our new vault created event:", info, "\n")
+
     # convex
+    cvx_strat = tx.events["NewAutomatedVault"]["convexStrategy"]
+    convex_strategy = StrategyConvexFactoryClonable.at(cvx_strat)
+    print("Convex strategy:", cvx_strat)
+
     assert vault.withdrawalQueue(0) == cvx_strat
     assert vault.strategies(cvx_strat)["performanceFee"] == 0
     assert convex_strategy.creditThreshold() == 1e24
@@ -395,6 +383,12 @@ def test_permissioned_vault(
     assert convex_strategy.rewards() == curve_global.treasury()
     assert convex_strategy.strategist() == curve_global.management()
     assert convex_strategy.keeper() == curve_global.keeper()
+    print("Asserts good for our convex strategy")
+
+    # curve
+    curve_strat = tx.events["NewAutomatedVault"]["curveStrategy"]
+    curve_strategy = StrategyCurveBoostedFactoryClonable.at(curve_strat)
+    print("Curve strategy:", curve_strat)
 
     # curve
     assert vault.withdrawalQueue(1) == curve_strat
@@ -406,9 +400,14 @@ def test_permissioned_vault(
     assert curve_strategy.rewards() == curve_global.treasury()
     assert curve_strategy.strategist() == curve_global.management()
     assert curve_strategy.keeper() == curve_global.keeper()
+    print("Asserts good for our curve strategy")
 
-    if pid > 100:
-        # frax
+    # frax
+    frax_strat = tx.events["NewAutomatedVault"]["convexFraxStrategy"]
+    if frax_strat != ZERO_ADDRESS:
+        frax_strategy = StrategyConvexFraxFactoryClonable.at(frax_strat)
+        print("Frax strategy:", frax_strat)
+        
         assert vault.withdrawalQueue(2) == frax_strat
         assert vault.strategies(frax_strat)["performanceFee"] == 0
         print("All three strategies attached in order")
@@ -432,40 +431,41 @@ def test_permissioned_vault(
         assert frax_strategy.rewards() == curve_global.treasury()
         assert frax_strategy.strategist() == curve_global.management()
         assert frax_strategy.keeper() == curve_global.keeper()
+        print("Asserts good on frax")
 
     # daddy needs to accept gov on all new vaults
     vault.acceptGovernance({"from": gov})
     assert vault.governance() == gov.address
+    print("Gov accepted by daddy")
 
-    # deploy a stETH vault, should have convex and curve
+    # deploy a stETH vault, should have convex and curve. we have to call this for coverage though or else it will stall forever
     if pid != 25:
-        tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-            "0x182B723a58739a9c974cFDB385ceaDb237453c28",
+        chain.sleep(1)
+        chain.mine(1)
+        tx = curve_global.createNewVaultsAndStrategiesPermissioned.call(
+            steth_gauge,
             "stETH Vault",
             "yvCurve-stETH",
             {"from": gov},
         )
-    vault_address = tx.events["NewAutomatedVault"]["vault"]
-    vault = Contract(vault_address)
-    assert vault.withdrawalQueue(2) == ZERO_ADDRESS
-    print("First stETH vault done")
-    chain.sleep(1)
-    chain.mine(1)
+
+        vault = tx[0]
+        convex = tx[1]
+        curve = tx[2]
+        frax = tx[3]
+        assert vault != ZERO_ADDRESS
+        assert convex != ZERO_ADDRESS
+        assert curve != ZERO_ADDRESS
+        assert frax == ZERO_ADDRESS
+        print("New stETH vault deployed, vault/convex/curve/frax", tx)
+        chain.sleep(1)
+        chain.mine(1)
 
     if not tests_using_tenderly:
         # we can't deploy another frax vault because we already have a strategy on our proxy for that gauge
         with brownie.reverts():
             tx = curve_global.createNewVaultsAndStrategiesPermissioned(
                 gauge, "test2", "test2", {"from": gov}
-            )
-
-        # try to deploy a second stETH vault, should fail.
-        with brownie.reverts():
-            tx = curve_global.createNewVaultsAndStrategiesPermissioned(
-                "0x182B723a58739a9c974cFDB385ceaDb237453c28",
-                "test4",
-                "test4",
-                {"from": gov},
             )
 
 
@@ -481,6 +481,7 @@ def test_curve_global_setters_and_views(
     pid,
     frax_pid,
     token,
+    steth_gauge,
 ):
 
     if pid == 25:
@@ -526,10 +527,7 @@ def test_curve_global_setters_and_views(
         print("Not a Frax pool")
 
     # check if we can create vaults
-    # this one should be yes for automatic vaults (stETH)
-    assert curve_global.canCreateVaultPermissionlessly(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28"
-    )
+    assert not curve_global.canCreateVaultPermissionlessly(steth_gauge)
 
     # this one should always be yes (SDT/ETH) as we will almost certainly never make a vault for this
     assert curve_global.canCreateVaultPermissionlessly(
@@ -537,15 +535,13 @@ def test_curve_global_setters_and_views(
     )
 
     # this one should be no (stETH)
-    assert not curve_global.doesStrategyProxyHaveGauge(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28"
-    )
+    assert not curve_global.doesStrategyProxyHaveGauge(steth_gauge)
 
     # check our latest vault for stETH
-    latest = curve_global.latestStandardVaultFromGauge(
-        "0x182B723a58739a9c974cFDB385ceaDb237453c28"
-    )
+    latest = curve_global.latestStandardVaultFromGauge(steth_gauge)
     print("Latest stETH vault:", latest)
+    if pid == 25:
+        assert latest == stvault
 
     # check our setters
     with brownie.reverts():
