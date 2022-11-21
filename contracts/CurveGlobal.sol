@@ -26,7 +26,7 @@ interface IProxy {
     function strategies(address gauge) external view returns (address);
 }
 
-interface Registry {
+interface IRegistry {
     function newVault(
         address _token,
         address _governance,
@@ -37,10 +37,6 @@ interface Registry {
         uint256 _releaseDelta,
         uint256 _type
     ) external returns (address);
-
-    function isRegistered(address token) external view returns (bool);
-
-    function latestVault(address token) external view returns (address);
 
     function latestVaultOfType(
         address token,
@@ -87,19 +83,6 @@ interface ICurveGauge {
     function rewarded_token() external view returns (address); //v1
 
     function lp_token() external view returns (address);
-}
-
-interface IGaugeController {
-    function get_gauge_weight(address _gauge) external view returns (uint256);
-
-    function vote_user_slopes(
-        address,
-        address
-    ) external view returns (uint256, uint256, uint256); //slope,power,end
-
-    function vote_for_gauge_weights(address, uint256) external;
-
-    function add_gauge(address, int128, uint256) external;
 }
 
 interface IStrategy {
@@ -271,13 +254,13 @@ contract CurveGlobal {
         convexFraxPoolRegistry = _convexFraxPoolRegistry;
     }
 
-    Registry public registry; // = Registry(address(0x50c1a2eA0a861A967D9d0FFE2AE4012c2E053804));
+    IRegistry public registry;
 
     function setRegistry(address _registry) external {
         if (msg.sender != owner) {
             revert();
         }
-        registry = Registry(_registry);
+        registry = IRegistry(_registry);
     }
 
     IBooster public booster =
@@ -536,7 +519,7 @@ contract CurveGlobal {
         address _convexFraxStratImplementation,
         address _owner
     ) {
-        registry = Registry(_registry);
+        registry = IRegistry(_registry);
         convexStratImplementation = _convexStratImplementation;
         curveStratImplementation = _curveStratImplementation;
         convexFraxStratImplementation = _convexFraxStratImplementation;
@@ -558,15 +541,11 @@ contract CurveGlobal {
         address _gauge
     ) public view returns (address) {
         address lptoken = ICurveGauge(_gauge).lp_token();
-        Registry _registry = registry;
-        if (!_registry.isRegistered(lptoken)) {
-            return address(0);
-        }
         address latest;
         
         // we only care about types 0-2 here, so enforce that
-        for (uint256 i = 2; i >= 0; --i) { 
-            latest = _registry.latestVaultOfType(lptoken, i);
+        for (uint256 i = 0; i < 3; ++i) { 
+            latest = registry.latestVaultOfType(lptoken, i);
             if (latest != address(0)) {
                 break;
             }

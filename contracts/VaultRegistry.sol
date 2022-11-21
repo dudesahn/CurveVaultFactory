@@ -21,8 +21,8 @@ interface IReleaseRegistry {
 }
 
 contract VaultRegistry is Ownable {
-    uint256 constant DEFAULT_VAULT_TYPE = 1;
-    address immutable LEGACY_REGISTRY; // vaults read from the legacy registry are, by default, type 0
+    uint256 public constant DEFAULT_VAULT_TYPE = 1;
+    address public immutable LEGACY_REGISTRY; // vaults read from the legacy registry are, by default, type 0
 
     address public releaseRegistry;
     // token => vaults
@@ -83,14 +83,14 @@ contract VaultRegistry is Ownable {
     function _latestVaultOfType(
         address _token,
         uint256 _type
-    ) internal view returns (address) {
+    ) public view returns (address) {
+        if (_type == 0) {
+            return _fetchFromLegacy(_token);
+        }
+        
         uint256 length = _numVaults(_token);
         if (length == 0) {
             return address(0);
-        }
-        
-        if (_type == 0) {
-            return _fetchFromLegacy(_token);
         }
         
         uint256 i = length - 1;

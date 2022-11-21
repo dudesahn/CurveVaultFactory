@@ -681,7 +681,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     "Need to wait till most recent deposit unlocks"
                 );
             }
-
+            
+            // no need to check for >0, we know needed has to be at least 1 wei
             withdrawSome(needed);
 
             _liquidWant = balanceOfWant();
@@ -698,8 +699,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     function withdrawSome(uint256 _amount) internal {
-        if (_amount == 0) return;
-
         IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
             address(userVault)
         );
@@ -785,24 +784,32 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Function to change the allowed amount of max keks
     //Will withdraw funds if lowering the max. Should harvest after maxKeks is lowered
     function setMaxKeks(uint256 _newMaxKeks) external onlyVaultManagers {
-        require(nextKek > _newMaxKeks, "Can't lower this early");
-        
-        // If we are lowering the max we need to withdraw the diff if we are already over the new max
-        if (_newMaxKeks < maxKeks) {
-            uint256 toWithdraw = maxKeks - _newMaxKeks;
-            IConvexFrax.LockedStake[] memory stakes = stakingAddress
-                .lockedStakesOf(address(userVault));
-            IConvexFrax.LockedStake memory stake;
-            for (uint256 i; i < toWithdraw; ++i) {
-                stake = stakes[nextKek - maxKeks + i];
+        uint256 _maxKeks = maxKeks;
+        uint256 _nextKek = nextKek;
 
-                // Need to make sure the kek can be withdrawn and is > 0
-                if (stake.amount > 0) {
-                    require(
-                        stake.ending_timestamp < block.timestamp,
-                        "Not liquid"
-                    );
-                    userVault.withdrawLockedAndUnwrap(stake.kek_id);
+        // if next kek + 1 == new max, 
+        
+        // If we are lowering the max we need to withdraw the diff, 
+        // but only if we are already over the new max
+        if (_newMaxKeks < _maxKeks) {
+            // this second if statement will only matter very early on
+            if (_newMaxKeks < _nextKek + 1) {
+                uint256 toWithdraw = _maxKeks - _newMaxKeks;
+                IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(address(userVault));
+                IConvexFrax.LockedStake memory stake;
+                
+                for (uint256 i; i < toWithdraw; ++i) {
+                    // withdraw our oldest keks to lower the number staked
+                    stake = stakes[_nextKek - _maxKeks + i];
+                
+                    // Need to make sure the kek can be withdrawn and is > 0
+                    if (stake.amount > 0) {
+                        require(
+                            stake.ending_timestamp < block.timestamp,
+                            "Not liquid"
+                        );
+                        userVault.withdrawLockedAndUnwrap(stake.kek_id);
+                    }
                 }
             }
         }

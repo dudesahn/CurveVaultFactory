@@ -91,7 +91,7 @@ def test_staking_address():
 @pytest.fixture(scope="session")
 def which_strategy():
     # must be 0, 1, or 2 for convex, curve, and frax
-    which_strategy = 2
+    which_strategy = 0
     yield which_strategy
 
 
@@ -352,6 +352,14 @@ if chain_used == 1:  # mainnet
     @pytest.fixture(scope="session")
     def frax_booster():
         yield Contract("0x569f5B842B5006eC17Be02B8b94510BA8e79FbCa")
+
+    @pytest.fixture(scope="session")
+    def steth_gauge():
+        yield Contract("0x182B723a58739a9c974cFDB385ceaDb237453c28")
+
+    @pytest.fixture(scope="session")
+    def steth_lp():
+        yield Contract("0x06325440D014e39736583c165C2963BA99fAf14E")
 
     ########################################## FACTORY TESTING CONTRACTS ABOVE ##########################################
 

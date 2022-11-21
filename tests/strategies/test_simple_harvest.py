@@ -252,6 +252,8 @@ def test_simple_harvest(
     chain.mine(1)
 
     if which_strategy == 2:
+        with brownie.reverts():
+            vault.withdraw({"from": whale})
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
