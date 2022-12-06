@@ -407,7 +407,7 @@ def test_permissioned_vault(
     if frax_strat != ZERO_ADDRESS:
         frax_strategy = StrategyConvexFraxFactoryClonable.at(frax_strat)
         print("Frax strategy:", frax_strat)
-        
+
         assert vault.withdrawalQueue(2) == frax_strat
         assert vault.strategies(frax_strat)["performanceFee"] == 0
         print("All three strategies attached in order")
@@ -442,21 +442,12 @@ def test_permissioned_vault(
     if pid != 25:
         chain.sleep(1)
         chain.mine(1)
-        tx = curve_global.createNewVaultsAndStrategiesPermissioned.call(
+        tx = curve_global.createNewVaultsAndStrategiesPermissioned(
             steth_gauge,
             "stETH Vault",
             "yvCurve-stETH",
             {"from": gov},
         )
-
-        vault = tx[0]
-        convex = tx[1]
-        curve = tx[2]
-        frax = tx[3]
-        assert vault != ZERO_ADDRESS
-        assert convex != ZERO_ADDRESS
-        assert curve != ZERO_ADDRESS
-        assert frax == ZERO_ADDRESS
         print("New stETH vault deployed, vault/convex/curve/frax", tx)
         chain.sleep(1)
         chain.mine(1)

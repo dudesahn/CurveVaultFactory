@@ -83,7 +83,7 @@ contract VaultRegistry is Ownable {
     function _latestVaultOfType(
         address _token,
         uint256 _type
-    ) public view returns (address) {
+    ) internal view returns (address) {
         if (_type == 0) {
             return _fetchFromLegacy(_token);
         }

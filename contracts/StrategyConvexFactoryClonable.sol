@@ -556,7 +556,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     // determine whether we will check if our convex rewards need to be earmarked
-    function setCheckEarmark(bool _checkEarmark) external onlyAuthorized {
+    function setCheckEarmark(bool _checkEarmark) external onlyVaultManagers {
         checkEarmark = _checkEarmark;
     }
 
@@ -640,7 +640,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     // in case we need to exit into the convex deposit token, this will allow us to do that
     // make sure to check claimRewards before this step if needed
     // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyAuthorized {
+    function withdrawToConvexDepositTokens() external onlyVaultManagers {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             rewardsContract.withdraw(_stakedBal, claimRewards);
@@ -660,7 +660,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
     // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyAuthorized {
+    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
     }
 
