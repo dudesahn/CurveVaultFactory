@@ -324,7 +324,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
-        if (_localKeepCRV > 0) {
+        if (_localKeepCRV > 0 && _curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
             uint256 _sendToVoter = (crvBalance * _localKeepCRV) /
                 FEE_DENOMINATOR;
@@ -384,10 +384,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
     }
 
-    //Migration should only be called if all funds are completely liquid
-    //In case of problems, emergencyExit can be set to true and then harvest the strategy.
-    //Or manually withdraw all liquid keks and wait until the remainder becomes liquid
-    //This will allow as much of the liquid position to be withdrawn while allowing future withdraws for still locked tokens
+    // Migration should only be called if all funds are completely liquid
+    // In case of problems, emergencyExit can be set to true and then harvest the strategy.
+    // Or manually withdraw all liquid keks and wait until the remainder becomes liquid
+    // This will allow as much of the liquid position to be withdrawn while allowing future withdraws for still locked tokens
     function prepareMigration(address _newStrategy) internal override {
         require(
             lastDeposit + lockTime < block.timestamp,
@@ -607,21 +607,21 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 _liquidWant = balanceOfWant();
 
         if (_liquidWant < _amountNeeded) {
-            uint256 needed;
+            uint256 toWithdraw;
             unchecked {
-                needed = _amountNeeded - _liquidWant;
+                toWithdraw = _amountNeeded - _liquidWant;
             }
 
             //Need to check that there is enough liquidity to withdraw so we dont report loss thats not true
             if (lastDeposit + lockTime > block.timestamp) {
                 require(
-                    stakedBalance() - stillLockedStake() >= needed,
+                    stakedBalance() - stillLockedStake() >= toWithdraw,
                     "Need to wait till most recent deposit unlocks"
                 );
             }
             
-            // no need to check for >0, we know needed has to be at least 1 wei
-            withdrawSome(needed);
+            // no need to check for >0, we know toWithdraw has to be at least 1 wei
+            withdrawSome(toWithdraw);
 
             _liquidWant = balanceOfWant();
         }
@@ -668,8 +668,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
     }
 
-    // Will liquidate as much as possible at the time. May not be able to liquidate all if anything has been deposited in the last day
+    // Will liquidate as much as possible at the time. May not be able to liquidate all if anything has been deposited in the last week
     // Would then have to be called again after locked period has expired
+    // @dev Note that when this is called (only during emergencyExit) any funds not retrieved at the time will be treated as a loss.
     function liquidateAllPositions() internal override returns (uint256) {
         withdrawSome(type(uint256).max);
         return balanceOfWant();
@@ -803,7 +804,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     // once this is called setupTradefactory must be called to get things working again
-    function removeTradeFactoryPermissions() external onlyEmergencyAuthorized {
+    function removeTradeFactoryPermissions() external onlyVaultManagers {
         _removeTradeFactoryPermissions();
     }
 

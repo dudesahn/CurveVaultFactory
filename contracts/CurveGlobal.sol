@@ -15,6 +15,11 @@ interface IDetails {
     function symbol() external view returns (string memory);
 }
 
+interface IGaugeController {
+    // check if gauge has weight
+    function get_gauge_weight(address) external view returns (uint256);
+}
+
 interface IVoter {
     // get details from our curve voter
     function strategy() external view returns (address);
@@ -143,6 +148,8 @@ interface IStrategy {
     function updateLocalKeepCrv(uint256 _keepCrv) external;
 
     function setHealthCheck(address) external;
+
+    function setBaseFeeOracle(address) external;
 }
 
 interface IBooster {
@@ -398,7 +405,7 @@ contract CurveGlobal {
     }
 
     uint256 public keepCRV; // the percentage of CRV we re-lock for boost (in basis points). Default is 0%.
-    address public curveVoter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter, should never change
+    address public curveVoter = 0xF147b8125d2ef93FB6965Db97D6746952a133934; // Yearn's veCRV voter
 
     // Set the amount of CRV to be locked in Yearn's veCRV voter from each harvest.
     function setKeepCRV(uint256 _keepCRV, address _curveVoter) external {
@@ -673,6 +680,11 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
+        // a curve gauge must have weight for a vault to be deployed
+        IGaugeController gaugeController = IGaugeController(0x2F50D538606Fa9EDD2B11E2446BEb18C9D5846bB);
+        require(gaugeController.get_gauge_weight(_gauge) > 0, "Gauge must have weight");
+        
+        // if a legacy vault already exists, only permissioned users can deploy another
         if (!_permissionedUser) {
             require(
                 canCreateVaultPermissionlessly(_gauge),
@@ -811,8 +823,8 @@ contract CurveGlobal {
         
         // attach our strategies in our preferred order
         // all vaults at least have convex and curve, and we want them to be the first two strategies
-        convexStrategy = _addConvexStrategy(_vault, _pid, hasFraxPool);
-        curveStrategy = _addCurveStrategy(_vault, _gauge);
+        convexStrategy = _addConvexStrategy(_vault, _pid);
+        curveStrategy = _addCurveStrategy(_vault, _gauge, hasFraxPool);
         if (hasFraxPool) {
                 // we attach a frax strategy here since this is a frax pool, whether we also attach curve or not
                 convexFraxStrategy = _addConvexFraxStrategy(
@@ -825,8 +837,7 @@ contract CurveGlobal {
 
     function _addConvexStrategy(
         address _vault,
-        uint256 _pid,
-        bool _isFrax
+        uint256 _pid
     ) internal returns (address convexStrategy) {
         convexStrategy = IStrategy(convexStratImplementation)
             .cloneStrategyConvex(
@@ -842,20 +853,17 @@ contract CurveGlobal {
                 CVX
             );
         IStrategy(convexStrategy).setHealthCheck(healthCheck);
+        IStrategy(convexStrategy).setBaseFeeOracle(baseFeeOracle);
 
         if (keepCRV > 0 || keepCVX > 0) {
             IStrategy(convexStrategy).updateVoters(curveVoter, convexVoter);
             IStrategy(convexStrategy).updateLocalKeepCrvs(keepCRV, keepCVX);
         }
 
-        uint256 convexDebtRatio;
-        if (!_isFrax) {
-            convexDebtRatio = 8_000;
-        }
-
+        // convex debtRatio can always start at 0
         Vault(_vault).addStrategy(
             convexStrategy,
-            convexDebtRatio,
+            0,
             0,
             type(uint256).max,
             0
@@ -864,7 +872,8 @@ contract CurveGlobal {
 
     function _addCurveStrategy(
         address _vault,
-        address _gauge
+        address _gauge, 
+        bool _hasFraxPool
     ) internal returns (address curveStrategy) {
         // pull our strategyProxy from our voter
         IProxy proxy = IProxy(getProxy());
@@ -881,16 +890,21 @@ contract CurveGlobal {
                 _gauge
             );
         IStrategy(curveStrategy).setHealthCheck(healthCheck);
+        IStrategy(curveStrategy).setBaseFeeOracle(baseFeeOracle);
 
         if (keepCRV > 0) {
             IStrategy(curveStrategy).updateVoter(curveVoter);
             IStrategy(curveStrategy).updateLocalKeepCrv(keepCRV);
         }
         
-        // either way, we'll have curve set to 20%
+        uint256 curveDebtRatio = 10_000;
+        if (_hasFraxPool) {
+            curveDebtRatio = 2_000;
+        }
+        
         Vault(_vault).addStrategy(
             curveStrategy,
-            2_000,
+            curveDebtRatio,
             0,
             type(uint256).max,
             0
@@ -919,6 +933,7 @@ contract CurveGlobal {
                 address(fraxBooster)
             );
         IStrategy(convexFraxStrategy).setHealthCheck(healthCheck);
+        IStrategy(convexFraxStrategy).setBaseFeeOracle(baseFeeOracle);
 
         if (keepCRV > 0 || keepCVX > 0 || keepFXS > 0) {
             IStrategy(convexFraxStrategy).updateVoters(

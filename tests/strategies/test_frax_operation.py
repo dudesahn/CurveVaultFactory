@@ -149,6 +149,7 @@ def test_lower_keks(
     strategy.setMaxKeks(3, {"from": gov})
     print("Keks successfullly lowered to 3")
 
+
 # lower our number of keks after we get well above our maxKeks
 def test_lower_keks_part_two(
     gov,
@@ -176,7 +177,7 @@ def test_lower_keks_part_two(
 ):
     if which_strategy != 2:
         return
-        
+
     # lower it immediately
     strategy.setMaxKeks(3, {"from": gov})
 
@@ -228,9 +229,10 @@ def test_lower_keks_part_two(
 
     # sleep to free them all up
     chain.sleep(86400 * 7)
-    
+
     # lower down to 2, this should hit the other branch in our setMaxKeks
     strategy.setMaxKeks(2, {"from": gov})
+
 
 # increase our number of keks
 def test_increase_keks(
@@ -308,10 +310,11 @@ def test_increase_keks(
     print("Next kek:", strategy.nextKek())
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    
+
     # increase our max keks to 7
     strategy.setMaxKeks(7, {"from": gov})
     print("successfully increased our keks")
+
 
 # withdraw from the only unlocked kek
 def test_withdraw_with_some_locked(
@@ -400,10 +403,9 @@ def test_withdraw_with_some_locked(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
-    
+
     # withdraw from our first kek
     vault.withdraw(1e18, {"from": whale})
-
 
 
 # test manual withdrawals
@@ -482,20 +484,16 @@ def test_manual_withdrawal(
     print("Next kek:", strategy.nextKek())
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    
+
     # test withdrawing 1 kek manually at a time
     assert strategy.balanceOfWant() == 0
     index_to_withdraw = strategy.nextKek() - 1
-    
+
     # can't withdraw yet, need to wait
     with brownie.reverts():
         strategy.manualWithdraw(index_to_withdraw)
-        
+
     chain.sleep(86400 * 7)
     chain.mine(1)
     strategy.manualWithdraw(index_to_withdraw)
     assert strategy.balanceOfWant() > 0
-    
-    
-    
-
