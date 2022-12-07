@@ -723,6 +723,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Function to change the allowed amount of max keks
     //Will withdraw funds if lowering the max. Should harvest after maxKeks is lowered
     function setMaxKeks(uint256 _newMaxKeks) external onlyVaultManagers {
+        require(_newMaxKeks > 0, "Must be >0");
+        
         uint256 _maxKeks = maxKeks;
         uint256 _nextKek = nextKek;
 
