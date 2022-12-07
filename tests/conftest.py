@@ -91,7 +91,7 @@ def test_staking_address():
 @pytest.fixture(scope="session")
 def which_strategy():
     # must be 0, 1, or 2 for convex, curve, and frax
-    which_strategy = 1
+    which_strategy = 2
     yield which_strategy
 
 
