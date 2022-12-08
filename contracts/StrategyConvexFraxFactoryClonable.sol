@@ -724,24 +724,27 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Will withdraw funds if lowering the max. Should harvest after maxKeks is lowered
     function setMaxKeks(uint256 _newMaxKeks) external onlyVaultManagers {
         require(_newMaxKeks > 0, "Must be >0");
-        
+
         uint256 _maxKeks = maxKeks;
         uint256 _nextKek = nextKek;
-
-        // if next kek + 1 == new max, 
-        
+                
         // If we are lowering the max we need to withdraw the diff, 
         // but only if we are already over the new max
         if (_newMaxKeks < _maxKeks) {
-            // this second if statement will only matter very early on
-            if (_newMaxKeks < _nextKek + 1) {
-                uint256 toWithdraw = _maxKeks - _newMaxKeks;
+            // this second if statement will likely only be false early on (unless we choose a massive newMaxKeks)
+            if (_newMaxKeks < _nextKek) {
+                uint256 toWithdraw = _nextKek > _maxKeks ? _maxKeks - _newMaxKeks : nextKek - _newMaxKeks;
                 IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(address(userVault));
                 IConvexFrax.LockedStake memory stake;
-                
+                                
                 for (uint256 i; i < toWithdraw; ++i) {
-                    // withdraw our oldest keks to lower the number staked
-                    stake = stakes[_nextKek - _maxKeks + i];
+                    // withdraw our oldest keks to lower the number staked. 
+                    // this has the added benefit of clearing any early stranded keks that shouldn't have funds
+                    if (_maxKeks > _nextKek) {
+                        stake = stakes[i];
+                    } else {
+                        stake = stakes[_nextKek - _maxKeks + i];
+                    }
                 
                     // Need to make sure the kek can be withdrawn and is > 0
                     if (stake.amount > 0) {
