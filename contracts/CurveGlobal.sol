@@ -811,8 +811,8 @@ contract CurveGlobal {
         )
     {
         // if we don't have an implementation for frax or convex, skip them
-        if convexFraxStratImplementation == address(0) {
-            if convexStratImplementation != address(0) {
+        if (convexFraxStratImplementation == address(0)) {
+            if (convexStratImplementation != address(0)) {
                 convexStrategy = _addConvexStrategy(_vault, _pid);
             }
             // we want a curve strategy no matter what, with 100% debtRatio in this case
