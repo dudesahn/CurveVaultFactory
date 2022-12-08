@@ -810,27 +810,27 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
-        // check if we can add a convex frax strategy, comment this during coverage testing
-        //         (bool hasFraxPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(
-        //             _pid
-        //         );
-        // 0 = CVX+CRV, 1 = CVX + CRV + FRAX
-        bool hasFraxPool;
-        if (_pid > 25) {
-            hasFraxPool = true; // this is just for testing, delete this section for final contract
+        // if we don't have an implementation for frax or convex, skip them
+        if convexFraxStratImplementation == address(0) {
+            if convexStratImplementation != address(0) {
+                convexStrategy = _addConvexStrategy(_vault, _pid);
+            }
+            // we want a curve strategy no matter what, with 100% debtRatio in this case
+            curveStrategy = _addCurveStrategy(_vault, _gauge, false);
+            return;
         }
         
-        
+        // check if we can add a convex frax strategy for this pool, ganache can't handle this (use tenderly)
+        (bool hasFraxPool, uint256 fraxPid, address stakingAddress) = getFraxInfo(_pid);
+
         // attach our strategies in our preferred order
         // all vaults at least have convex and curve, and we want them to be the first two strategies
-        convexStrategy = _addConvexStrategy(_vault, _pid);
-        curveStrategy = _addCurveStrategy(_vault, _gauge, hasFraxPool);
         if (hasFraxPool) {
-                // we attach a frax strategy here since this is a frax pool, whether we also attach curve or not
+                // we attach a frax strategy here since this is a frax pool
                 convexFraxStrategy = _addConvexFraxStrategy(
                     _vault,
-                    9, // 9 coverage, fraxPid
-                    0x963f487796d54d2f27bA6F3Fbe91154cA103b199 // 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 coverage, stakingAddress
+                    fraxPid,
+                    stakingAddress
                 );
         }
     }
