@@ -54,6 +54,10 @@ interface IConvexFrax {
 
     function cvx() external view returns (address);
 
+    function lock_time_for_max_multiplier() external view returns (uint256);
+
+    function lock_time_min() external view returns (uint256);
+
     struct LockedStake {
         bytes32 kek_id;
         uint256 start_timestamp;
@@ -81,8 +85,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     uint256 public localKeepFXS;
 
     address public curveVoter; // Yearn's veCRV voter, we send some extra CRV here
-    address public convexVoter; // Yearn's veCVX voter, we send some extra CVX here
-    address public fraxVoter; // Yearn's veCVX voter, we send some extra CVX here
+    address public convexVoter; // Yearn's vlCVX voter, we send some extra CVX here
+    address public fraxVoter; // Yearn's veFXS voter, we send some extra FXS here
     uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
 
     IERC20 public crv;
@@ -91,7 +95,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     string internal stratName; // we use this to be able to adjust our strategy's name
 
-    // convex-specific variables
     uint256 public harvestProfitMinInUsdc; // minimum size in USDC that we want to harvest
     uint256 public harvestProfitMaxInUsdc; // maximum size in USDC that we want to harvest
 
@@ -258,7 +261,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         fraxPid = _fraxPid;
 
-        lockTime = 604800; // default to minimum of 1 week
+        lockTime = stakingAddress.lock_time_min(); // default to minimum
 
         maxSingleDeposit = 500_000e18;
         minDeposit = 10_000e18;
@@ -296,13 +299,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         fxs.approve(_tradeFactory, type(uint256).max);
         tf.enable(address(fxs), _want);
 
-        // check if we have anything other than CRV, CVX, and FXS
-        (address[] memory tokenAddresses, ) = userVault.earned();
-        uint256 rewardsLength = tokenAddresses.length;
-
         // enable if we have anything else
-        if (rewardsLength > 3) {
-            for (uint256 i = 1; i < rewardsLength - 2; ++i) {
+        if (rewardsTokens.length > 0) {
+            for (uint256 i; i < rewardsTokens.length; ++i) {
                 address _rewardsToken = tokenAddresses[i];
                 IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
                 tf.enable(_rewardsToken, _want);
@@ -739,12 +738,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                                 
                 for (uint256 i; i < toWithdraw; ++i) {
                     // withdraw our oldest keks to lower the number staked. 
-                    // this has the added benefit of clearing any early stranded keks that shouldn't have funds
-                    if (_maxKeks > _nextKek) {
-                        stake = stakes[i];
-                    } else {
-                        stake = stakes[_nextKek - _maxKeks + i];
-                    }
+                    stake = _maxKeks > _nextKek ? stakes[i] : stakes[_nextKek - _maxKeks + i];
                 
                     // Need to make sure the kek can be withdrawn and is > 0
                     if (stake.amount > 0) {
@@ -765,8 +759,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     //Otherwise the timestamp checks when withdrawing could be inaccurate
     function setLockTime(uint256 _lockTime) external onlyVaultManagers {
         require(
-            594000 < _lockTime && _lockTime < 31536000,
-            "1 week < x < 1 year"
+            stakingAddress.lock_time_min() <= _lockTime && _lockTime <= stakingAddress.lock_time_for_max_multiplier(),
+            "Disallowed by staking address"
         );
         lockTime = _lockTime;
     }
@@ -788,14 +782,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     function updateTradeFactory(
         address _newTradeFactory
     ) external onlyGovernance {
-        if (tradeFactory != address(0)) {
-            _removeTradeFactoryPermissions();
-        }
-
+        require(_newTradeFactory != address(0), "Can't remove with this function");
+        _removeTradeFactoryPermissions();
         tradeFactory = _newTradeFactory;
-        if (_newTradeFactory != address(0)) {
-            _setUpTradeFactory();
-        }
+        _setUpTradeFactory();
     }
 
     function updateVoters(
@@ -830,12 +820,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         fxs.approve(_tradeFactory, 0);
         tf.disable(address(fxs), _want);
 
-        (address[] memory tokenAddresses, ) = userVault.earned();
-        uint256 rewardsLength = tokenAddresses.length;
-
-        // enable for any other rewards tokens too
-        if (rewardsLength > 3) {
-            for (uint256 i = 1; i < rewardsLength - 2; ++i) {
+        // disable for any other rewards tokens too
+        if (rewardsTokens.length > 0) {
+            for (uint256 i; i < rewardsTokens.length; ++i) {
                 address _rewardsToken = tokenAddresses[i];
                 IERC20(_rewardsToken).approve(_tradeFactory, 0);
                 tf.disable(_rewardsToken, _want);
