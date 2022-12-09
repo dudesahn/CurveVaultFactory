@@ -14,6 +14,7 @@ interface ITradeFactory {
 }
 
 interface IOracle {
+    // pull our asset price, in usdc, via yearn's oracle
     function getPriceUsdcRecommended(
         address tokenAddress
     ) external view returns (uint256);
@@ -26,10 +27,7 @@ interface IConvexRewards {
     // read how much claimable CRV a strategy has
     function earned(address account) external view returns (uint256);
 
-    // stake a convex tokenized deposit
-    function stake(uint256 _amount) external returns (bool);
-
-    // withdraw to a convex tokenized deposit, probably never need to use this
+    // burn a tokenized deposit (Convex deposit tokens) to receive curve lp tokens back
     function withdraw(uint256 _amount, bool _claim) external returns (bool);
 
     // withdraw directly to curve LP token, this is what we primarily use
@@ -72,11 +70,7 @@ interface IConvexDeposit {
         bool _stake
     ) external returns (bool);
 
-    // burn a tokenized deposit (Convex deposit tokens) to receive curve lp tokens back
-    function withdraw(uint256 _pid, uint256 _amount) external returns (bool);
-
-    function poolLength() external view returns (uint256);
-
+    // pull our curve token address from the booster
     function crv() external view returns (address);
 
     // give us info about a pool based on its pid
@@ -87,38 +81,65 @@ interface IConvexDeposit {
 
 contract StrategyConvexFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
+
     /* ========== STATE VARIABLES ========== */
-    // these should stay the same across different wants.
 
-    // convex stuff
+    /// @notice This is the deposit contract that all Convex pools use, aka booster.
     address public depositContract;
-    // this is the deposit contract that all pools use, aka booster
-    IConvexRewards public rewardsContract; // This is unique to each curve pool
 
-    uint256 public pid; // this is unique to each pool
+    /// @notice This is unique to each pool and holds the rewards.
+    IConvexRewards public rewardsContract;
+
+    /// @notice This is a unique numerical identifier for each Convex pool.
+    uint256 public pid;
+
+    /// @notice The percentage of CRV from each harvest that we send to our voter (out of 10,000).
     uint256 public localKeepCRV;
+
+    /// @notice The percentage of CVX from each harvest that we send to our voter (out of 10,000).
     uint256 public localKeepCVX;
 
-    address public curveVoter; // Yearn's veCRV voter, we send some extra CRV here
-    address public convexVoter; // Yearn's veCVX voter, we send some extra CVX here
-    uint256 internal constant FEE_DENOMINATOR = 10000; // this means all of our fee values are in basis points
+    /// @notice The address of our Curve voter. This is where we send any keepCRV.
+    address public curveVoter;
 
+    /// @notice The address of our Convex voter. This is where we send any keepCVX.
+    address public convexVoter;
+
+    // this means all of our fee values are in basis points
+    uint256 internal constant FEE_DENOMINATOR = 10000;
+
+    /// @notice The address of our base token (CRV for Curve, BAL for Balancer, etc.).
     IERC20 public crv;
+
+    /// @notice The address of our Convex token (CVX for Curve, AURA for Balancer, etc.).
     IERC20 public convexToken;
 
-    string internal stratName; // we use this to be able to adjust our strategy's name
+    // we use this to be able to adjust our strategy's name
+    string internal stratName;
 
-    // convex-specific variables
-    bool public claimRewards; // boolean if we should always claim rewards when withdrawing, usually withdrawAndUnwrap (generally this should be false)
-    uint256 public harvestProfitMinInUsdc; // minimum size in USDC that we want to harvest
-    uint256 public harvestProfitMaxInUsdc; // maximum size in USDC that we want to harvest
-    bool public checkEarmark; // this determines if we should check if we need to earmark rewards before harvesting
+    /// @notice Whether we should claim rewards when withdrawing, generally this should be false.
+    bool public claimRewards;
+
+    /// @notice Minimum profit size in USDC that we want to harvest.
+    /// @dev Only used in harvestTrigger.
+    uint256 public harvestProfitMinInUsdc;
+
+    /// @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
+    /// @dev Only used in harvestTrigger.
+    uint256 public harvestProfitMaxInUsdc;
+
+    /// @notice Check if we need to earmark rewards on Convex before harvesting, usually false.
+    /// @dev Only used in harvestTrigger.
+    bool public checkEarmark;
 
     // ySwaps stuff
+    /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
+
+    /// @notice Array of any extra rewards tokens this Convex pool may have.
     address[] public rewardsTokens;
 
-    // check for cloning. Will only be true on the original deployed contract and not on the clones
+    /// @notice Will only be true on the original deployed contract and not on clones; we don't want to clone a clone.
     bool public isOriginal = true;
 
     /* ========== CONSTRUCTOR ========== */
@@ -146,7 +167,18 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     event Cloned(address indexed clone);
 
-    // we use this to clone our original strategy to other vaults
+    /// @notice Use this to clone an exact copy of this strategy on another vault.
+    /// @dev In practice, this will only be called by the factory on the template contract.
+    /// @param _vault Vault address we are targeting with this strategy.
+    /// @param _strategist Address to grant the strategist role.
+    /// @param _rewards If we have any strategist rewards, send them here.
+    /// @param _keeper Address to grant the keeper role.
+    /// @param _tradeFactory Our trade factory address.
+    /// @param _pid Our pool id (pid) for this strategy.
+    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+    /// @param _booster Address of the convex booster/deposit contract.
+    /// @param _convexToken Address of our convex token.
     function cloneStrategyConvex(
         address _vault,
         address _strategist,
@@ -159,6 +191,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _booster,
         address _convexToken
     ) external returns (address newStrategy) {
+        // don't clone a clone
         if (!isOriginal) {
             revert();
         }
@@ -196,7 +229,18 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         emit Cloned(newStrategy);
     }
 
-    // this will only be called by the clone function above
+    /// @notice Initialize the strategy.
+    /// @dev This should only be called by the clone function above.
+    /// @param _vault Vault address we are targeting with this strategy.
+    /// @param _strategist Address to grant the strategist role.
+    /// @param _rewards If we have any strategist rewards, send them here.
+    /// @param _keeper Address to grant the keeper role.
+    /// @param _tradeFactory Our trade factory address.
+    /// @param _pid Our pool id (pid) for this strategy.
+    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+    /// @param _booster Address of the convex booster/deposit contract.
+    /// @param _convexToken Address of our convex token.
     function initialize(
         address _vault,
         address _strategist,
@@ -220,7 +264,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         );
     }
 
-    // this is called by our original strategy, as well as any clones
+    // this is called by our original strategy, as well as any clones via the above function
     function _initializeStrat(
         address _tradeFactory,
         uint256 _pid,
@@ -230,31 +274,36 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexToken
     ) internal {
         // make sure that we haven't initialized this before
-        if (address(tradeFactory) != address(0)) {
+        if (depositContract != address(0)) {
             revert(); // already initialized.
         }
 
+        // 1:1 assignments
+        tradeFactory = _tradeFactory;
+        pid = _pid;
+        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
+        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
         depositContract = _booster;
         convexToken = IERC20(_convexToken);
 
         // want = Curve LP
         want.approve(address(_booster), type(uint256).max);
 
-        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
-        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
+        // set up our max delay
+        maxReportDelay = 365 days;
 
-        IConvexDeposit dp = IConvexDeposit(_booster);
-        crv = IERC20(dp.crv());
-        pid = _pid;
-        (address lptoken, , , address _rewardsContract, , ) = dp.poolInfo(_pid);
+        // use the booster contract to pull more info needed
+        IConvexDeposit booster = IConvexDeposit(_booster);
+        crv = IERC20(booster.crv());
+        (address lptoken, , , address _rewardsContract, , ) = booster.poolInfo(
+            _pid
+        );
         rewardsContract = IConvexRewards(_rewardsContract);
-
         if (address(lptoken) != address(want)) {
             revert();
         }
 
-        tradeFactory = _tradeFactory;
-
+        // set up rewards and trade factory
         _updateRewards();
         _setUpTradeFactory();
 
@@ -269,28 +318,40 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         );
     }
 
-    function _setUpTradeFactory() internal {
-        //approve and set up trade factory
-        address _tradeFactory = tradeFactory;
-        address _want = address(want);
+    /* ========== VIEWS ========== */
 
-        ITradeFactory tf = ITradeFactory(_tradeFactory);
-        crv.approve(_tradeFactory, type(uint256).max);
-        tf.enable(address(crv), _want);
-
-        //enable for all rewards tokens too
-        uint256 rLength = rewardsTokens.length;
-        for (uint256 i; i < rLength; ++i) {
-            address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
-            tf.enable(_rewardsToken, _want);
-        }
-
-        convexToken.approve(_tradeFactory, type(uint256).max);
-        tf.enable(address(convexToken), _want);
+    /// @notice Strategy name.
+    /// @return Strategy name.
+    function name() external view override returns (string memory) {
+        return stratName;
     }
 
-    /* ========== FUNCTIONS ========== */
+    /// @notice How much want we have staked in Convex.
+    /// @return Balance of want staked in Convex.
+    function stakedBalance() public view returns (uint256) {
+        return rewardsContract.balanceOf(address(this));
+    }
+
+    /// @notice How much want we have sitting in our strategy.
+    /// @return Balance of want sitting in our strategy.
+    function balanceOfWant() public view returns (uint256) {
+        // balance of want sitting in our strategy
+        return want.balanceOf(address(this));
+    }
+
+    /// @notice How much CRV we can claim from the staking contract.
+    /// @return Balance of CRV we can claim from the staking contract.
+    function claimableBalance() public view returns (uint256) {
+        return rewardsContract.earned(address(this));
+    }
+
+    /// @notice Total assets the strategy holds, sum of loose and staked want.
+    /// @return Total assets of the strategy.
+    function estimatedTotalAssets() public view override returns (uint256) {
+        return balanceOfWant() + stakedBalance();
+    }
+
+    /* ========== CORE STRATEGY FUNCTIONS ========== */
 
     function prepareReturn(
         uint256 _debtOutstanding
@@ -303,6 +364,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
         rewardsContract.getReward(address(this), true);
 
+        // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
         if (_localKeepCRV > 0 && _curveVoter != address(0)) {
@@ -316,6 +378,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             }
         }
 
+        // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCVX = localKeepCVX;
         address _convexVoter = convexVoter;
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
@@ -342,7 +405,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
             uint256 toFree = _profit + _debtPayment;
 
-            //freed is math.min(wantBalance, toFree)
+            // freed is math.min(wantBalance, toFree)
             (uint256 freed, ) = liquidatePosition(toFree);
 
             if (toFree > freed) {
@@ -356,7 +419,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                 }
             }
         }
-        // if assets are less than debt, we are in trouble. should never happen. dont worry about withdrawing here just report profit
+        // if assets are less than debt, we are in trouble. don't worry about withdrawing here, just report losses
         else {
             unchecked {
                 _loss = debt - assets;
@@ -364,8 +427,62 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    // migrate our want token to a new strategy if needed
-    // also send over any CRV or CVX that is claimed; for migrations we definitely want to claim
+    function adjustPosition(uint256 _debtOutstanding) internal override {
+        // if in emergency exit, we don't want to deploy any more funds
+        if (emergencyExit) {
+            return;
+        }
+
+        // Send all of our Curve pool tokens to be deposited
+        uint256 _toInvest = balanceOfWant();
+
+        // deposit into convex and stake immediately but only if we have something to invest
+        // the final true argument means we deposit + stake at the same time
+        if (_toInvest > 0) {
+            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+        }
+    }
+
+    function liquidatePosition(
+        uint256 _amountNeeded
+    ) internal override returns (uint256 _liquidatedAmount, uint256 _loss) {
+        // check our loose want
+        uint256 _wantBal = balanceOfWant();
+        if (_amountNeeded > _wantBal) {
+            uint256 _stakedBal = stakedBalance();
+            if (_stakedBal > 0) {
+                uint256 _neededFromStaked;
+                unchecked {
+                    _neededFromStaked = _amountNeeded - _wantBal;
+                }
+                // withdraw whatever extra funds we need
+                rewardsContract.withdrawAndUnwrap(
+                    Math.min(_stakedBal, _neededFromStaked),
+                    claimRewards
+                );
+            }
+            uint256 _withdrawnBal = balanceOfWant();
+            _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
+            unchecked {
+                _loss = _amountNeeded - _liquidatedAmount;
+            }
+        } else {
+            // we have enough balance to cover the liquidation available
+            return (_amountNeeded, 0);
+        }
+    }
+
+    // fire sale, get rid of it all!
+    function liquidateAllPositions() internal override returns (uint256) {
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
+            // don't bother withdrawing zero, save gas where we can
+            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
+        }
+        return balanceOfWant();
+    }
+
+    // migrate our want token to a new strategy if needed, claim rewards tokens as well unless it's an emergency
     function prepareMigration(address _newStrategy) internal override {
         uint256 stakedBal = stakedBalance();
 
@@ -384,8 +501,139 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
+    // want is blocked by default, add any other tokens to protect from gov here.
+    function protectedTokens()
+        internal
+        view
+        override
+        returns (address[] memory)
+    {}
+
+    /// @notice In case we need to emergency exit into the convex deposit
+    ///  token, this will allow us to do that.
+    /// @dev Make sure to check claimRewards before this step if needed, and
+    ///  plan to have gov sweep convex deposit tokens from strategy after this.
+    function withdrawToConvexDepositTokens() external onlyVaultManagers {
+        uint256 _stakedBal = stakedBalance();
+        if (_stakedBal > 0) {
+            rewardsContract.withdraw(_stakedBal, claimRewards);
+        }
+    }
+
+    /* ========== YSWAPS ========== */
+
+    /// @notice Use to add or update rewards, rebuilds tradefactory too
+    /// @dev Do this before updating trade factory if we have extra rewards.
+    ///  Can only be called by governance.
+    function updateRewards() external onlyGovernance {
+        address tf = tradeFactory;
+        _removeTradeFactoryPermissions();
+        _updateRewards();
+
+        tradeFactory = tf;
+        _setUpTradeFactory();
+    }
+
+    function _updateRewards() internal {
+        // empty the rewardsTokens and rebuild
+        delete rewardsTokens;
+
+        // convex provides us info on any extra tokens we may receive
+        uint256 length = rewardsContract.extraRewardsLength();
+        address _convexToken = address(convexToken);
+        for (uint256 i; i < length; ++i) {
+            address virtualRewardsPool = rewardsContract.extraRewards(i);
+            address _rewardsToken = IConvexRewards(virtualRewardsPool)
+                .rewardToken();
+
+            // we only need to approve the new token and turn on rewards if the extra reward isn't CVX
+            if (_rewardsToken != _convexToken) {
+                rewardsTokens.push(_rewardsToken);
+            }
+        }
+    }
+
+    /// @notice Use to update our trade factory.
+    /// @dev Can only be called by governance.
+    /// @param _newTradeFactory Address of new trade factory.
+    function updateTradeFactory(
+        address _newTradeFactory
+    ) external onlyGovernance {
+        require(
+            _newTradeFactory != address(0),
+            "Can't remove with this function"
+        );
+        _removeTradeFactoryPermissions();
+        tradeFactory = _newTradeFactory;
+        _setUpTradeFactory();
+    }
+
+    function _setUpTradeFactory() internal {
+        // approve and set up trade factory
+        address _tradeFactory = tradeFactory;
+        address _want = address(want);
+
+        ITradeFactory tf = ITradeFactory(_tradeFactory);
+        crv.approve(_tradeFactory, type(uint256).max);
+        tf.enable(address(crv), _want);
+
+        // enable for any rewards tokens too
+        uint256 rLength = rewardsTokens.length;
+        for (uint256 i; i < rLength; ++i) {
+            address _rewardsToken = rewardsTokens[i];
+            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
+            tf.enable(_rewardsToken, _want);
+        }
+
+        convexToken.approve(_tradeFactory, type(uint256).max);
+        tf.enable(address(convexToken), _want);
+    }
+
+    /// @notice Use this to remove permissions from our current trade factory.
+    /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
+    function removeTradeFactoryPermissions() external onlyVaultManagers {
+        _removeTradeFactoryPermissions();
+    }
+
+    function _removeTradeFactoryPermissions() internal {
+        address _tradeFactory = tradeFactory;
+        if (_tradeFactory == address(0)) {
+            return;
+        }
+        ITradeFactory tf = ITradeFactory(_tradeFactory);
+
+        address _want = address(want);
+        crv.approve(_tradeFactory, 0);
+        tf.disable(address(crv), _want);
+
+        //disable for all rewards tokens too
+        uint256 rLength = rewardsTokens.length;
+        for (uint256 i; i < rLength; ++i) {
+            address _rewardsToken = rewardsTokens[i];
+            IERC20(_rewardsToken).approve(_tradeFactory, 0);
+            tf.disable(_rewardsToken, _want);
+        }
+
+        convexToken.approve(_tradeFactory, 0);
+        tf.disable(address(convexToken), _want);
+
+        tradeFactory = address(0);
+    }
+
     /* ========== KEEP3RS ========== */
-    // use this to determine when to harvest automagically
+
+    /**
+     * @notice
+     *  Provide a signal to the keeper that harvest() should be called.
+     *
+     *  Don't harvest if a strategy is inactive, or if it needs an earmark first.
+     *  If our profit exceeds our upper limit, then harvest no matter what. For
+     *  our lower profit limit, credit threshold, max delay, and manual force trigger,
+     *  only harvest if our gas price is acceptable.
+     *
+     * @param callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
+     * @return True if harvest() should be called, false otherwise.
+     */
     function harvestTrigger(
         uint256 callCostinEth
     ) public view override returns (bool) {
@@ -439,6 +687,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+    /// @dev Uses yearn's lens oracle, if returned values are strange then troubleshoot there.
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
         IOracle yearnOracle = IOracle(
@@ -467,6 +716,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             cliff = supply / reductionPerCliff;
         }
         uint256 _claimableBal = claimableBalance();
+
         //mint if below total cliffs
         if (cliff < totalCliffs) {
             uint256 reduction; // for reduction% take inverse of current cliff
@@ -492,12 +742,17 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             (crvPrice * _claimableBal + convexTokenPrice * mintableCvx) / 1e18;
     }
 
-    // convert our keeper's eth cost into want, we don't need this anymore since we don't use baseStrategy harvestTrigger
+    /// @notice Convert our keeper's eth cost into want
+    /// @dev We don't use this since we don't factor call cost into our harvestTrigger.
+    /// @param _ethAmount Amount of ether spent.
+    /// @return Value of ether in want.
     function ethToWant(
         uint256 _ethAmount
     ) public view override returns (uint256) {}
 
-    // check if someone needs to earmark rewards on convex before keepers harvest again
+    /// @notice Check if someone needs to earmark rewards on Convex before keepers harvest again.
+    /// @dev Not worth harvesting if this is true as our rewards will be minimal.
+    /// @return needsEarmark Whether or not rewards need to be earmarked before flowing again.
     function needsEarmarkReward() public view returns (bool needsEarmark) {
         // check if there is any CRV we need to earmark
         uint256 crvExpiry = rewardsContract.periodFinish();
@@ -507,177 +762,29 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     /* ========== SETTERS ========== */
-
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    // Use to add or update rewards
-    // Rebuilds tradefactory too
-    function updateRewards() external onlyGovernance {
-        address tf = tradeFactory;
-        _removeTradeFactoryPermissions();
-        _updateRewards();
-
-        tradeFactory = tf;
-        _setUpTradeFactory();
-    }
-
-    function _updateRewards() internal {
-        delete rewardsTokens; //empty the rewardsTokens and rebuild
-
-        uint256 length = rewardsContract.extraRewardsLength();
-        address _convexToken = address(convexToken);
-        for (uint256 i; i < length; ++i) {
-            address virtualRewardsPool = rewardsContract.extraRewards(i);
-            address _rewardsToken = IConvexRewards(virtualRewardsPool)
-                .rewardToken();
-
-            // we only need to approve the new token and turn on rewards if the extra rewards isn't CVX
-            if (_rewardsToken != _convexToken) {
-                rewardsTokens.push(_rewardsToken);
-            }
-        }
-    }
-
-    function updateLocalKeepCrvs(
+    /// @notice Use this to set or update our keep amounts for this strategy.
+    /// @dev Must be less than 10,000. Set in basis points. Only governance can set this.
+    /// @param _keepCrv Percent of each CRV harvest to send to our voter.
+    /// @param _keepCvx Percent of each CVX harvest to send to our voter.
+    function setLocalKeepCrvs(
         uint256 _keepCrv,
         uint256 _keepCvx
     ) external onlyGovernance {
         if (_keepCrv > 10_000 || _keepCvx > 10_000) {
             revert();
         }
-
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
     }
 
-    // Use to turn off extra rewards claiming and selling.
-    function turnOffRewards() external onlyGovernance {
-        delete rewardsTokens;
-    }
-
-    // determine whether we will check if our convex rewards need to be earmarked
-    function setCheckEarmark(bool _checkEarmark) external onlyVaultManagers {
-        checkEarmark = _checkEarmark;
-    }
-
-    /* ========== VIEWS ========== */
-
-    function name() external view override returns (string memory) {
-        return stratName;
-    }
-
-    function stakedBalance() public view returns (uint256) {
-        // how much want we have staked in Convex
-        return rewardsContract.balanceOf(address(this));
-    }
-
-    function balanceOfWant() public view returns (uint256) {
-        // balance of want sitting in our strategy
-        return want.balanceOf(address(this));
-    }
-
-    function claimableBalance() public view returns (uint256) {
-        // how much CRV we can claim from the staking contract
-        return rewardsContract.earned(address(this));
-    }
-
-    function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant() + stakedBalance();
-    }
-
-    /* ========== CONSTANT FUNCTIONS ========== */
-    // these should stay the same across different wants.
-
-    function adjustPosition(uint256 _debtOutstanding) internal override {
-        if (emergencyExit) {
-            return;
-        }
-        // Send all of our Curve pool tokens to be deposited
-        uint256 _toInvest = balanceOfWant();
-        // deposit into convex and stake immediately but only if we have something to invest
-        if (_toInvest > 0) {
-            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
-        }
-    }
-
-    function liquidatePosition(
-        uint256 _amountNeeded
-    ) internal override returns (uint256 _liquidatedAmount, uint256 _loss) {
-        uint256 _wantBal = balanceOfWant();
-        if (_amountNeeded > _wantBal) {
-            uint256 _stakedBal = stakedBalance();
-            if (_stakedBal > 0) {
-                uint256 _neededFromStaked;
-                unchecked {
-                    _neededFromStaked = _amountNeeded - _wantBal;
-                }
-                rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _neededFromStaked),
-                    claimRewards
-                );
-            }
-            uint256 _withdrawnBal = balanceOfWant();
-            _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
-            unchecked {
-                _loss = _amountNeeded - _liquidatedAmount;
-            }
-        } else {
-            // we have enough balance to cover the liquidation available
-            return (_amountNeeded, 0);
-        }
-    }
-
-    // fire sale, get rid of it all!
-    function liquidateAllPositions() internal override returns (uint256) {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            // don't bother withdrawing zero
-            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
-        }
-        return balanceOfWant();
-    }
-
-    // in case we need to exit into the convex deposit token, this will allow us to do that
-    // make sure to check claimRewards before this step if needed
-    // plan to have gov sweep convex deposit tokens from strategy after this
-    function withdrawToConvexDepositTokens() external onlyVaultManagers {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            rewardsContract.withdraw(_stakedBal, claimRewards);
-        }
-    }
-
-    // we don't want for these tokens to be swept out. We allow gov to sweep out cvx vault tokens; we would only be holding these if things were really, really rekt.
-    function protectedTokens()
-        internal
-        view
-        override
-        returns (address[] memory)
-    {}
-
-    /* ========== SETTERS ========== */
-
-    // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    // We usually don't need to claim rewards on withdrawals, but might change our mind for migrations etc
-    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
-        claimRewards = _claimRewards;
-    }
-
-    function updateTradeFactory(
-        address _newTradeFactory
-    ) external onlyGovernance {
-        if (tradeFactory != address(0)) {
-            _removeTradeFactoryPermissions();
-        }
-
-        tradeFactory = _newTradeFactory;
-        if (_newTradeFactory != address(0)) {
-            _setUpTradeFactory();
-        }
-    }
-
-    function updateVoters(
+    /// @notice Use this to set or update our voter contracts.
+    /// @dev For Convex strategies, this is simply where we send our keepCRV and keepCVX.
+    ///  Only governance can set this.
+    /// @param _curveVoter Address of our curve voter.
+    /// @param _convexVoter Address of our convex voter.
+    function setVoters(
         address _curveVoter,
         address _convexVoter
     ) external onlyGovernance {
@@ -685,34 +792,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         convexVoter = _convexVoter;
     }
 
-    // once this is called setupTradefactory must be called to get things working again
-    function removeTradeFactoryPermissions() external onlyEmergencyAuthorized {
-        _removeTradeFactoryPermissions();
-    }
-
-    function _removeTradeFactoryPermissions() internal {
-        address _tradeFactory = tradeFactory;
-        if (_tradeFactory == address(0)) {
-            return;
-        }
-        ITradeFactory tf = ITradeFactory(_tradeFactory);
-
-        address _want = address(want);
-        crv.approve(_tradeFactory, 0);
-        tf.disable(address(crv), _want);
-
-        //disable for all rewards tokens too
-        uint256 rLength = rewardsTokens.length;
-        for (uint256 i; i < rLength; ++i) {
-            address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, 0);
-            tf.disable(_rewardsToken, _want);
-        }
-
-        convexToken.approve(_tradeFactory, 0);
-        tf.disable(address(convexToken), _want);
-
-        tradeFactory = address(0);
+    /// @notice Set whether we claim rewards on withdrawals.
+    /// @dev Usually false, but may set to true during migrations.
+    /// @param _claimRewards Whether we want to claim rewards on withdrawals.
+    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
+        claimRewards = _claimRewards;
     }
 
     /**
