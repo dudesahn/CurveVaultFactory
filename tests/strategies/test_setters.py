@@ -138,7 +138,7 @@ def test_setters(
         print("Claimable Profit:", profit / 1e6)
 
     if which_strategy == 0:
-        strategy.setVoters(ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
+        strategy.setVoters(gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(10, 10, {"from": gov})
         strategy.setClaimRewards(True, {"from": gov})
 
@@ -148,13 +148,14 @@ def test_setters(
         with brownie.reverts():
             strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
     elif which_strategy == 1:
+        strategy.setVoter(gov, {"from": gov})
         strategy.setLocalKeepCrv(10, {"from": gov})
 
         # test our reverts as well
         with brownie.reverts():
             strategy.setLocalKeepCrv(1000000, {"from": gov})
     else:
-        strategy.setVoters(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
 
         # test our reverts as well
