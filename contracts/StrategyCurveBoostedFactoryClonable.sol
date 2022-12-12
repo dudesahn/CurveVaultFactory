@@ -502,6 +502,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         if (_keepCrv > 10_000) {
             revert();
         }
+        if (_keepCrv > 0 && curveVoter == address(0)) {
+            revert();
+        }
         localKeepCRV = _keepCrv;
     }
 

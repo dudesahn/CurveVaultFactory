@@ -889,6 +889,7 @@ def test_odds_and_ends_keep(
         strategy.setVoters(gov, gov, {"from": gov})
         tx = strategy.harvest({"from": gov})
     elif which_strategy == 1:
+        strategy.setVoter(gov, {"from": gov})
         strategy.setLocalKeepCrv(1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
     else:
