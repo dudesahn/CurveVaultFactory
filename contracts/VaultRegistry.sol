@@ -87,12 +87,12 @@ contract VaultRegistry is Ownable {
         if (_type == 0) {
             return _fetchFromLegacy(_token);
         }
-        
+
         uint256 length = _numVaults(_token);
         if (length == 0) {
             return address(0);
         }
-        
+
         uint256 i = length - 1;
         while (true) {
             address vault = vaults[_token][i];

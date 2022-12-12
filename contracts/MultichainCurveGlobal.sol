@@ -191,7 +191,7 @@ interface Vault {
     function addStrategy(address, uint256, uint256, uint256, uint256) external;
 }
 
-contract CurveGlobal {
+contract MultichainCurveGlobal {
     event NewAutomatedVault(
         uint256 indexed category,
         address indexed lpToken,
@@ -988,6 +988,16 @@ contract CurveGlobal {
             address convexFraxStrategy
         )
     {
+        // if we don't have an implementation for frax or convex, skip them always
+        if (convexFraxStratImplementation == address(0)) {
+            if (convexStratImplementation != address(0)) {
+                convexStrategy = _addConvexStrategy(_vault, _pid);
+            }
+            // we want a curve strategy no matter what, with 100% debtRatio in this case
+            curveStrategy = _addCurveStrategy(_vault, _gauge, false);
+            return (convexStrategy, curveStrategy, address(0));
+        }
+
         // check if we can add a convex frax strategy for this pool, ganache can't handle this (use tenderly)
         (
             bool hasFraxPool,

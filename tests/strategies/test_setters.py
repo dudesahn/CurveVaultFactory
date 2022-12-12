@@ -87,7 +87,6 @@ def test_setters(
     strategy.setMetadataURI(0, {"from": gov})
     strategy.setMinReportDelay(100, {"from": gov})
     strategy.setRewards(gov, {"from": strategist})
-    strategy.turnOffRewards({"from": gov})
 
     # special setter for frax
     if which_strategy == 2:
@@ -139,33 +138,32 @@ def test_setters(
         print("Claimable Profit:", profit / 1e6)
 
     if which_strategy == 0:
-        strategy.setCheckEarmark(False, {"from": gov})
-        strategy.updateVoters(ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
-        strategy.updateLocalKeepCrvs(10, 10, {"from": gov})
+        strategy.setVoters(ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
+        strategy.setLocalKeepCrvs(10, 10, {"from": gov})
         strategy.setClaimRewards(True, {"from": gov})
 
         # test our reverts as well
         with brownie.reverts():
-            strategy.updateLocalKeepCrvs(1000000, 0, {"from": gov})
+            strategy.setLocalKeepCrvs(1000000, 0, {"from": gov})
         with brownie.reverts():
-            strategy.updateLocalKeepCrvs(0, 100000000, {"from": gov})
+            strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
     elif which_strategy == 1:
-        strategy.updateLocalKeepCrv(10, {"from": gov})
+        strategy.setLocalKeepCrv(10, {"from": gov})
 
         # test our reverts as well
         with brownie.reverts():
-            strategy.updateLocalKeepCrv(1000000, {"from": gov})
+            strategy.setLocalKeepCrv(1000000, {"from": gov})
     else:
-        strategy.updateVoters(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
-        strategy.updateLocalKeepCrvs(10, 10, 10, {"from": gov})
+        strategy.setVoters(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
+        strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
 
         # test our reverts as well
         with brownie.reverts():
-            strategy.updateLocalKeepCrvs(1000000, 0, 0, {"from": gov})
+            strategy.setLocalKeepCrvs(1000000, 0, 0, {"from": gov})
         with brownie.reverts():
-            strategy.updateLocalKeepCrvs(0, 100000000, 0, {"from": gov})
+            strategy.setLocalKeepCrvs(0, 100000000, 0, {"from": gov})
         with brownie.reverts():
-            strategy.updateLocalKeepCrvs(0, 0, 10000000, {"from": gov})
+            strategy.setLocalKeepCrvs(0, 0, 10000000, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()

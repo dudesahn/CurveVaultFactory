@@ -310,10 +310,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // set our strategy's name
         stratName = string(
             abi.encodePacked(
-                IDetails(address(want)).name(),
-                " Auto-Compounding ",
-                IDetails(address(convexToken)).symbol(),
-                " Strategy"
+                "StrategyConvexFactory-",
+                IDetails(address(want)).symbol()
             )
         );
     }
@@ -606,7 +604,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         crv.approve(_tradeFactory, 0);
         tf.disable(address(crv), _want);
 
-        //disable for all rewards tokens too
+        // disable for all rewards tokens too
         uint256 rLength = rewardsTokens.length;
         for (uint256 i; i < rLength; ++i) {
             address _rewardsToken = rewardsTokens[i];
@@ -717,7 +715,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
         uint256 _claimableBal = claimableBalance();
 
-        //mint if below total cliffs
+        // mint if below total cliffs
         if (cliff < totalCliffs) {
             uint256 reduction; // for reduction% take inverse of current cliff
             unchecked {
@@ -801,13 +799,13 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     /**
      * @notice
-     * Here we set various parameters to optimize our harvestTrigger.
+     *  Here we set various parameters to optimize our harvestTrigger.
      * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
-     * that will trigger a harvest if gas price is acceptable.
+     *  that will trigger a harvest if gas price is acceptable.
      * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
-     * will trigger a harvest regardless of gas price.
+     *  will trigger a harvest regardless of gas price.
      * @param _checkEarmark Whether or not we should check Convex's
-     * booster to see if we need to earmark before harvesting.
+     *  booster to see if we need to earmark before harvesting.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
