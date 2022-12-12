@@ -944,6 +944,18 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             revert();
         }
 
+        if (_keepCrv > 0 && curveVoter == address(0)) {
+            revert();
+        }
+
+        if (_keepCvx > 0 && convexVoter == address(0)) {
+            revert();
+        }
+
+        if (_keepFxs > 0 && fraxVoter == address(0)) {
+            revert();
+        }
+
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
         localKeepFXS = _keepFxs;
