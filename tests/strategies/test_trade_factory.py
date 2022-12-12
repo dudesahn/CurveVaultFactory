@@ -132,5 +132,6 @@ def test_keepers(
         tx = strategy.harvest({"from": gov})
         chain.sleep(1)
 
-    # set trade factory to zero
-    strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})
+    # can't set trade factory to zero
+    with brownie.reverts():
+        strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})

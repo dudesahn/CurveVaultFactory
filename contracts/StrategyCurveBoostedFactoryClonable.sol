@@ -177,10 +177,8 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         // set our strategy's name
         stratName = string(
             abi.encodePacked(
-                IDetails(address(want)).name(),
-                " Auto-Compounding ",
-                IDetails(address(crv)).symbol(),
-                " Strategy"
+                "StrategyCurveBoostedFactory-",
+                IDetails(address(want)).symbol()
             )
         );
     }
@@ -423,7 +421,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         crv.approve(_tradeFactory, 0);
         tf.disable(address(crv), _want);
 
-        //disable for all rewards tokens too
+        // disable for all rewards tokens too
         uint256 rLength = rewardsTokens.length;
         for (uint256 i; i < rLength; ++i) {
             address _rewardsToken = rewardsTokens[i];

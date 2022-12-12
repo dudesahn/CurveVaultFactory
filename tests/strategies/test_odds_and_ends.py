@@ -885,15 +885,15 @@ def test_odds_and_ends_keep(
 
     # harvest as-is before we have yield to hit all parts of our if statement
     if which_strategy == 0:
-        strategy.updateLocalKeepCrvs(1000, 1000, {"from": gov})
-        strategy.updateVoters(gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, {"from": gov})
         tx = strategy.harvest({"from": gov})
     elif which_strategy == 1:
-        strategy.updateLocalKeepCrv(1000, {"from": gov})
+        strategy.setLocalKeepCrv(1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
     else:
-        strategy.updateLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
-        strategy.updateVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
         tx = strategy.harvest({"from": gov})
 
     # sleep to get some profit
@@ -931,7 +931,7 @@ def test_odds_and_ends_keep(
 
     # keepCRV off only
     if which_strategy == 0:
-        strategy.updateLocalKeepCrvs(0, 0, {"from": gov})
+        strategy.setLocalKeepCrvs(0, 0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         treasury_before = convexToken.balanceOf(strategy.convexVoter())
@@ -940,7 +940,7 @@ def test_odds_and_ends_keep(
         treasury_after = convexToken.balanceOf(strategy.convexVoter())
         assert treasury_after == treasury_before
     elif which_strategy == 1:
-        strategy.updateLocalKeepCrv(0, {"from": gov})
+        strategy.setLocalKeepCrv(0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         treasury_before = crv.balanceOf(strategy.curveVoter())
@@ -949,8 +949,8 @@ def test_odds_and_ends_keep(
         treasury_after = crv.balanceOf(strategy.curveVoter())
         assert treasury_after == treasury_before
     else:
-        strategy.updateLocalKeepCrvs(0, 0, 0, {"from": gov})
-        strategy.updateVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(0, 0, 0, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         treasury_before = fxs.balanceOf(strategy.fraxVoter())
@@ -961,22 +961,22 @@ def test_odds_and_ends_keep(
 
     # voter off only
     if which_strategy == 0:
-        strategy.updateLocalKeepCrvs(1000, 1000, {"from": gov})
-        strategy.updateVoters(gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
     elif which_strategy == 1:
-        strategy.updateLocalKeepCrv(1000, {"from": gov})
-        strategy.updateVoter(gov, {"from": gov})
+        strategy.setLocalKeepCrv(1000, {"from": gov})
+        strategy.setVoter(gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
     else:
-        strategy.updateLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
-        strategy.updateVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})
@@ -984,19 +984,19 @@ def test_odds_and_ends_keep(
 
     # both off
     if which_strategy == 0:
-        strategy.updateLocalKeepCrvs(0, 0, {"from": gov})
+        strategy.setLocalKeepCrvs(0, 0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
     elif which_strategy == 1:
-        strategy.updateLocalKeepCrv(0, {"from": gov})
+        strategy.setLocalKeepCrv(0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
     else:
-        strategy.updateLocalKeepCrvs(0, 0, 0, {"from": gov})
+        strategy.setLocalKeepCrvs(0, 0, 0, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})

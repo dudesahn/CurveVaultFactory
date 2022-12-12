@@ -150,7 +150,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     uint256 public lastDepositAmount;
 
     /// @notice Minimum size required for deposit (in want).
-    /// @dev Prevents us from creating a new kek for dust.
+    /// @dev Prevents us from creating a new kek for only dust.
     uint256 public minDeposit;
 
     /// @notice Maximum size for a single deposit (in want).
@@ -161,9 +161,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @dev Initially set to the min time, ~1 week, and can be updated later if desired.
     uint256 public lockTime;
 
-    /// @notice This is the max number of Keks we will allow the strategy to have
-    ///  open at one time to limit withdraw loops
-    /// @dev A new "kek" is created each time we stake the LP token and a whole
+    /// @notice This is the max number of keks we will allow the strategy to have
+    ///  open at one time to limit withdraw loops.
+    /// @dev A new kek (position) is created each time we stake the LP token. A whole
     ///  kek must be withdrawn during any withdrawals.
     uint256 public maxKeks;
 
@@ -341,8 +341,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // set our strategy's name
         stratName = string(
             abi.encodePacked(
-                IDetails(address(want)).name(),
-                " Auto-Compounding Convex Frax Strategy"
+                "StrategyConvexFraxFactory-",
+                IDetails(address(want)).symbol()
             )
         );
     }
@@ -471,8 +471,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             _toInvest = maxSingleDeposit;
         }
 
-        // If we have already locked the max amount of keks, we need to withdraw the oldest one
-        // and reinvest that alongside the new funds
+        // If we have already locked the max amount of keks, we need
+        // to withdraw the oldest one and reinvest that alongside the new funds
         if (nextKek >= maxKeks) {
             // Get the oldest kek that could have funds in it
             IConvexFrax.LockedStake memory stake = stakingAddress
@@ -510,7 +510,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     require(
                         stakedBalance() - stillLockedStake() >=
                             _neededFromStaked,
-                        "Need to wait till most recent deposit unlocks"
+                        "Need to wait until most recent deposit unlocks"
                     );
                 }
                 // no need to check for >0, we know _neededFromStaked has to be at least 1 wei
@@ -967,11 +967,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     /**
      * @notice
-     * Here we set various parameters to optimize our harvestTrigger.
+     *  Here we set various parameters to optimize our harvestTrigger.
      * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
-     * that will trigger a harvest if gas price is acceptable.
+     *  that will trigger a harvest if gas price is acceptable.
      * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
-     * will trigger a harvest regardless of gas price.
+     *  will trigger a harvest regardless of gas price.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
