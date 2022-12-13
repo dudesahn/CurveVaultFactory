@@ -705,7 +705,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         address _want = address(want);
         crv.approve(_tradeFactory, 0);
-        tf.disable(address(crv), _want);
+        if (_disableTf) {
+            tf.disable(address(crv), _want);
+        }
 
         // disable for any other rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
@@ -717,10 +719,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
 
         convexToken.approve(_tradeFactory, 0);
-        tf.disable(address(convexToken), _want);
-
+        if (_disableTf) {
+            tf.disable(address(convexToken), _want);
+        }
+        
         fxs.approve(_tradeFactory, 0);
-        tf.disable(address(fxs), _want);
+        if (_disableTf) {
+            tf.disable(address(fxs), _want);
+        }
 
         tradeFactory = address(0);
     }

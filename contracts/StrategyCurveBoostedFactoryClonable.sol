@@ -420,7 +420,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
         address _want = address(want);
         crv.approve(_tradeFactory, 0);
-        tf.disable(address(crv), _want);
+        if (_disableTf) {
+            tf.disable(address(crv), _want);
+        }
 
         // disable for all rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
