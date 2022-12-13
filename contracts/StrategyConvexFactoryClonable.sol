@@ -525,7 +525,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     ///  Can only be called by governance.
     function updateRewards() external onlyGovernance {
         address tf = tradeFactory;
-        _removeTradeFactoryPermissions();
+        _removeTradeFactoryPermissions(true);
         _updateRewards();
 
         tradeFactory = tf;
@@ -561,7 +561,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             _newTradeFactory != address(0),
             "Can't remove with this function"
         );
-        _removeTradeFactoryPermissions();
+        _removeTradeFactoryPermissions(true);
         tradeFactory = _newTradeFactory;
         _setUpTradeFactory();
     }
@@ -576,8 +576,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         tf.enable(address(crv), _want);
 
         // enable for any rewards tokens too
-        uint256 rLength = rewardsTokens.length;
-        for (uint256 i; i < rLength; ++i) {
+        for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
             IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
             tf.enable(_rewardsToken, _want);
@@ -589,11 +588,13 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     /// @notice Use this to remove permissions from our current trade factory.
     /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
-    function removeTradeFactoryPermissions() external onlyVaultManagers {
-        _removeTradeFactoryPermissions();
+    /// @param _disableTf Specify whether to disable the tradefactory when removing.
+    ///  Option given in case we need to get around a reverting disable.
+    function removeTradeFactoryPermissions(bool _disableTf) external onlyVaultManagers {
+        _removeTradeFactoryPermissions(_disableTf);
     }
 
-    function _removeTradeFactoryPermissions() internal {
+    function _removeTradeFactoryPermissions(bool _disableTf) internal {
         address _tradeFactory = tradeFactory;
         if (_tradeFactory == address(0)) {
             return;
@@ -605,11 +606,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         tf.disable(address(crv), _want);
 
         // disable for all rewards tokens too
-        uint256 rLength = rewardsTokens.length;
-        for (uint256 i; i < rLength; ++i) {
+        for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
             IERC20(_rewardsToken).approve(_tradeFactory, 0);
-            tf.disable(_rewardsToken, _want);
+            if (_disableTf) {
+                tf.disable(_rewardsToken, _want);
+            }
         }
 
         convexToken.approve(_tradeFactory, 0);
