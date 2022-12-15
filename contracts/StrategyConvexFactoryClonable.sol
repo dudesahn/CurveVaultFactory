@@ -319,32 +319,27 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
-    /// @return Strategy name.
     function name() external view override returns (string memory) {
         return stratName;
     }
 
-    /// @notice How much want we have staked in Convex.
-    /// @return Balance of want staked in Convex.
+    /// @notice Balance of want staked in Convex.
     function stakedBalance() public view returns (uint256) {
         return rewardsContract.balanceOf(address(this));
     }
 
-    /// @notice How much want we have sitting in our strategy.
-    /// @return Balance of want sitting in our strategy.
+    /// @notice Balance of want sitting in our strategy.
     function balanceOfWant() public view returns (uint256) {
         // balance of want sitting in our strategy
         return want.balanceOf(address(this));
     }
 
-    /// @notice How much CRV we can claim from the staking contract.
-    /// @return Balance of CRV we can claim from the staking contract.
+    /// @notice Balance of CRV we can claim from the staking contract.
     function claimableBalance() public view returns (uint256) {
         return rewardsContract.earned(address(this));
     }
 
     /// @notice Total assets the strategy holds, sum of loose and staked want.
-    /// @return Total assets of the strategy.
     function estimatedTotalAssets() public view override returns (uint256) {
         return balanceOfWant() + stakedBalance();
     }
@@ -590,7 +585,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
     /// @param _disableTf Specify whether to disable the tradefactory when removing.
     ///  Option given in case we need to get around a reverting disable.
-    function removeTradeFactoryPermissions(bool _disableTf) external onlyVaultManagers {
+    function removeTradeFactoryPermissions(
+        bool _disableTf
+    ) external onlyVaultManagers {
         _removeTradeFactoryPermissions(_disableTf);
     }
 
@@ -606,7 +603,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         if (_disableTf) {
             tf.disable(address(crv), _want);
         }
-            
+
         // disable for all rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
@@ -620,7 +617,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         if (_disableTf) {
             tf.disable(address(convexToken), _want);
         }
-        
+
         tradeFactory = address(0);
     }
 

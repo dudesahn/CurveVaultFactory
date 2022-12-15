@@ -1,11 +1,14 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./IVault.sol";
 
 contract ReleaseRegistry is Ownable {
+    /// @notice Number of vault releases in this registry.
     uint256 public numReleases;
+
+    /// @notice Address of a given vault release index.
     mapping(uint256 => address) public releases;
 
     event NewRelease(
@@ -20,7 +23,6 @@ contract ReleaseRegistry is Ownable {
     @notice Returns the api version of the latest release.
     @dev Throws if no releases are registered yet.
     @return The api version of the latest release.
-    NOTE: Throws if there has not been a release yet
     */
     function latestRelease() external view returns (string memory) {
         return IVault(releases[numReleases - 1]).apiVersion(); // dev: no release
@@ -30,12 +32,11 @@ contract ReleaseRegistry is Ownable {
     @notice
         Add a previously deployed Vault as the template contract for the latest release,
         to be used by further "forwarder-style" delegatecall proxy contracts that can be
-        deployed from the registry throw other methods (to save gas).
+        deployed from the registry through other methods (to save gas).
     @dev
-        Throws if caller isn't `governance`.
-        Throws if `vault`'s governance isn't `governance`.
+        Throws if caller isn't owner.
         Throws if the api version is the same as the previous release.
-        Emits a `NewVault` event.
+        Emits a NewRelease event.
     @param _vault The vault that will be used as the template contract for the next release.
     */
     function newRelease(address _vault) external onlyOwner {
@@ -85,6 +86,8 @@ contract ReleaseRegistry is Ownable {
         return vault;
     }
 
+    /// @notice Deploy a new vault with the latest vault release.
+    /// @dev See other newVault() function for more details.
     function newVault(
         address _token,
         address _guardian,
@@ -109,7 +112,7 @@ contract ReleaseRegistry is Ownable {
         Create a new vault for the given token using the latest release in the registry,
         as a simple "forwarder-style" delegatecall proxy to the latest release.
     @dev
-        Throws if no releases are registered yet.
+        Throws if no releases are registered yet. Note that this vault will not be automatically endorsed.
     @param _token The token that may be deposited into the new Vault.
     @param _governance vault governance
     @param _guardian The address authorized for guardian interactions in the new Vault.

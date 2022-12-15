@@ -885,16 +885,23 @@ def test_odds_and_ends_keep(
 
     # harvest as-is before we have yield to hit all parts of our if statement
     if which_strategy == 0:
-        strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
+        # need to set voters first if we're trying to set keep
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
         strategy.setVoters(gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
     elif which_strategy == 1:
+        with brownie.reverts():
+            strategy.setLocalKeepCrv(1000, {"from": gov})
         strategy.setVoter(gov, {"from": gov})
         strategy.setLocalKeepCrv(1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
     else:
-        strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
         strategy.setVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
 
     # sleep to get some profit

@@ -311,6 +311,23 @@ contract CurveGlobal {
     /// @notice Default deposit limit on our factory vaults. Set to a large number.
     uint256 public depositLimit = 10_000_000_000_000 * 1e18;
 
+    /* ========== CONSTRUCTOR ========== */
+
+    constructor(
+        address _registry,
+        address _convexStratImplementation,
+        address _curveStratImplementation,
+        address _convexFraxStratImplementation,
+        address _owner
+    ) {
+        registry = IRegistry(_registry);
+        convexStratImplementation = _convexStratImplementation;
+        curveStratImplementation = _curveStratImplementation;
+        convexFraxStratImplementation = _convexFraxStratImplementation;
+        owner = _owner;
+        pendingOwner = _owner;
+    }
+
     /* ========== STATE VARIABLE SETTERS ========== */
 
     /// @notice Set the new owner of the factory.
@@ -630,23 +647,6 @@ contract CurveGlobal {
         managementFee = _managementFee;
     }
 
-    /* ========== CONSTRUCTOR ========== */
-
-    constructor(
-        address _registry,
-        address _convexStratImplementation,
-        address _curveStratImplementation,
-        address _convexFraxStratImplementation,
-        address _owner
-    ) {
-        registry = IRegistry(_registry);
-        convexStratImplementation = _convexStratImplementation;
-        curveStratImplementation = _curveStratImplementation;
-        convexFraxStratImplementation = _convexFraxStratImplementation;
-        owner = _owner;
-        pendingOwner = _owner;
-    }
-
     /* ========== VIEWS ========== */
 
     /// @notice View all vault addresses deployed by this factory.
@@ -682,7 +682,7 @@ contract CurveGlobal {
         address latest;
 
         // we only care about types 0-2 here, so enforce that
-        for (uint256 i = 0; i < 3; ++i) {
+        for (uint256 i; i < 3; ++i) {
             latest = registry.latestVaultOfType(lptoken, i);
             if (latest != address(0)) {
                 break;

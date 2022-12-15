@@ -73,11 +73,11 @@ def test_keepers(
             {"from": new_trade_factory},
         )
 
-    strategy.removeTradeFactoryPermissions({"from": gov})
+    strategy.removeTradeFactoryPermissions(True, {"from": gov})
     assert strategy.tradeFactory() == ZERO_ADDRESS
 
     # do it twice to hit both arms of the if statement
-    strategy.removeTradeFactoryPermissions({"from": gov})
+    strategy.removeTradeFactoryPermissions(False, {"from": gov})
 
     assert crv.balanceOf(strategy) > 0
     if which_strategy != 1:

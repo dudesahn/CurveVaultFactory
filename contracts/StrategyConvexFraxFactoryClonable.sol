@@ -350,27 +350,23 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
-    /// @return Strategy name.
     function name() external view override returns (string memory) {
         return stratName;
     }
 
-    /// @notice How much want we have staked in Convex Frax.
-    /// @return Balance of want staked in Convex Frax.
+    /// @notice Balance of want staked in Convex Frax.
     function stakedBalance() public view returns (uint256) {
         // how much want we have staked in Convex-Frax
         return stakingAddress.lockedLiquidityOf(address(userVault));
     }
 
-    /// @notice How much want we have sitting in our strategy.
-    /// @return Balance of want sitting in our strategy.
+    /// @notice Balance of want sitting in our strategy.
     function balanceOfWant() public view returns (uint256) {
         // balance of want sitting in our strategy
         return want.balanceOf(address(this));
     }
 
     /// @notice Total assets the strategy holds, sum of loose and staked want.
-    /// @return Total assets of the strategy.
     function estimatedTotalAssets() public view override returns (uint256) {
         return balanceOfWant() + stakedBalance();
     }
@@ -692,7 +688,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
     /// @param _disableTf Specify whether to disable the tradefactory when removing.
     ///  Option given in case we need to get around a reverting disable.
-    function removeTradeFactoryPermissions(bool _disableTf) external onlyVaultManagers {
+    function removeTradeFactoryPermissions(
+        bool _disableTf
+    ) external onlyVaultManagers {
         _removeTradeFactoryPermissions(_disableTf);
     }
 
@@ -722,7 +720,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         if (_disableTf) {
             tf.disable(address(convexToken), _want);
         }
-        
+
         fxs.approve(_tradeFactory, 0);
         if (_disableTf) {
             tf.disable(address(fxs), _want);
