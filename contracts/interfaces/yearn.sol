@@ -27,7 +27,7 @@ interface ICurveStrategyProxy {
 
     function revokeStrategy(address) external;
 
-    function claimRewards(address _gauge, address[] memory _token) external;
+    function claimManyRewards(address _gauge, address[] memory _token) external;
 }
 
 interface IVoter {

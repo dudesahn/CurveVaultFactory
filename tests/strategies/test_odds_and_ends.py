@@ -1009,3 +1009,82 @@ def test_odds_and_ends_keep(
         chain.mine(1)
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         tx = strategy.harvest({"from": gov})
+
+
+# this tests having multiple rewards tokens on our strategy proxy
+def test_odds_and_ends_strategy_proxy_rewards(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    chain,
+    strategist_ms,
+    voter,
+    cvxDeposit,
+    new_proxy,
+    crv,
+    fxs,
+    amount,
+    sleep_time,
+    convexToken,
+    no_profit,
+    profit_amount,
+    profit_whale,
+    which_strategy,
+    has_rewards,
+    rewards_token,
+    accounts,
+):
+    # only do for curve strat
+    if which_strategy != 1 or not has_rewards:
+        print("\nNot Curve strategy and/or no extra rewards token\n")
+        return
+    
+    ## deposit to the vault after approving
+    startingWhale = token.balanceOf(whale)
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    newWhale = token.balanceOf(whale)
+    chain.sleep(1)
+    chain.mine(1)
+
+    # harvest, store asset amount
+    tx = strategy.harvest({"from": gov})
+    print("Harvest info:", tx.events["Harvested"])
+    chain.sleep(1)
+    chain.mine(1)
+
+    # simulate profits
+    chain.sleep(sleep_time)
+    chain.mine(1)
+    
+    # add a second rewards token to our array, doesn't matter what
+    second_reward_token = fxs
+    fxs_whale = accounts.at("0xc8418aF6358FFddA74e09Ca9CC3Fe03Ca6aDC5b0", force=True)
+    fxs.transfer(voter, 100e18, {"from": fxs_whale})
+    new_proxy.approveRewardToken(second_reward_token, {"from": gov})
+    strategy.updateRewards([rewards_token, second_reward_token], {"from": gov})
+    assert fxs.balanceOf(voter) > 0
+
+    # harvest, store new asset amount
+    chain.sleep(1)
+    token.transfer(strategy, profit_amount, {"from": profit_whale})
+    tx = strategy.harvest({"from": gov})
+    chain.sleep(1)
+    assert fxs.balanceOf(voter) == 0
+    
+    crv_balance = crv.balanceOf(strategy)
+    assert crv_balance > 0
+    print("CRV Balance:", crv_balance / 1e18)
+    
+    rewards_balance = rewards_token.balanceOf(strategy)
+    assert rewards_balance > 0
+    print("Rewards Balance:", rewards_balance / 1e18)
+    
+    rewards_balance_too = second_reward_token.balanceOf(strategy)
+    assert rewards_balance_too > 0
+    print("Second Rewards Token Balance:", rewards_balance_too / 1e18)
+    
+    
