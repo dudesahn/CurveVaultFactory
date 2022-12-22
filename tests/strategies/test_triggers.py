@@ -64,11 +64,11 @@ def test_triggers(
         chain.mine(1)
 
         # set our max delay to 1 day so we trigger true, then set it back to 21 days
-        strategy.setMaxReportDelay(sleep_time - 1)
+        strategy.setMaxReportDelay(sleep_time - 1, {"from": gov})
         tx = strategy.harvestTrigger.call(0, {"from": gov})
         print("\nShould we harvest? Should be True.", tx)
         assert tx == True
-        strategy.setMaxReportDelay(86400 * 21)
+        strategy.setMaxReportDelay(86400 * 21, {"from": gov})
 
         if not (is_slippery and no_profit):
             # update our minProfit so our harvest triggers true
@@ -139,11 +139,11 @@ def test_triggers(
         chain.mine(1)
 
         # set our max delay to 1 day so we trigger true, then set it back to 21 days
-        strategy.setMaxReportDelay(sleep_time - 1)
+        strategy.setMaxReportDelay(sleep_time - 1, {"from": gov})
         tx = strategy.harvestTrigger(0, {"from": gov})
         print("\nShould we harvest? Should be True.", tx)
         assert tx == True
-        strategy.setMaxReportDelay(86400 * 21)
+        strategy.setMaxReportDelay(86400 * 21, {"from": gov})
 
         # only convex does this mess with earmarking
         if which_strategy == 0:
@@ -186,7 +186,7 @@ def test_triggers(
             assert tx == False
             strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
         else:  # curve uses minDelay as well
-            strategy.setMinReportDelay(sleep_time - 1)
+            strategy.setMinReportDelay(sleep_time - 1, {"from": gov})
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be True.", tx)
             assert tx == True

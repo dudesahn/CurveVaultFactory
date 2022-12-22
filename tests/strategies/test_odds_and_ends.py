@@ -892,8 +892,6 @@ def test_odds_and_ends_keep(
         strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
     elif which_strategy == 1:
-        with brownie.reverts():
-            strategy.setLocalKeepCrv(1000, {"from": gov})
         strategy.setVoter(gov, {"from": gov})
         strategy.setLocalKeepCrv(1000, {"from": gov})
         tx = strategy.harvest({"from": gov})
@@ -1041,7 +1039,7 @@ def test_odds_and_ends_strategy_proxy_rewards(
     if which_strategy != 1 or not has_rewards:
         print("\nNot Curve strategy and/or no extra rewards token\n")
         return
-    
+
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
     token.approve(vault, 2**256 - 1, {"from": whale})
@@ -1059,7 +1057,7 @@ def test_odds_and_ends_strategy_proxy_rewards(
     # simulate profits
     chain.sleep(sleep_time)
     chain.mine(1)
-    
+
     # add a second rewards token to our array, doesn't matter what
     second_reward_token = fxs
     fxs_whale = accounts.at("0xc8418aF6358FFddA74e09Ca9CC3Fe03Ca6aDC5b0", force=True)
@@ -1074,17 +1072,15 @@ def test_odds_and_ends_strategy_proxy_rewards(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     assert fxs.balanceOf(voter) == 0
-    
+
     crv_balance = crv.balanceOf(strategy)
     assert crv_balance > 0
     print("CRV Balance:", crv_balance / 1e18)
-    
+
     rewards_balance = rewards_token.balanceOf(strategy)
     assert rewards_balance > 0
     print("Rewards Balance:", rewards_balance / 1e18)
-    
+
     rewards_balance_too = second_reward_token.balanceOf(strategy)
     assert rewards_balance_too > 0
     print("Second Rewards Token Balance:", rewards_balance_too / 1e18)
-    
-    

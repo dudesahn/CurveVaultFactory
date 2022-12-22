@@ -46,6 +46,7 @@ def test_cloning(
 
     # skip this test if we don't clone
     if not is_clonable:
+        print("No cloning here!")
         return
 
     # tenderly doesn't work for "with brownie.reverts"

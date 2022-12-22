@@ -491,9 +491,9 @@ def test_manual_withdrawal(
 
     # can't withdraw yet, need to wait
     with brownie.reverts():
-        strategy.manualWithdraw(index_to_withdraw)
+        strategy.manualWithdraw(index_to_withdraw, {"from": gov})
 
     chain.sleep(86400 * 7)
     chain.mine(1)
-    strategy.manualWithdraw(index_to_withdraw)
+    strategy.manualWithdraw(index_to_withdraw, {"from": gov})
     assert strategy.balanceOfWant() > 0
