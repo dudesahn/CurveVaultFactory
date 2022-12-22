@@ -46,9 +46,10 @@ chain_used = 1
 
 
 # put our test pool's convex pid here
+# if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 100  # 115 DOLA FRAXBP, 100 FRAX-USDC (do for frax), 25 stETH
+    pid = 100  # 100 FRAX-USDC (do for frax), 25 stETH
     yield pid
 
 
@@ -90,15 +91,15 @@ def test_staking_address():
 # put our pool's convex pid here
 @pytest.fixture(scope="session")
 def which_strategy():
-    # must be 0, 1, or 2 for convex, curve, and frax
-    which_strategy = 2
+    # must be 0, 1, or 2 for convex, curve, and frax. Only test 2 (Frax) for pools that actually have frax.
+    which_strategy = 0
     yield which_strategy
 
 
 # this is the amount of funds we have our whale deposit. adjust this as needed based on their wallet balance
 @pytest.fixture(scope="session")
 def amount():
-    amount = 500_000e18  # 500k for FRAX-USDC, 400 for stETH
+    amount = 500_000e18  # 500k for FRAX-USDC, 300 for stETH
     yield amount
 
 
@@ -114,9 +115,10 @@ def profit_whale(accounts, profit_amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
+    # ideally not the same whale as the main whale, or else they will lose money
     profit_whale = accounts.at(
         "0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190", force=True
-    )  # 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, stETH: 0x43378368D84D4bA00D1C8E97EC2E6016A82fC062, 730 tokens
+    )  # 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, stETH: 0xF31501905Bdb035119031510c724C4a4d67acA14, 500 tokens
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -131,7 +133,7 @@ def whale(accounts, amount, token):
     # use the FRAX-USDC pool for now
     whale = accounts.at(
         "0xE57180685E3348589E9521aa53Af0BCD497E884d", force=True
-    )  # 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens, stETH: 0x13e382dfe53207E9ce2eeEab330F69da2794179E, 900 tokens
+    )  # 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens, stETH: 0x43378368D84D4bA00D1C8E97EC2E6016A82fC062, 730 tokens
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -178,7 +180,7 @@ def try_blocks():
 # if you want to bother with whale and amount below, this needs to be true
 @pytest.fixture(scope="session")
 def test_donation():
-    test_donation = True
+    test_donation = False
     yield test_donation
 
 
@@ -251,7 +253,7 @@ def sleep_time():
     hour = 3600
 
     # change this one right here
-    hours_to_sleep = 6
+    hours_to_sleep = 24
 
     sleep_time = hour * hours_to_sleep
     yield sleep_time
@@ -653,6 +655,8 @@ if chain_used == 1:  # mainnet
         frax_pid,
         staking_address,
         vault,
+        has_rewards,
+        rewards_token,
     ):
 
         if which_strategy == 0:  # convex
@@ -712,6 +716,12 @@ if chain_used == 1:  # mainnet
             print("New Vault, Curve Strategy")
             chain.sleep(1)
             chain.mine(1)
+
+            # approve reward token on our strategy proxy if needed
+            if has_rewards:
+                # first, add our rewards token to our strategy, then use that for our strategy proxy
+                strategy.updateRewards([rewards_token], {"from": gov})
+                new_proxy.approveRewardToken(strategy.rewardsTokens(0), {"from": gov})
 
             # approve our new strategy on the proxy
             new_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})

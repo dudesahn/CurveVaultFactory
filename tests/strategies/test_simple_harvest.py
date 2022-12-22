@@ -21,12 +21,16 @@ def test_simple_harvest(
     is_slippery,
     no_profit,
     crv,
+    convexToken,
+    fxs,
     accounts,
     booster,
     pid,
     which_strategy,
     profit_amount,
     profit_whale,
+    has_rewards,
+    rewards_token,
 ):
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -78,6 +82,40 @@ def test_simple_harvest(
     # confirm we made money, or at least that we have about the same
     assert new_assets >= old_assets
     print("\nAssets after 1 day: ", new_assets / 1e18)
+
+    # since we take profit with ySwaps, check that we received our various tokens
+    if not no_profit:
+        if which_strategy == 0:
+            crv_balance = crv.balanceOf(strategy)
+            assert crv_balance > 0
+            cvx_balance = convexToken.balanceOf(strategy)
+            assert cvx_balance > 0
+            print(
+                "CRV Balance:", crv_balance / 1e18, "CVX Balance:", cvx_balance / 1e18
+            )
+        elif which_strategy == 1:
+            crv_balance = crv.balanceOf(strategy)
+            assert crv_balance > 0
+            print("CRV Balance:", crv_balance / 1e18)
+        else:
+            crv_balance = crv.balanceOf(strategy)
+            assert crv_balance > 0
+            cvx_balance = convexToken.balanceOf(strategy)
+            assert cvx_balance > 0
+            fxs_balance = fxs.balanceOf(strategy)
+            assert fxs_balance > 0
+            print(
+                "CRV Balance:",
+                crv_balance / 1e18,
+                "CVX Balance:",
+                cvx_balance / 1e18,
+                "FXS Balance:",
+                fxs_balance / 1e18,
+            )
+        if has_rewards:
+            rewards_balance = rewards_token.balanceOf(strategy)
+            assert rewards_balance > 0
+            print("Rewards Balance:", rewards_balance / 1e18)
 
     if which_strategy == 2:
         staking_address = Contract(strategy.stakingAddress())

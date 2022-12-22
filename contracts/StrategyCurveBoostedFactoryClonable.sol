@@ -239,7 +239,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
         // claim any extra rewards we may have
         if (rewardsTokens.length > 0) {
-            proxy.claimRewards(gauge, rewardsTokens);
+            proxy.claimManyRewards(gauge, rewardsTokens);
         }
 
         // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately

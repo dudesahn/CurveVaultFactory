@@ -20,6 +20,7 @@ def test_keepers(
     amount,
     crv,
     convexToken,
+    fxs,
     sleep_time,
     profit_whale,
     profit_amount,
@@ -51,6 +52,8 @@ def test_keepers(
     assert crv.balanceOf(strategy) > 0
     if which_strategy != 1:
         assert convexToken.balanceOf(strategy) > 0
+    if which_strategy == 2:
+        assert fxs.balanceOf(strategy) > 0
 
     # rando cant sweep
     with brownie.reverts():
@@ -59,6 +62,11 @@ def test_keepers(
         with brownie.reverts():
             convexToken.transferFrom(
                 strategy, rando, convexToken.balanceOf(strategy) / 2, {"from": rando}
+            )
+    if which_strategy == 2:
+        with brownie.reverts():
+            fxs.transferFrom(
+                strategy, rando, fxs.balanceOf(strategy) / 2, {"from": rando}
             )
 
     crv.transferFrom(
@@ -73,6 +81,14 @@ def test_keepers(
             {"from": new_trade_factory},
         )
 
+    if which_strategy == 2:
+        fxs.transferFrom(
+            strategy,
+            rando,
+            fxs.balanceOf(strategy) / 2,
+            {"from": new_trade_factory},
+        )
+
     strategy.removeTradeFactoryPermissions(True, {"from": gov})
     assert strategy.tradeFactory() == ZERO_ADDRESS
 
@@ -82,6 +98,8 @@ def test_keepers(
     assert crv.balanceOf(strategy) > 0
     if which_strategy != 1:
         assert convexToken.balanceOf(strategy) > 0
+    if which_strategy == 2:
+        assert fxs.balanceOf(strategy) > 0
 
     # trade factory now cant sweep
     with brownie.reverts():
@@ -94,6 +112,14 @@ def test_keepers(
                 strategy,
                 rando,
                 convexToken.balanceOf(strategy) / 2,
+                {"from": new_trade_factory},
+            )
+    if which_strategy == 2:
+        with brownie.reverts():
+            fxs.transferFrom(
+                strategy,
+                rando,
+                fxs.balanceOf(strategy) / 2,
                 {"from": new_trade_factory},
             )
 
@@ -109,6 +135,14 @@ def test_keepers(
             strategy,
             rando,
             convexToken.balanceOf(strategy) / 2,
+            {"from": new_trade_factory},
+        )
+
+    if which_strategy == 2:
+        fxs.transferFrom(
+            strategy,
+            rando,
+            fxs.balanceOf(strategy) / 2,
             {"from": new_trade_factory},
         )
 
