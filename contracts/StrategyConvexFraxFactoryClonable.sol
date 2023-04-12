@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
-pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -325,14 +324,15 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(userVault), type(uint256).max);
 
-        // set up our max delay
+        // set up our baseStrategy vars
         maxReportDelay = 365 days;
+        creditThreshold = 50_000e18;
 
         // setup our default frax LP management vars
         maxKeks = 5;
         lockTime = stakingAddress.lock_time_min(); // default to current minimum
         maxSingleDeposit = 500_000e18;
-        minDeposit = 10_000e18;
+        minDeposit = 100e18;
 
         // set up rewards and trade factory
         _updateRewards();
@@ -506,7 +506,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     require(
                         stakedBalance() - stillLockedStake() >=
                             _neededFromStaked,
-                        "Need to wait until most recent deposit unlocks"
+                        "Need to wait until oldest deposit unlocks"
                     );
                 }
                 // no need to check for >0, we know _neededFromStaked has to be at least 1 wei

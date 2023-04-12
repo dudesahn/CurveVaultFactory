@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
-pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -141,6 +140,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     /// @notice Will only be true on the original deployed contract and not on clones; we don't want to clone a clone.
     bool public isOriginal = true;
+
+    /// @notice A wrapper for CVX in newer rewards pools that doesn't behave like a normal token.
+    address public constant cvxWrapper =
+        0x8534332d66552390081c0bfB03f4C8E218413A48;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -289,8 +292,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(_booster), type(uint256).max);
 
-        // set up our max delay
+        // set up our baseStrategy vars
         maxReportDelay = 365 days;
+        creditThreshold = 50_000e18;
 
         // use the booster contract to pull more info needed
         IConvexDeposit booster = IConvexDeposit(_booster);
@@ -540,7 +544,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                 .rewardToken();
 
             // we only need to approve the new token and turn on rewards if the extra reward isn't CVX
-            if (_rewardsToken != _convexToken) {
+            if (_rewardsToken != _convexToken || _rewardsToken != cvxWrapper) {
                 rewardsTokens.push(_rewardsToken);
             }
         }
@@ -573,6 +577,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // enable for any rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
+            // cvxWrapper is not a normal token
+            if (_rewardsToken == cvxWrapper) {
+                continue;
+            }
             IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
             tf.enable(_rewardsToken, _want);
         }
@@ -607,6 +615,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // disable for all rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
+            // cvxWrapper is not a normal token
+            if (_rewardsToken == cvxWrapper) {
+                continue;
+            }
             IERC20(_rewardsToken).approve(_tradeFactory, 0);
             if (_disableTf) {
                 tf.disable(_rewardsToken, _want);
