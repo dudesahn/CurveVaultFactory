@@ -19,7 +19,7 @@ def test_remove_from_withdrawal_queue(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -84,7 +84,7 @@ def test_revoke_strategy_from_vault(
 
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -197,7 +197,7 @@ def test_setters(
 ):
     # deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     name = strategy.name()
 
@@ -220,7 +220,7 @@ def test_setters(
             strategy.setLockTime(100, {"from": gov})
         # or too long
         with brownie.reverts():
-            strategy.setLockTime(2 ** 256 - 1, {"from": gov})
+            strategy.setLockTime(2**256 - 1, {"from": gov})
 
         # set our deposit params
         maxToStake = amount * 0.75
@@ -314,7 +314,7 @@ def test_sweep(
     use_yswaps,
 ):
     # deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,

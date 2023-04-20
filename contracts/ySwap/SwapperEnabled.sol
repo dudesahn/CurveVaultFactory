@@ -87,8 +87,16 @@ abstract contract SwapperEnabled {
     }
 
     function _cancelPendingTrade(uint256 _pendingTradeId) internal {
-        (, , , address _tokenIn, , uint256 _amountIn, , ) =
-            ITradeFactoryPositionsHandler(tradeFactory).pendingTradesById(
+        (
+            ,
+            ,
+            ,
+            address _tokenIn,
+            ,
+            uint256 _amountIn,
+            ,
+
+        ) = ITradeFactoryPositionsHandler(tradeFactory).pendingTradesById(
                 _pendingTradeId
             );
         IERC20(_tokenIn).safeDecreaseAllowance(tradeFactory, _amountIn);
@@ -97,11 +105,9 @@ abstract contract SwapperEnabled {
         );
     }
 
-    function _tradeFactoryAllowance(address _token)
-        internal
-        view
-        returns (uint256 _allowance)
-    {
+    function _tradeFactoryAllowance(
+        address _token
+    ) internal view returns (uint256 _allowance) {
         return IERC20(_token).allowance(address(this), tradeFactory);
     }
 }

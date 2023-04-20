@@ -32,7 +32,7 @@ def test_liquidatePosition(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -166,15 +166,10 @@ def test_liquidatePosition(
                 == old_assets
             )
             # debt outstanding is the portion of debt that needs to be paid back (DR is still greater than zero)
-            assert (
-                pytest.approx(
-                    vault.totalAssets()
-                    * (10_000 - strategy_params["debtRatio"])
-                    / 10_000,
-                    rel=RELATIVE_APPROX,
-                )
-                == vault.debtOutstanding(strategy)
-            )
+            assert pytest.approx(
+                vault.totalAssets() * (10_000 - strategy_params["debtRatio"]) / 10_000,
+                rel=RELATIVE_APPROX,
+            ) == vault.debtOutstanding(strategy)
         else:
             assert strategy_params["totalDebt"] + amount == old_assets
             assert strategy_params["debtRatio"] == whale_holdings
@@ -235,7 +230,7 @@ def test_rekt(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -383,7 +378,7 @@ def test_empty_strat(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -567,7 +562,7 @@ def test_no_profit(
     sleep_time,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,

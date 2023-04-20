@@ -28,7 +28,7 @@ def test_keep(
     new_proxy,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest as-is before we have yield to hit all parts of our if statement
@@ -278,7 +278,7 @@ def test_proxy_rewards(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
@@ -362,7 +362,7 @@ def test_lower_keks(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount / 20, {"from": whale})
     newWhale = token.balanceOf(whale)
     (profit, loss) = harvest_strategy(
@@ -561,7 +561,7 @@ def test_lower_keks_part_two(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount / 20, {"from": whale})
     newWhale = token.balanceOf(whale)
     (profit, loss) = harvest_strategy(
@@ -668,7 +668,7 @@ def test_increase_keks(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount / 20, {"from": whale})
     newWhale = token.balanceOf(whale)
     (profit, loss) = harvest_strategy(
@@ -776,7 +776,7 @@ def test_withdraw_with_some_locked(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount / 20, {"from": whale})
     newWhale = token.balanceOf(whale)
     (profit, loss) = harvest_strategy(
@@ -899,7 +899,7 @@ def test_manual_withdrawal(
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount / 20, {"from": whale})
     newWhale = token.balanceOf(whale)
     (profit, loss) = harvest_strategy(

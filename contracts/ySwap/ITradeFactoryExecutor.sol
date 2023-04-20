@@ -19,10 +19,9 @@ interface ITradeFactoryExecutor {
 
     event SwapperAndTokenEnabled(address indexed _swapper, address _token);
 
-    function approvedTokensBySwappers(address _swapper)
-        external
-        view
-        returns (address[] memory _tokens);
+    function approvedTokensBySwappers(
+        address _swapper
+    ) external view returns (address[] memory _tokens);
 
     function execute(
         address _tokenIn,
@@ -32,9 +31,10 @@ interface ITradeFactoryExecutor {
         bytes calldata _data
     ) external returns (uint256 _receivedAmount);
 
-    function execute(uint256 _id, bytes calldata _data)
-        external
-        returns (uint256 _receivedAmount);
+    function execute(
+        uint256 _id,
+        bytes calldata _data
+    ) external returns (uint256 _receivedAmount);
 
     function expire(uint256 _id) external returns (uint256 _freedAmount);
 }

@@ -34,7 +34,9 @@ interface ITradeFactoryPositionsHandler {
         address _newSwapper
     );
 
-    function pendingTradesById(uint256)
+    function pendingTradesById(
+        uint256
+    )
         external
         view
         returns (
@@ -53,10 +55,9 @@ interface ITradeFactoryPositionsHandler {
         view
         returns (uint256[] memory _pendingIds);
 
-    function pendingTradesIds(address _strategy)
-        external
-        view
-        returns (uint256[] memory _pendingIds);
+    function pendingTradesIds(
+        address _strategy
+    ) external view returns (uint256[] memory _pendingIds);
 
     function create(
         address _tokenIn,

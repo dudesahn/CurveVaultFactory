@@ -22,7 +22,7 @@ def test_change_debt(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -231,7 +231,7 @@ def test_change_debt_with_profit(
     which_strategy,
 ):
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -383,13 +383,10 @@ def test_change_debt_with_profit(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported. yswaps has extra profit donated to the strategy as well that has not yet been reported.
     if use_yswaps:
-        assert (
-            pytest.approx(
-                vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount,
-                rel=RELATIVE_APPROX,
-            )
-            == strategy.estimatedTotalAssets() + vault.creditAvailable(strategy)
-        )
+        assert pytest.approx(
+            vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount,
+            rel=RELATIVE_APPROX,
+        ) == strategy.estimatedTotalAssets() + vault.creditAvailable(strategy)
     else:
         assert pytest.approx(
             vault.totalAssets() * new_params["debtRatio"] / 10_000, rel=RELATIVE_APPROX

@@ -248,7 +248,7 @@ def vault(pm, gov, rewards, guardian, management, token, vault_address):
         Vault = pm(config["dependencies"][0]).Vault
         vault = guardian.deploy(Vault)
         vault.initialize(token, gov, rewards, "", "", guardian)
-        vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
+        vault.setDepositLimit(2**256 - 1, {"from": gov})
         vault.setManagement(management, {"from": gov})
     else:
         vault = interface.IVaultFactory045(vault_address)
@@ -346,7 +346,7 @@ def strategy(
         chain.sleep(1)
         chain.mine(1)
 
-        vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
+        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Convex Strategy")
         chain.sleep(1)
         chain.mine(1)
@@ -356,7 +356,7 @@ def strategy(
             90000e6, 150000e6, strategy.checkEarmark(), {"from": gov}
         )
     elif which_strategy == 1:  # Curve
-        vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
+        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Curve Strategy")
         chain.sleep(1)
         chain.mine(1)
@@ -372,7 +372,7 @@ def strategy(
         assert new_proxy.strategies(gauge.address) == strategy.address
         assert voter.strategy() == new_proxy.address
     else:  # frax
-        vault.addStrategy(strategy, 10_000, 0, 2 ** 256 - 1, 0, {"from": gov})
+        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Frax Strategy")
         chain.sleep(1)
         chain.mine(1)

@@ -30,7 +30,7 @@ def test_emergency_exit(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -210,7 +210,7 @@ def test_emergency_exit_with_profit(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -404,7 +404,7 @@ def test_emergency_exit_with_loss(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -651,7 +651,7 @@ def test_emergency_exit_with_no_loss(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -916,7 +916,7 @@ def test_emergency_shutdown_from_vault(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -1109,7 +1109,7 @@ def test_emergency_withdraw_method_0(
 
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -1325,7 +1325,7 @@ def test_emergency_withdraw_method_1(
 
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,

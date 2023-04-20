@@ -223,7 +223,7 @@ def test_vault_deployment(
         vault.updateStrategyDebtRatio(convex_strategy, 5000, {"from": gov})
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
 
     # harvest, pass 9 to gov so we know this is a permissionless harvest
@@ -607,7 +607,7 @@ def test_curve_global_setters_and_views(
 
     # trying to pull a PID for an address that doesn't have one should return max uint
     fake_pid = curve_global.getPid.call(gov)
-    assert fake_pid == 2 ** 256 - 1
+    assert fake_pid == 2**256 - 1
     print("Fake gauge gives max uint")
 
     # check our deployed vaults

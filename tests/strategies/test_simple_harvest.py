@@ -25,7 +25,7 @@ def test_simple_harvest(
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 

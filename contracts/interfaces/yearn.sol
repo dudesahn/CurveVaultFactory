@@ -15,9 +15,10 @@ interface ICurveStrategyProxy {
         uint256 _amount
     ) external returns (uint256);
 
-    function withdrawAll(address _gauge, address _token)
-        external
-        returns (uint256);
+    function withdrawAll(
+        address _gauge,
+        address _token
+    ) external returns (uint256);
 
     function harvest(address _gauge) external;
 

@@ -25,7 +25,7 @@ def test_withdraw_after_donation_1(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -217,23 +217,15 @@ def test_withdraw_after_donation_1(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported, and yswaps adds extra unrealized profit to the strategy since debtRatio > 0
     if use_yswaps:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(
-                vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount
-            )
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount)
     else:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
 
 # lower debtRatio to 0, donate, withdraw less than the donation, then harvest
@@ -258,7 +250,7 @@ def test_withdraw_after_donation_2(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -440,13 +432,10 @@ def test_withdraw_after_donation_2(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported. also, if strategy assets are zero, we don't get additional yswaps profit.
     # so in this case, no difference expected between yswaps and non-yswaps strategies.
-    assert (
-        pytest.approx(
-            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-            rel=RELATIVE_APPROX,
-        )
-        == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-    )
+    assert pytest.approx(
+        strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+        rel=RELATIVE_APPROX,
+    ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
 
 # lower debtRatio to 0, donate, withdraw more than the donation, then harvest
@@ -471,7 +460,7 @@ def test_withdraw_after_donation_3(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -653,13 +642,10 @@ def test_withdraw_after_donation_3(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported. also, if strategy assets are zero, we don't get additional yswaps profit.
     # so in this case, no difference expected between yswaps and non-yswaps strategies.
-    assert (
-        pytest.approx(
-            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-            rel=RELATIVE_APPROX,
-        )
-        == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-    )
+    assert pytest.approx(
+        strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+        rel=RELATIVE_APPROX,
+    ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
 
 # lower debtRatio to 50%, donate, withdraw more than the donation, then harvest
@@ -684,7 +670,7 @@ def test_withdraw_after_donation_4(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -876,23 +862,15 @@ def test_withdraw_after_donation_4(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported, and yswaps adds extra unrealized profit to the strategy since debtRatio > 0
     if use_yswaps:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(
-                vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount
-            )
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount)
     else:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
 
 # donate, withdraw more than the donation, then harvest
@@ -917,7 +895,7 @@ def test_withdraw_after_donation_5(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -1087,23 +1065,15 @@ def test_withdraw_after_donation_5(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported, and yswaps adds extra unrealized profit to the strategy since debtRatio > 0
     if use_yswaps:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(
-                vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount
-            )
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount)
     else:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
 
 # donate, withdraw less than the donation, then harvest
@@ -1128,7 +1098,7 @@ def test_withdraw_after_donation_6(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -1298,23 +1268,15 @@ def test_withdraw_after_donation_6(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported, and yswaps adds extra unrealized profit to the strategy since debtRatio > 0
     if use_yswaps:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(
-                vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount
-            )
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000 + profit_amount)
     else:
-        assert (
-            pytest.approx(
-                strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-                rel=RELATIVE_APPROX,
-            )
-            == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-        )
+        assert pytest.approx(
+            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+            rel=RELATIVE_APPROX,
+        ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
 
 # lower debtRatio to 0, donate, withdraw more than the donation, then harvest
@@ -1340,7 +1302,7 @@ def test_withdraw_after_donation_7(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -1523,13 +1485,10 @@ def test_withdraw_after_donation_7(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported. also, if strategy assets are zero, we don't get additional yswaps profit.
     # so in this case, no difference expected between yswaps and non-yswaps strategies.
-    assert (
-        pytest.approx(
-            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-            rel=RELATIVE_APPROX,
-        )
-        == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-    )
+    assert pytest.approx(
+        strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+        rel=RELATIVE_APPROX,
+    ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
     # check everywhere to make sure we emptied out the strategy
     if is_slippery:
@@ -1578,7 +1537,7 @@ def test_withdraw_after_donation_8(
 ):
 
     ## deposit to the vault after approving
-    token.approve(vault, 2 ** 256 - 1, {"from": whale})
+    token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -1762,13 +1721,10 @@ def test_withdraw_after_donation_8(
     # we multiply this by the debtRatio of our strategy out of 10_000 total
     # a vault only knows it has assets if the strategy has reported. also, if strategy assets are zero, we don't get additional yswaps profit.
     # so in this case, no difference expected between yswaps and non-yswaps strategies.
-    assert (
-        pytest.approx(
-            strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
-            rel=RELATIVE_APPROX,
-        )
-        == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
-    )
+    assert pytest.approx(
+        strategy.estimatedTotalAssets() + vault.creditAvailable(strategy),
+        rel=RELATIVE_APPROX,
+    ) == int(vault.totalAssets() * new_params["debtRatio"] / 10_000)
 
     # check everywhere to make sure we emptied out the strategy
     if is_slippery:
