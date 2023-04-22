@@ -1,5 +1,5 @@
 import brownie
-from brownie import chain
+from brownie import chain, ZERO_ADDRESS
 import pytest
 from utils import harvest_strategy
 
@@ -39,11 +39,19 @@ def test_keep(
         strategy.setVoters(gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
     elif which_strategy == 1:
-        strategy.setVoter(gov, {"from": gov})
+        strategy.setVoter(ZERO_ADDRESS, {"from": gov})
+        # need to set voters first if we're trying to set keep
+        with brownie.reverts():
+            strategy.setLocalKeepCrv(1000, {"from": gov})
+        strategy.setVoter(voter, {"from": gov})
         strategy.setLocalKeepCrv(1000, {"from": gov})
     else:
         with brownie.reverts():
             strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(0, 1000, 1000, {"from": gov})
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(0, 0, 1000, {"from": gov})
         strategy.setVoters(gov, gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
 
@@ -166,7 +174,7 @@ def test_keep(
     # voter off only
     if which_strategy == 0:
         strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
-        strategy.setVoters(gov, gov, {"from": gov})
+        strategy.setVoters(ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
 
         (profit, loss) = harvest_strategy(
             use_yswaps,
@@ -180,7 +188,7 @@ def test_keep(
 
     elif which_strategy == 1:
         strategy.setLocalKeepCrv(1000, {"from": gov})
-        strategy.setVoter(gov, {"from": gov})
+        strategy.setVoter(ZERO_ADDRESS, {"from": gov})
 
         (profit, loss) = harvest_strategy(
             use_yswaps,
@@ -194,7 +202,7 @@ def test_keep(
 
     else:
         strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
-        strategy.setVoters(gov, gov, gov, {"from": gov})
+        strategy.setVoters(ZERO_ADDRESS, ZERO_ADDRESS, ZERO_ADDRESS, {"from": gov})
 
         (profit, loss) = harvest_strategy(
             use_yswaps,
@@ -413,6 +421,14 @@ def test_lower_keks(
         profit_amount,
         target,
     )
+    
+    # can't do this yet since we're still locked
+    with brownie.reverts():
+        strategy.setMaxKeks(3, {"from": gov})
+    
+    # can't withdraw everything right now
+    with brownie.reverts():
+        vault.withdraw({"from": whale})
 
     # deposit and harvest multiple separate times to increase our nextKek
     vault.deposit(amount / 20, {"from": whale})
@@ -421,6 +437,10 @@ def test_lower_keks(
     tx = strategy.harvest({"from": gov})
     chain.sleep(1)
     chain.mine(1)
+
+    # can't set to zero
+    with brownie.reverts():
+        strategy.setMaxKeks(0, {"from": gov})
 
     print("First 5 harvests down")
     print("Max keks:", strategy.maxKeks())
@@ -524,6 +544,14 @@ def test_lower_keks(
     # lower now
     strategy.setMaxKeks(3, {"from": gov})
     print("Keks successfullly lowered to 3")
+    
+    # withdraw everything
+    vault.withdraw({"from": whale})
+    
+    # should still be able to lower keks when strategy is empty
+    strategy.setMaxKeks(1, {"from": gov})
+    
+    
 
 
 # lower our number of keks after we get well above our maxKeks

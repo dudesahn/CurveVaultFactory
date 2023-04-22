@@ -4,6 +4,8 @@ import pytest
 from utils import harvest_strategy, check_status
 
 # test our harvest triggers
+# for frax, skip this when trying coverage
+@pytest.mark.skip_coverage
 def test_triggers(
     gov,
     token,

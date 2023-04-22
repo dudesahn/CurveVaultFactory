@@ -49,7 +49,7 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     whale = accounts.at(
-        "0xfB18127c1471131468a1AaD4785c19678e521D86", force=True
+        "0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5", force=True
     )  # cvxCRV new gauge: 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens, stETH: 0x43378368D84D4bA00D1C8E97EC2E6016A82fC062, 730 tokens,
     # frax: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens, 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens
     if token.balanceOf(whale) < 2 * amount:
@@ -63,7 +63,7 @@ def whale(accounts, amount, token):
 @pytest.fixture(scope="session")
 def amount(token):
     amount = (
-        500_000 * 10 ** token.decimals()
+        5_000 * 10 ** token.decimals()
     )  # 500k for cvxCRV, 300 for stETH, 50k for frax, 5k for frxETH
     yield amount
 
@@ -72,7 +72,7 @@ def amount(token):
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
     profit_whale = accounts.at(
-        "0x109B3C39d675A2FF16354E116d080B94d238a7c9", force=True
+        "0x520304321Fa982f1Ecd8Df55C30C3066753927FE", force=True
     )  # 0x109B3C39d675A2FF16354E116d080B94d238a7c9, new cvxCRV 5100 tokens, stETH: 0xF31501905Bdb035119031510c724C4a4d67acA14, 500 tokens
     # frax 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x520304321Fa982f1Ecd8Df55C30C3066753927FE frxETH 8.6 tokens
     if token.balanceOf(profit_whale) < 5 * profit_amount:
@@ -85,7 +85,7 @@ def profit_whale(accounts, profit_amount, token):
 @pytest.fixture(scope="session")
 def profit_amount(token):
     profit_amount = (
-        300 * 10 ** token.decimals()
+        1.2 * 10 ** token.decimals()
     )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 1.2 for frxETH
     yield profit_amount
 
@@ -113,7 +113,7 @@ def old_vault():
 # this is the name we want to give our strategy
 @pytest.fixture(scope="session")
 def strategy_name():
-    strategy_name = "StrategyConvexFRAX-USDC"
+    strategy_name = "StrategyConvexfrxETH"
     yield strategy_name
 
 
@@ -400,7 +400,7 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 157  # 100 FRAX-USDC (do for frax), 25 stETH, 157 cvxCRV new, 128 frxETH-ETH
+    pid = 128  # 100 FRAX-USDC (do for frax), 25 stETH, 157 cvxCRV new, 128 frxETH-ETH
     yield pid
 
 
