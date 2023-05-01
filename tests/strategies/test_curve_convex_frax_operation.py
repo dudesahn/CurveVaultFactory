@@ -421,11 +421,11 @@ def test_lower_keks(
         profit_amount,
         target,
     )
-    
+
     # can't do this yet since we're still locked
     with brownie.reverts():
         strategy.setMaxKeks(3, {"from": gov})
-    
+
     # can't withdraw everything right now
     with brownie.reverts():
         vault.withdraw({"from": whale})
@@ -544,14 +544,12 @@ def test_lower_keks(
     # lower now
     strategy.setMaxKeks(3, {"from": gov})
     print("Keks successfullly lowered to 3")
-    
+
     # withdraw everything
     vault.withdraw({"from": whale})
-    
+
     # should still be able to lower keks when strategy is empty
     strategy.setMaxKeks(1, {"from": gov})
-    
-    
 
 
 # lower our number of keks after we get well above our maxKeks

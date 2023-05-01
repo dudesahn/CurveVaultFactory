@@ -544,7 +544,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                 .rewardToken();
 
             // we only need to approve the new token and turn on rewards if the extra reward isn't CVX
-            if (_rewardsToken != _convexToken || _rewardsToken != cvxWrapper) {
+            if (_rewardsToken != _convexToken && _rewardsToken != cvxWrapper) {
                 rewardsTokens.push(_rewardsToken);
             }
         }
