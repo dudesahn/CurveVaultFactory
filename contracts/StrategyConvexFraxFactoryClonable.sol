@@ -13,9 +13,19 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    function getPriceUsdcRecommended(
-        address tokenAddress
-    ) external view returns (uint256);
+    function latestRoundData(
+        address,
+        address
+    )
+        external
+        view
+        returns (
+            uint80 roundId,
+            uint256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
 }
 
 interface IDetails {
@@ -797,14 +807,26 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 claimableCvx = tokenAmounts[rewardLength - 1];
         uint256 claimableCrv = tokenAmounts[rewardLength - 2];
 
-        IOracle yearnOracle = IOracle(
-            0x83d95e0D5f402511dB06817Aff3f9eA88224B030
-        ); // yearn lens oracle
-        uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
-        uint256 cvxPrice = yearnOracle.getPriceUsdcRecommended(
-            address(convexToken)
-        );
-        uint256 fxsPrice = yearnOracle.getPriceUsdcRecommended(address(fxs));
+        (, uint256 crvPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(crv),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
+
+        (, uint256 cvxPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(convexToken),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
+
+        (, uint256 fxsPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(fxs),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
 
         return
             (crvPrice *
@@ -812,7 +834,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 cvxPrice *
                 claimableCvx +
                 fxsPrice *
-                claimableFxs) / 1e18;
+                claimableFxs) / 1e20;
     }
 
     /// @notice Convert our keeper's eth cost into want

@@ -13,10 +13,19 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    // pull our asset price, in usdc, via yearn's oracle
-    function getPriceUsdcRecommended(
-        address tokenAddress
-    ) external view returns (uint256);
+    function latestRoundData(
+        address,
+        address
+    )
+        external
+        view
+        returns (
+            uint80 roundId,
+            uint256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
 }
 
 interface IConvexRewards {
@@ -700,16 +709,22 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
-    /// @dev Uses yearn's lens oracle, if returned values are strange then troubleshoot there.
+    /// @dev Uses Chainlink's feed registry.
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
-        IOracle yearnOracle = IOracle(
-            0x83d95e0D5f402511dB06817Aff3f9eA88224B030
-        ); // yearn lens oracle
-        uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
-        uint256 convexTokenPrice = yearnOracle.getPriceUsdcRecommended(
-            address(convexToken)
-        );
+        (, uint256 crvPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(crv),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
+
+        (, uint256 cvxPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(convexToken),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
 
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
@@ -751,8 +766,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
 
         // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
-        return
-            (crvPrice * _claimableBal + convexTokenPrice * mintableCvx) / 1e18;
+        return (crvPrice * _claimableBal + cvxPrice * mintableCvx) / 1e20;
     }
 
     /// @notice Convert our keeper's eth cost into want
