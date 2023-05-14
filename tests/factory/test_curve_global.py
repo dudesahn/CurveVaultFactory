@@ -4,7 +4,7 @@ import math
 from utils import harvest_strategy, check_status
 
 # note that because ganache crashes with the try-catch when checking for frax pids, we need to do this test and the next with tenderly
-# for the vault deployment to not revert
+# for the vault deployment to not revert. additionally, best to do the first two individually.
 # also important to note that these tests don't care about which_strategy, but good to test out PIDs with and without frax strategies
 def test_vault_deployment(
     StrategyConvexFactoryClonable,
@@ -28,14 +28,17 @@ def test_vault_deployment(
     amount,
     booster,
     legacy_gauge,
-    convex_template,
     use_yswaps,
     profit_whale,
     profit_amount,
     target,
+    convex_template,
+    frax_template,
+    curve_template,
 ):
+    ############# skip all of this since factory is already live
+
     # once our factory is deployed, setup the factory from gov
-    # skip all of this since factory is already live
     # registry_owner = accounts.at(new_registry.owner(), force=True)
     # new_registry.setApprovedVaultsOwner(curve_global, True, {"from": registry_owner})
     # new_registry.setVaultEndorsers(curve_global, True, {"from": registry_owner})
@@ -45,6 +48,9 @@ def test_vault_deployment(
 
     # set our factory address on the strategy proxy
     # new_proxy.setFactory(curve_global.address, {"from": gov})
+
+    #############
+
     print("New proxy updated, factory added to proxy")
 
     # make sure our curve global can own vaults and endorse them
@@ -53,8 +59,10 @@ def test_vault_deployment(
     assert curve_global.registry() == new_registry.address
     print("Our factory can endorse vaults")
 
-    # attach our new convex strategy template
+    # attach our new strategy templates
     curve_global.setConvexStratImplementation(convex_template, {"from": gov})
+    curve_global.setConvexFraxStratImplementation(frax_template, {"from": gov})
+    curve_global.setCurveStratImplementation(curve_template, {"from": gov})
 
     _pid = curve_global.getPid(gauge)
     assert _pid == pid
@@ -158,7 +166,7 @@ def test_vault_deployment(
         # curve
         assert vault.withdrawalQueue(1) == curve_strat
         assert vault.strategies(curve_strat)["performanceFee"] == 0
-        assert curve_strategy.creditThreshold() == 1e24  # 1e24 since currently live
+        assert curve_strategy.creditThreshold() == 5e22  # 50k
         assert curve_strategy.healthCheck() == curve_global.healthCheck()
         assert curve_strategy.localKeepCRV() == curve_global.keepCRV()
         assert curve_strategy.curveVoter() == curve_global.curveVoter()
@@ -173,7 +181,7 @@ def test_vault_deployment(
         assert vault.withdrawalQueue(2) == frax_strat
         assert vault.strategies(frax_strat)["performanceFee"] == 0
         print("All three strategies attached in order")
-        assert frax_strategy.creditThreshold() == 1e24  # 1e24 since currently live
+        assert frax_strategy.creditThreshold() == 5e22  # 50k
         assert frax_strategy.healthCheck() == curve_global.healthCheck()
         assert (
             frax_strategy.harvestProfitMaxInUsdc()
@@ -373,13 +381,16 @@ def test_permissioned_vault(
     tests_using_tenderly,
     legacy_gauge,
     convex_template,
+    frax_template,
+    curve_template,
 ):
+    ############# skip all of this since factory is already live
+
     # deploying curve global with frax strategies doesn't work unless with tenderly;
     # ganache crashes because of the try-catch in the fraxPid function
     # however, I usually do hacky coverage testing (commenting out section in curveGlobal)
 
     # once our factory is deployed, setup the factory from gov
-    # skip all of this since factory is already live
     # registry_owner = accounts.at(new_registry.owner(), force=True)
     # new_registry.setApprovedVaultsOwner(curve_global, True, {"from": registry_owner})
     # new_registry.setVaultEndorsers(curve_global, True, {"from": registry_owner})
@@ -389,6 +400,9 @@ def test_permissioned_vault(
 
     # set our factory address on the strategy proxy
     # new_proxy.setFactory(curve_global.address, {"from": gov})
+
+    #############
+
     print("New proxy updated, factory added to proxy")
 
     # make sure our curve global can own vaults and endorse them
@@ -408,8 +422,11 @@ def test_permissioned_vault(
     else:
         print("This isn't a Frax pool")
 
-    # attach our new convex strategy template
+    # attach our new strategy templates
     curve_global.setConvexStratImplementation(convex_template, {"from": gov})
+    curve_global.setConvexFraxStratImplementation(frax_template, {"from": gov})
+    curve_global.setCurveStratImplementation(curve_template, {"from": gov})
+
     print("New proxy updated, factory added to proxy")
     print("Let's deploy this vault")
     print("Factory address: ", curve_global)
@@ -500,7 +517,7 @@ def test_permissioned_vault(
     # curve
     assert vault.withdrawalQueue(1) == curve_strat
     assert vault.strategies(curve_strat)["performanceFee"] == 0
-    assert curve_strategy.creditThreshold() == 1e24
+    assert curve_strategy.creditThreshold() == 5e22  # 50k
     assert curve_strategy.healthCheck() == curve_global.healthCheck()
     assert curve_strategy.localKeepCRV() == curve_global.keepCRV()
     assert curve_strategy.curveVoter() == curve_global.curveVoter()
@@ -517,7 +534,7 @@ def test_permissioned_vault(
         assert vault.withdrawalQueue(2) == frax_strat
         assert vault.strategies(frax_strat)["performanceFee"] == 0
         print("All three strategies attached in order")
-        assert frax_strategy.creditThreshold() == 1e24
+        assert frax_strategy.creditThreshold() == 5e22  # 50k
         assert frax_strategy.healthCheck() == curve_global.healthCheck()
         assert (
             frax_strategy.harvestProfitMaxInUsdc()
@@ -551,7 +568,7 @@ def test_permissioned_vault(
         "yvCurve-Legacy",
         {"from": gov},
     )
-    print("New factory vault deployed, vault/convex/curve/frax", tx)
+    print("New factory vault deployed")
 
     if not tests_using_tenderly:
         # we can't deploy another frax vault because we already have a strategy on our proxy for that gauge
@@ -574,9 +591,12 @@ def test_curve_global_setters_and_views(
     voter,
     new_proxy,
     convex_template,
+    frax_template,
+    curve_template,
 ):
+    ############# skip all of this since factory is already live
+
     # once our factory is deployed, setup the factory from gov
-    # skip all of this since factory is already live
     # registry_owner = accounts.at(new_registry.owner(), force=True)
     # new_registry.setApprovedVaultsOwner(curve_global, True, {"from": registry_owner})
     # new_registry.setVaultEndorsers(curve_global, True, {"from": registry_owner})
@@ -586,6 +606,9 @@ def test_curve_global_setters_and_views(
 
     # set our factory address on the strategy proxy
     # new_proxy.setFactory(curve_global.address, {"from": gov})
+
+    #############
+
     print("New proxy updated, factory added to proxy")
 
     # make sure our curve global can own vaults and endorse them
@@ -594,8 +617,10 @@ def test_curve_global_setters_and_views(
     assert curve_global.registry() == new_registry.address
     print("Our factory can endorse vaults")
 
-    # attach our new convex strategy template
+    # attach our new strategy templates
     curve_global.setConvexStratImplementation(convex_template, {"from": gov})
+    curve_global.setConvexFraxStratImplementation(frax_template, {"from": gov})
+    curve_global.setCurveStratImplementation(curve_template, {"from": gov})
 
     # check our views
     print("Time to check the views")

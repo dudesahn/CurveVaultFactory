@@ -434,9 +434,9 @@ def template_frax_pid():
 
 # this is only used for deploying our template—should be for an existing vault
 @pytest.fixture(scope="session")
-def test_staking_address():
-    test_staking_address = "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab"  # 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC, 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP
-    yield test_staking_address
+def template_staking_address():
+    template_staking_address = "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab"  # 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC, 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP
+    yield template_staking_address
 
 
 # put our pool's convex pid here
@@ -632,7 +632,7 @@ def gauge(pid, booster):
     yield Contract(gauge)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def convex_template(
     StrategyConvexFactoryClonable,
     trade_factory,
@@ -658,7 +658,7 @@ def convex_template(
     yield convex_template
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def curve_template(
     StrategyCurveBoostedFactoryClonable,
     trade_factory,
@@ -668,40 +668,47 @@ def curve_template(
     new_proxy,
     gov,
 ):
-    curve_template = StrategyCurveBoostedFactoryClonable.at(
-        "0x9B4B3DBCE6A2c7d65bFE3679bA2512fca39bB526"
+    # deploy our curve template
+    curve_template = gov.deploy(
+        StrategyCurveBoostedFactoryClonable,
+        template_vault,
+        trade_factory,
+        new_proxy,
+        template_gauge,
     )
-    print("Curve Template already deployed:", curve_template)
+    print("Curve Template deployed:", curve_template)
 
     yield curve_template
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def frax_template(
     StrategyConvexFraxFactoryClonable,
     trade_factory,
     template_vault,
     strategist,
     frax_booster,
-    test_staking_address,
+    template_staking_address,
     template_frax_pid,
+    gov,
 ):
-    frax_template = StrategyConvexFraxFactoryClonable.at(
-        "0x78883A75c058557Cc74b773c6E96150DB4B01aAf"
+    frax_template = gov.deploy(
+        StrategyConvexFraxFactoryClonable,
+        template_vault,
+        trade_factory,
+        template_frax_pid,
+        template_staking_address,
+        10_000 * 1e6,
+        25_000 * 1e6,
+        frax_booster,
     )
 
-    print("Frax Template already deployed:", frax_template)
+    print("Frax Template deployed:", frax_template)
     yield frax_template
 
 
-@pytest.fixture(scope="module")
-def curve_global(
-    CurveGlobal,
-    new_registry,
-    gov,
-    curve_template,
-    frax_template,
-):
+@pytest.fixture(scope="session")
+def curve_global(CurveGlobal):
     # deploy our factory
     curve_global = CurveGlobal.at("0x21b1FC8A52f179757bf555346130bF27c0C2A17A")
     print("Curve factory already deployed:", curve_global)
