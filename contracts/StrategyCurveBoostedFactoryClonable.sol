@@ -43,9 +43,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     IERC20 public constant crv =
         IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
-    // we use this to be able to adjust our strategy's name
-    string internal stratName;
-
     // ySwaps stuff
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
@@ -173,21 +170,19 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
         // ySwaps setup
         _setUpTradeFactory();
-
-        // set our strategy's name
-        stratName = string(
-            abi.encodePacked(
-                "StrategyCurveBoostedFactory-",
-                IDetails(address(want)).symbol()
-            )
-        );
     }
 
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
     function name() external view override returns (string memory) {
-        return stratName;
+        return
+            string(
+                abi.encodePacked(
+                    "StrategyCurveBoostedFactory-",
+                    IDetails(address(want)).symbol()
+                )
+            );
     }
 
     /// @notice Balance of want staked in Curve's gauge.

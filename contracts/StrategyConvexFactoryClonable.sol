@@ -122,9 +122,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @notice The address of our Convex token (CVX for Curve, AURA for Balancer, etc.).
     IERC20 public convexToken;
 
-    // we use this to be able to adjust our strategy's name
-    string internal stratName;
-
     /// @notice Whether we should claim rewards when withdrawing, generally this should be false.
     bool public claimRewards;
 
@@ -319,21 +316,19 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // set up rewards and trade factory
         _updateRewards();
         _setUpTradeFactory();
-
-        // set our strategy's name
-        stratName = string(
-            abi.encodePacked(
-                "StrategyConvexFactory-",
-                IDetails(address(want)).symbol()
-            )
-        );
     }
 
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
     function name() external view override returns (string memory) {
-        return stratName;
+        return
+            string(
+                abi.encodePacked(
+                    "StrategyConvexFactory-",
+                    IDetails(address(want)).symbol()
+                )
+            );
     }
 
     /// @notice Balance of want staked in Convex.
@@ -373,9 +368,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
+        uint256 _sendToVoter;
         if (_localKeepCRV > 0 && _curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 _sendToVoter;
             unchecked {
                 _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
             }
@@ -389,7 +384,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexVoter = convexVoter;
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
             uint256 cvxBalance = convexToken.balanceOf(address(this));
-            uint256 _sendToVoter;
             unchecked {
                 _sendToVoter = (cvxBalance * _localKeepCVX) / FEE_DENOMINATOR;
             }
@@ -586,10 +580,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // enable for any rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
-            // cvxWrapper is not a normal token
-            if (_rewardsToken == cvxWrapper) {
-                continue;
-            }
+
             IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
             tf.enable(_rewardsToken, _want);
         }

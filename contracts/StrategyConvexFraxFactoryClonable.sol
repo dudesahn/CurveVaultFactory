@@ -130,9 +130,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice The address of our Frax token (FXS).
     IERC20 public fxs;
 
-    // we use this to be able to adjust our strategy's name
-    string internal stratName;
-
     /// @notice Minimum profit size in USDC that we want to harvest.
     /// @dev Only used in harvestTrigger.
     uint256 public harvestProfitMinInUsdc;
@@ -347,21 +344,19 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // set up rewards and trade factory
         _updateRewards();
         _setUpTradeFactory();
-
-        // set our strategy's name
-        stratName = string(
-            abi.encodePacked(
-                "StrategyConvexFraxFactory-",
-                IDetails(address(want)).symbol()
-            )
-        );
     }
 
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
     function name() external view override returns (string memory) {
-        return stratName;
+        return
+            string(
+                abi.encodePacked(
+                    "StrategyConvexFraxFactory-",
+                    IDetails(address(want)).symbol()
+                )
+            );
     }
 
     /// @notice Balance of want staked in Convex Frax.
@@ -396,10 +391,12 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
+        uint256 _sendToVoter;
         if (_localKeepCRV > 0 && _curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 _sendToVoter = (crvBalance * _localKeepCRV) /
-                FEE_DENOMINATOR;
+            unchecked {
+                _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 crv.safeTransfer(_curveVoter, _sendToVoter);
             }
@@ -410,8 +407,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _convexVoter = convexVoter;
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
             uint256 cvxBalance = convexToken.balanceOf(address(this));
-            uint256 _sendToVoter = (cvxBalance * _localKeepCVX) /
-                FEE_DENOMINATOR;
+            unchecked {
+                _sendToVoter = (cvxBalance * _localKeepCVX) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
             }
@@ -422,8 +420,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _fraxVoter = fraxVoter;
         if (_localKeepFXS > 0 && _fraxVoter != address(0)) {
             uint256 fxsBalance = fxs.balanceOf(address(this));
-            uint256 _sendToVoter = (fxsBalance * _localKeepFXS) /
-                FEE_DENOMINATOR;
+            unchecked {
+                _sendToVoter = (fxsBalance * _localKeepFXS) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 fxs.safeTransfer(_fraxVoter, _sendToVoter);
             }
