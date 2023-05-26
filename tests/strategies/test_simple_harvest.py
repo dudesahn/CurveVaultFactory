@@ -1,4 +1,4 @@
-from brownie import chain, Contract
+from brownie import chain, Contract, ZERO_ADDRESS, interface
 from utils import harvest_strategy
 import pytest
 
@@ -119,3 +119,160 @@ def test_simple_harvest(
         )
     else:
         assert token.balanceOf(whale) > starting_whale
+
+
+# basic rewards check
+def test_check_rewards(
+    gov,
+    token,
+    vault,
+    strategist,
+    whale,
+    strategy,
+    keeper,
+    rewards,
+    chain,
+    contract_name,
+    voter,
+    new_proxy,
+    pid,
+    amount,
+    pool,
+    strategy_name,
+    gauge,
+    has_rewards,
+    convex_token,
+    which_strategy,
+    sleep_time,
+    rewards_template,
+    rewards_whale,
+    rewards_amount,
+    rewards_token,
+    test_donation,
+    try_blocks,
+    use_yswaps,
+    profit_whale,
+    profit_amount,
+    target,
+):
+    # skip this test if we don't use rewards in this template
+    if not rewards_template:
+        return
+
+    # if we're supposed to have a rewards token, make sure it's not CVX
+    if has_rewards:
+        assert rewards_token.address == strategy.rewardsTokens(0)
+        print("\nThis is our rewards token:", rewards_token.name())
+        assert convex_token != rewards_token
+    else:
+        assert ZERO_ADDRESS == strategy.rewardsTokens(0)
+
+    # make sure we get our reward token when we harvest
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+
+    # harvest
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+    )
+
+    if test_donation:
+        # setup our rewards if we need to
+        if not has_rewards:
+            if which_strategy == 1:
+                strategy.updateRewards(rewards_token, {"from": gov})
+            else:
+                strategy.updateRewards({"from": gov})
+
+        if which_strategy == 1 and try_blocks:
+            # test our proxy, some old gauges use blocks instead of seconds. make sure we're earning!
+            chain.mine(240)
+            assert gauge.balanceOf(voter) > 0
+            balance_1 = gauge.claimable_reward(voter)
+            print("Earned balance:", balance_1)
+            chain.sleep(1)
+            chain.mine(240)
+            chain.sleep(1)
+            balance_2 = gauge.claimable_reward(voter)
+            print("Earned balance:", balance_2)
+            assert balance_2 > balance_1
+            tx = strategy.harvest({"from": gov})
+            chain.mine(240)
+            chain.sleep(1)
+            balance_3 = gauge.claimable_reward(voter)
+            print("Earned balance:", balance_3)
+            assert balance_3 > balance_2
+            proxy.claimRewards(gauge, rewards_token, {"from": strategy})
+            assert rewards_token.balanceOf(strategy) > 0
+
+        chain.sleep(sleep_time)
+
+    # harvest
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+    )
+
+    if use_yswaps:
+        # harvest
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+    normal_profit = profit
+    print("Normal Profit:", normal_profit)
+
+    if test_donation:
+        rewards_token.transfer(strategy, rewards_amount, {"from": rewards_whale})
+        chain.sleep(sleep_time)
+        strategy.setDoHealthCheck(False, {"from": gov})
+
+    # harvest
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+    )
+
+    reward_address = strategy.rewardsTokens(0)
+    if reward_address != ZERO_ADDRESS:
+        reward_token = interface.IERC20(reward_address)
+        if reward_token.balanceOf(strategy) > 0:
+            print("We have a reward token balance, send double profit")
+            token.transfer(strategy, profit_amount, {"from": profit_whale})
+
+    if use_yswaps:
+        # harvest
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+    print("Rewards Profit:", profit)
+    assert profit > normal_profit

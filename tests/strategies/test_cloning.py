@@ -1,5 +1,5 @@
 import brownie
-from brownie import chain
+from brownie import chain, Contract
 import pytest
 from utils import harvest_strategy
 
@@ -58,7 +58,7 @@ def test_cloning(
     )
     before_pps = vault.pricePerShare()
 
-    # tenderly doesn't work for "with brownie.reverts"
+    # tenderly doesn't work for "with brownie.reverts". also doesn't accept return values.
     if tests_using_tenderly:
         if which_strategy == 0:  # convex
             tx = strategy.cloneStrategyConvex(
@@ -73,7 +73,9 @@ def test_cloning(
                 booster,
                 convex_token,
             )
-            new_strategy = contract_name.at(tx.return_value)
+            new_strategy = tx.events["Cloned"]["clone"]
+            print("Cloned strategy:", new_strategy)
+            new_strategy = contract_name.at(new_strategy)
         elif which_strategy == 1:  # curve
             tx = strategy.cloneStrategyCurveBoosted(
                 vault,
@@ -86,7 +88,9 @@ def test_cloning(
                 10_000 * 1e6,
                 25_000 * 1e6,
             )
-            new_strategy = contract_name.at(tx.return_value)
+            new_strategy = tx.events["Cloned"]["clone"]
+            print("Cloned strategy:", new_strategy)
+            new_strategy = contract_name.at(new_strategy)
         else:  # frax
             tx = strategy.cloneStrategyConvexFrax(
                 vault,
@@ -100,7 +104,9 @@ def test_cloning(
                 25_000 * 1e6,
                 frax_booster,
             )
-            new_strategy = contract_name.at(tx.return_value)
+            new_strategy = tx.events["Cloned"]["clone"]
+            print("Cloned strategy:", new_strategy)
+            new_strategy = contract_name.at(new_strategy)
     else:
         if which_strategy == 0:  # convex
             # Shouldn't be able to call initialize again
@@ -308,13 +314,6 @@ def test_cloning(
     assert vault.withdrawalQueue(0) == new_strategy.address
     assert vault.strategies(new_strategy)["debtRatio"] == 10_000
     assert vault.strategies(strategy)["debtRatio"] == 0
-
-    # add rewards token if needed
-    if has_rewards:
-        if which_strategy == 1:
-            newStrategy.updateRewards([rewards_token], {"from": gov})
-        else:
-            newStrategy.updateRewards({"from": gov})
 
     # make sure to update our proxy if a curve strategy
     if which_strategy == 1:

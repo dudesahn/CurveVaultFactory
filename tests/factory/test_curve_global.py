@@ -593,6 +593,7 @@ def test_curve_global_setters_and_views(
     convex_template,
     frax_template,
     curve_template,
+    tests_using_tenderly,
 ):
     ############# skip all of this since factory is already live
 
@@ -661,147 +662,135 @@ def test_curve_global_setters_and_views(
     print("Latest vault for legacy gauge:", latest)
 
     # check our setters
-    with brownie.reverts():
-        curve_global.setKeepCVX(69, gov, {"from": whale})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            curve_global.setKeepCVX(69, gov, {"from": whale})
     curve_global.setKeepCVX(0, gov, {"from": gov})
     curve_global.setKeepCVX(69, gov, {"from": gov})
     assert curve_global.keepCVX() == 69
     assert curve_global.convexVoter() == gov.address
-    with brownie.reverts():
-        curve_global.setKeepCVX(69, ZERO_ADDRESS, {"from": gov})
-    with brownie.reverts():
-        curve_global.setKeepCVX(10_001, gov, {"from": gov})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            curve_global.setKeepCVX(69, ZERO_ADDRESS, {"from": gov})
+        with brownie.reverts():
+            curve_global.setKeepCVX(10_001, gov, {"from": gov})
+        with brownie.reverts():
+            curve_global.setKeepCRV(69, gov, {"from": whale})
 
-    with brownie.reverts():
-        curve_global.setKeepCRV(69, gov, {"from": whale})
     curve_global.setKeepCRV(0, gov, {"from": gov})
     curve_global.setKeepCRV(69, gov, {"from": gov})
     assert curve_global.keepCRV() == 69
     assert curve_global.curveVoter() == gov.address
-    with brownie.reverts():
-        curve_global.setKeepCRV(69, ZERO_ADDRESS, {"from": gov})
-    with brownie.reverts():
-        curve_global.setKeepCRV(10_001, gov, {"from": gov})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            curve_global.setKeepCRV(69, ZERO_ADDRESS, {"from": gov})
+        with brownie.reverts():
+            curve_global.setKeepCRV(10_001, gov, {"from": gov})
+        with brownie.reverts():
+            curve_global.setKeepFXS(69, gov, {"from": whale})
 
-    with brownie.reverts():
-        curve_global.setKeepFXS(69, gov, {"from": whale})
     curve_global.setKeepFXS(0, gov, {"from": gov})
     curve_global.setKeepFXS(69, gov, {"from": gov})
     assert curve_global.keepFXS() == 69
     assert curve_global.fraxVoter() == gov.address
-    with brownie.reverts():
-        curve_global.setKeepFXS(69, ZERO_ADDRESS, {"from": gov})
-    with brownie.reverts():
-        curve_global.setKeepFXS(10_001, gov, {"from": gov})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            curve_global.setKeepFXS(69, ZERO_ADDRESS, {"from": gov})
+        with brownie.reverts():
+            curve_global.setKeepFXS(10_001, gov, {"from": gov})
+        with brownie.reverts():
+            curve_global.setDepositLimit(69, {"from": whale})
 
-    with brownie.reverts():
-        curve_global.setDepositLimit(69, {"from": whale})
     curve_global.setDepositLimit(0, {"from": gov})
     curve_global.setDepositLimit(69, {"from": curve_global.management()})
     assert curve_global.depositLimit() == 69
 
-    with brownie.reverts():
-        curve_global.setHarvestProfitMaxInUsdc(69, {"from": whale})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            curve_global.setHarvestProfitMaxInUsdc(69, {"from": whale})
+        with brownie.reverts():
+            curve_global.setHarvestProfitMinInUsdc(69, {"from": whale})
+        with brownie.reverts():
+            curve_global.setKeeper(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setHealthcheck(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setRegistry(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setGuardian(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setConvexPoolManager(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setBooster(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setGovernance(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setManagement(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setTreasury(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setGuardian(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setTradeFactory(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setBaseFeeOracle(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setConvexStratImplementation(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setCurveStratImplementation(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.setManagementFee(69, {"from": whale})
+        with brownie.reverts():
+            curve_global.setPerformanceFee(69, {"from": whale})
+        with brownie.reverts():
+            curve_global.setPerformanceFee(9999, {"from": gov})
+        with brownie.reverts():
+            curve_global.setManagementFee(9999, {"from": gov})
+        with brownie.reverts():
+            curve_global.setOwner(gov, {"from": whale})
+        with brownie.reverts():
+            curve_global.acceptOwner({"from": whale})
+
     curve_global.setHarvestProfitMaxInUsdc(0, {"from": gov})
     curve_global.setHarvestProfitMaxInUsdc(69, {"from": curve_global.management()})
     assert curve_global.harvestProfitMaxInUsdc() == 69
-
-    with brownie.reverts():
-        curve_global.setHarvestProfitMinInUsdc(69, {"from": whale})
     curve_global.setHarvestProfitMinInUsdc(0, {"from": gov})
     curve_global.setHarvestProfitMinInUsdc(69, {"from": curve_global.management()})
     assert curve_global.harvestProfitMinInUsdc() == 69
-
-    with brownie.reverts():
-        curve_global.setKeeper(gov, {"from": whale})
     curve_global.setKeeper(whale, {"from": gov})
     curve_global.setKeeper(gov, {"from": curve_global.management()})
     assert curve_global.keeper() == gov.address
-
-    with brownie.reverts():
-        curve_global.setHealthcheck(gov, {"from": whale})
     curve_global.setHealthcheck(whale, {"from": gov})
     curve_global.setHealthcheck(gov, {"from": curve_global.management()})
     assert curve_global.healthCheck() == gov.address
-
-    with brownie.reverts():
-        curve_global.setRegistry(gov, {"from": whale})
     curve_global.setRegistry(gov, {"from": gov})
     assert curve_global.registry() == gov.address
-
-    with brownie.reverts():
-        curve_global.setGuardian(gov, {"from": whale})
     curve_global.setGuardian(gov, {"from": gov})
     assert curve_global.guardian() == gov.address
-
-    with brownie.reverts():
-        curve_global.setConvexPoolManager(gov, {"from": whale})
     curve_global.setConvexPoolManager(gov, {"from": gov})
     assert curve_global.convexPoolManager() == gov.address
-
-    with brownie.reverts():
-        curve_global.setBooster(gov, {"from": whale})
     curve_global.setBooster(gov, {"from": gov})
     assert curve_global.booster() == gov.address
-
-    with brownie.reverts():
-        curve_global.setGovernance(gov, {"from": whale})
     curve_global.setGovernance(gov, {"from": gov})
     assert curve_global.governance() == gov.address
-
-    with brownie.reverts():
-        curve_global.setManagement(gov, {"from": whale})
     curve_global.setManagement(gov, {"from": gov})
     assert curve_global.management() == gov.address
-
-    with brownie.reverts():
-        curve_global.setGuardian(gov, {"from": whale})
     curve_global.setGuardian(gov, {"from": gov})
     assert curve_global.guardian() == gov.address
-
-    with brownie.reverts():
-        curve_global.setTreasury(gov, {"from": whale})
     curve_global.setTreasury(gov, {"from": gov})
     assert curve_global.treasury() == gov.address
-
-    with brownie.reverts():
-        curve_global.setTradeFactory(gov, {"from": whale})
     curve_global.setTradeFactory(gov, {"from": gov})
     assert curve_global.tradeFactory() == gov.address
-
-    with brownie.reverts():
-        curve_global.setBaseFeeOracle(gov, {"from": whale})
     curve_global.setBaseFeeOracle(gov, {"from": gov})
     assert curve_global.baseFeeOracle() == gov.address
-
-    with brownie.reverts():
-        curve_global.setConvexStratImplementation(gov, {"from": whale})
     curve_global.setConvexStratImplementation(gov, {"from": gov})
     assert curve_global.convexStratImplementation() == gov.address
-
-    with brownie.reverts():
-        curve_global.setCurveStratImplementation(gov, {"from": whale})
     curve_global.setCurveStratImplementation(gov, {"from": gov})
     assert curve_global.curveStratImplementation() == gov.address
-
-    with brownie.reverts():
-        curve_global.setManagementFee(69, {"from": whale})
     curve_global.setManagementFee(69, {"from": gov})
     assert curve_global.managementFee() == 69
-    with brownie.reverts():
-        curve_global.setManagementFee(9999, {"from": gov})
-
-    with brownie.reverts():
-        curve_global.setPerformanceFee(69, {"from": whale})
     curve_global.setPerformanceFee(69, {"from": gov})
     assert curve_global.performanceFee() == 69
-    with brownie.reverts():
-        curve_global.setPerformanceFee(9999, {"from": gov})
-
-    with brownie.reverts():
-        curve_global.setOwner(gov, {"from": whale})
     curve_global.setOwner(whale, {"from": gov})
-    with brownie.reverts():
-        curve_global.acceptOwner({"from": gov})
     curve_global.acceptOwner({"from": whale})
     assert curve_global.owner() == whale.address

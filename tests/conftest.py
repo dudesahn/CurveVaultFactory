@@ -49,9 +49,10 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     whale = accounts.at(
-        "0xfB18127c1471131468a1AaD4785c19678e521D86", force=True
-    )  # cvxCRV new gauge: 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens, stETH: 0x43378368D84D4bA00D1C8E97EC2E6016A82fC062, 730 tokens,
-    # frax: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens, 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens
+        "0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5", force=True
+    )  # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
+    # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
+    # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -63,8 +64,8 @@ def whale(accounts, amount, token):
 @pytest.fixture(scope="session")
 def amount(token):
     amount = (
-        500_000 * 10 ** token.decimals()
-    )  # 500k for cvxCRV, 300 for stETH, 50k for frax, 5k for frxETH
+        5_000 * 10 ** token.decimals()
+    )  # 500k for cvxCRV, 300 for stETH, 50k for frax, 5k for frxETH, 5 eCFX
     yield amount
 
 
@@ -72,9 +73,10 @@ def amount(token):
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
     profit_whale = accounts.at(
-        "0x109B3C39d675A2FF16354E116d080B94d238a7c9", force=True
-    )  # 0x109B3C39d675A2FF16354E116d080B94d238a7c9, new cvxCRV 5100 tokens, stETH: 0xF31501905Bdb035119031510c724C4a4d67acA14, 500 tokens
+        "0x2CA3a2b525E75b2F20f59dEcCaE3ffa4bdf3EAa2", force=True
+    )  # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x2CA3a2b525E75b2F20f59dEcCaE3ffa4bdf3EAa2 frxETH 70 tokens
+    # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -85,8 +87,8 @@ def profit_whale(accounts, profit_amount, token):
 @pytest.fixture(scope="session")
 def profit_amount(token):
     profit_amount = (
-        100 * 10 ** token.decimals()
-    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 10 for frxETH
+        10 * 10 ** token.decimals()
+    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 10 for frxETH, 1 eCFX
     yield profit_amount
 
 
@@ -400,7 +402,7 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 157  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax)
+    pid = 128  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160
     yield pid
 
 
@@ -443,7 +445,7 @@ def template_staking_address():
 @pytest.fixture(scope="session")
 def which_strategy():
     # must be 0, 1, or 2 for convex, curve, and frax. Only test 2 (Frax) for pools that actually have frax.
-    which_strategy = 0
+    which_strategy = 2
     yield which_strategy
 
 
@@ -488,15 +490,17 @@ def rewards_whale(accounts):
     # SNX whale: 0x8D6F396D210d385033b348bCae9e4f9Ea4e045bD, >600k SNX
     # SPELL whale: 0x46f80018211D5cBBc988e853A8683501FCA4ee9b, >10b SPELL
     # ANGLE whale: 0x2Fc443960971e53FD6223806F0114D5fAa8C7C4e, 11.6m ANGLE
-    yield accounts.at("0x2Fc443960971e53FD6223806F0114D5fAa8C7C4e", force=True)
+    # LDO whale: 0x28C6c06298d514Db089934071355E5743bf21d60, 7.6m LDO
+    yield accounts.at("0x28C6c06298d514Db089934071355E5743bf21d60", force=True)
 
 
 @pytest.fixture(scope="session")
 def rewards_amount():
-    rewards_amount = 10_000_000e18
+    rewards_amount = 50_000e18
     # SNX 50_000e18
     # SPELL 1_000_000e18
     # ANGLE 10_000_000e18
+    # LDO 50_000e18
     yield rewards_amount
 
 

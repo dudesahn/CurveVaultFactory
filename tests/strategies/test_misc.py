@@ -194,6 +194,7 @@ def test_setters(
     profit_amount,
     target,
     strategist,
+    tests_using_tenderly,
 ):
     # deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -212,15 +213,16 @@ def test_setters(
     if which_strategy == 2:
         strategy.setLockTime(90000 * 7, {"from": gov})
 
-        # whale can't call
-        with brownie.reverts():
-            strategy.setLockTime(90000, {"from": whale})
-        # can't be too short
-        with brownie.reverts():
-            strategy.setLockTime(100, {"from": gov})
-        # or too long
-        with brownie.reverts():
-            strategy.setLockTime(2**256 - 1, {"from": gov})
+        if not tests_using_tenderly:
+            # whale can't call
+            with brownie.reverts():
+                strategy.setLockTime(90000, {"from": whale})
+            # can't be too short
+            with brownie.reverts():
+                strategy.setLockTime(100, {"from": gov})
+            # or too long
+            with brownie.reverts():
+                strategy.setLockTime(2**256 - 1, {"from": gov})
 
         # set our deposit params
         maxToStake = amount * 0.75
@@ -270,29 +272,33 @@ def test_setters(
         strategy.setLocalKeepCrvs(10, 10, {"from": gov})
         strategy.setClaimRewards(True, {"from": gov})
 
-        # test our reverts as well
-        with brownie.reverts():
-            strategy.setLocalKeepCrvs(1000000, 0, {"from": gov})
-        with brownie.reverts():
-            strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(1000000, 0, {"from": gov})
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
     elif which_strategy == 1:
         strategy.setVoter(gov, {"from": gov})
         strategy.setLocalKeepCrv(10, {"from": gov})
 
-        # test our reverts as well
-        with brownie.reverts():
-            strategy.setLocalKeepCrv(1000000, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrv(1000000, {"from": gov})
+
     else:
         strategy.setVoters(gov, gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
 
-        # test our reverts as well
-        with brownie.reverts():
-            strategy.setLocalKeepCrvs(1000000, 0, 0, {"from": gov})
-        with brownie.reverts():
-            strategy.setLocalKeepCrvs(0, 100000000, 0, {"from": gov})
-        with brownie.reverts():
-            strategy.setLocalKeepCrvs(0, 0, 10000000, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(1000000, 0, 0, {"from": gov})
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(0, 100000000, 0, {"from": gov})
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(0, 0, 10000000, {"from": gov})
 
     strategy.setStrategist(strategist, {"from": gov})
     name = strategy.name()
@@ -312,6 +318,7 @@ def test_sweep(
     profit_amount,
     target,
     use_yswaps,
+    tests_using_tenderly,
 ):
     # deposit to the vault after approving
     token.approve(vault, 2**256 - 1, {"from": whale})
@@ -333,11 +340,13 @@ def test_sweep(
     token.transfer(strategy.address, amount, {"from": whale})
     assert token.address == strategy.want()
     assert token.balanceOf(strategy) > 0
-    with brownie.reverts("!want"):
-        strategy.sweep(token, {"from": gov})
-    with brownie.reverts():
-        strategy.sweep(to_sweep, {"from": whale})
 
-    # Vault share token doesn't work
-    with brownie.reverts("!shares"):
-        strategy.sweep(vault.address, {"from": gov})
+    if not tests_using_tenderly:
+        with brownie.reverts("!want"):
+            strategy.sweep(token, {"from": gov})
+        with brownie.reverts():
+            strategy.sweep(to_sweep, {"from": whale})
+
+        # Vault share token doesn't work
+        with brownie.reverts("!shares"):
+            strategy.sweep(vault.address, {"from": gov})

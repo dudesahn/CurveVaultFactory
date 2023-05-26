@@ -333,7 +333,10 @@ def test_weird_reverts(
     strategy,
     target,
     other_strategy,
+    tests_using_tenderly,
 ):
+    if tests_using_tenderly:
+        return
 
     # only vault can call this
     with brownie.reverts():

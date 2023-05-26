@@ -19,6 +19,7 @@ def test_keepers_and_trade_handler(
     trade_factory,
     crv_whale,
     which_strategy,
+    tests_using_tenderly,
 ):
     # no testing needed if we're not using yswaps
     if not use_yswaps:
@@ -69,8 +70,11 @@ def test_keepers_and_trade_handler(
     crv.transfer(strategy, 100e18, {"from": crv_whale})
 
     # whale can't sweep, but trade handler can
-    with brownie.reverts():
-        crv.transferFrom(strategy, whale, crv.balanceOf(strategy) / 2, {"from": whale})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            crv.transferFrom(
+                strategy, whale, crv.balanceOf(strategy) / 2, {"from": whale}
+            )
 
     crv.transferFrom(
         strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
@@ -82,10 +86,11 @@ def test_keepers_and_trade_handler(
     assert crv.balanceOf(strategy) > 0
 
     # trade factory now cant sweep
-    with brownie.reverts():
-        crv.transferFrom(
-            strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
-        )
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            crv.transferFrom(
+                strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
+            )
 
     # give back those permissions, now trade factory can sweep
     strategy.updateTradeFactory(trade_factory, {"from": gov})
@@ -104,31 +109,39 @@ def test_keepers_and_trade_handler(
     chain.mine(1)
 
     # can't set trade factory to zero
-    with brownie.reverts():
-        strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})
+    if not tests_using_tenderly:
+        with brownie.reverts():
+            strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})
+
+    # remove again!
+    strategy.removeTradeFactoryPermissions(True, {"from": gov})
+
+    # update again
+    strategy.updateTradeFactory(trade_factory, {"from": gov})
 
     # update our rewards again, shouldn't really change things
     if which_strategy != 1:
-        strategy.updateRewards({"from": gov})
+        tx = strategy.updateRewards({"from": gov})
     else:
         strategy.updateRewards([], {"from": gov})
 
     # check out our rewardsTokens
-    if which_strategy == 0:
-        # for convex, 0 position may be occupied by wrapped CVX token
-        with brownie.reverts():
-            strategy.rewardsTokens(1)
-    if which_strategy == 1:
-        with brownie.reverts():
-            strategy.rewardsTokens(0)
-    if which_strategy == 2:
-        with brownie.reverts():
-            strategy.rewardsTokens(0)
+    if not tests_using_tenderly:
+        if which_strategy == 0:
+            # for convex, 0 position may be occupied by wrapped CVX token
+            with brownie.reverts():
+                strategy.rewardsTokens(1)
+        if which_strategy == 1:
+            with brownie.reverts():
+                strategy.rewardsTokens(0)
+        if which_strategy == 2:
+            with brownie.reverts():
+                strategy.rewardsTokens(0)
 
-    # only gov can update rewards
-    if which_strategy != 1:
-        with brownie.reverts():
-            strategy.updateRewards({"from": whale})
-    else:
-        with brownie.reverts():
-            strategy.updateRewards([], {"from": whale})
+        # only gov can update rewards
+        if which_strategy != 1:
+            with brownie.reverts():
+                strategy.updateRewards({"from": whale})
+        else:
+            with brownie.reverts():
+                strategy.updateRewards([], {"from": whale})
