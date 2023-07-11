@@ -1,9 +1,11 @@
 import brownie
-from brownie import Contract
-from brownie import config
-import math
+from brownie import chain, Contract, ZERO_ADDRESS, accounts
+import pytest
+from utils import harvest_strategy, check_status
 
 # test our harvest triggers
+# for frax, skip this when trying coverage
+@pytest.mark.skip_coverage
 def test_triggers(
     gov,
     token,
@@ -13,29 +15,37 @@ def test_triggers(
     strategy,
     chain,
     amount,
-    gasOracle,
-    strategist_ms,
+    sleep_time,
     is_slippery,
     no_profit,
-    sleep_time,
-    profit_amount,
     profit_whale,
+    profit_amount,
+    target,
+    base_fee_oracle,
+    use_yswaps,
     which_strategy,
 ):
     # frax strategy gets stuck on these views, so we call them instead
     if which_strategy == 2:
         # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
-        gasOracle.setMaxAcceptableBaseFee(10000 * 1e9, {"from": strategist_ms})
         currentDebtRatio = vault.strategies(strategy)["debtRatio"]
         vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-        strategy.harvest({"from": gov})
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
         tx = strategy.harvestTrigger.call(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
         vault.updateStrategyDebtRatio(strategy, currentDebtRatio, {"from": gov})
 
-        ## deposit to the vault after approving
-        startingWhale = token.balanceOf(whale)
+        ## deposit to the vault after approving, no harvest yet
+        starting_whale = token.balanceOf(whale)
         token.approve(vault, 2**256 - 1, {"from": whale})
         vault.deposit(amount, {"from": whale})
         newWhale = token.balanceOf(whale)
@@ -48,27 +58,39 @@ def test_triggers(
         assert tx == True
         strategy.setCreditThreshold(1e24, {"from": gov})
 
-        # harvest the credit
-        chain.sleep(1)
-        strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
+        # test our manual harvest trigger
+        strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
 
-        # should trigger false, nothing is ready yet
+        # harvest the credit
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        # should trigger false, nothing is ready yet, just harvested
         tx = strategy.harvestTrigger.call(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
 
         # simulate earnings
         chain.sleep(sleep_time)
-        chain.mine(1)
 
-        # set our max delay to 1 day so we trigger true, then set it back to 21 days
-        strategy.setMaxReportDelay(sleep_time - 1)
-        tx = strategy.harvestTrigger.call(0, {"from": gov})
-        print("\nShould we harvest? Should be True.", tx)
-        assert tx == True
-        strategy.setMaxReportDelay(86400 * 21)
+        ################# GENERATE CLAIMABLE PROFIT HERE AS NEEDED #################
+        # we simulate minting LUSD fees from liquity's borrower operations to the staking contract so we have claimable yield
+        # for curve vaults, we shouldn't have to worry about a lack of claimable profit, should auto-generate
+
+        # check that we have claimable profit, need this for min and max profit checks below
+        claimable_profit = strategy.claimableProfitInUsdc()
+        assert claimable_profit > 0
+        print("🤑 Claimable profit >0")
 
         if not (is_slippery and no_profit):
             # update our minProfit so our harvest triggers true
@@ -84,33 +106,76 @@ def test_triggers(
             assert tx == True
             strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
+        # set our max delay to 1 day so we trigger true, then set it back to 21 days
+        strategy.setMaxReportDelay(sleep_time - 1)
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be True.", tx)
+        assert tx == True
+        strategy.setMaxReportDelay(86400 * 21)
+
         # harvest, wait
-        chain.sleep(1)
-        token.transfer(strategy, profit_amount, {"from": profit_whale})
-        tx = strategy.harvest({"from": gov})
-        print("Harvest info:", tx.events["Harvested"])
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+        print("Profit:", profit, "Loss:", loss)
         chain.sleep(sleep_time)
-        chain.mine(1)
 
         # harvest should trigger false because of oracle
-        gasOracle.setManualBaseFeeBool(False, {"from": gov})
+        base_fee_oracle.setManualBaseFeeBool(False, {"from": gov})
         tx = strategy.harvestTrigger.call(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
-        gasOracle.setManualBaseFeeBool(True, {"from": gov})
+        base_fee_oracle.setManualBaseFeeBool(True, {"from": gov})
+
+        # harvest again to get the last of our profit with ySwaps
+        if use_yswaps:
+            (profit, loss) = harvest_strategy(
+                use_yswaps,
+                strategy,
+                token,
+                gov,
+                profit_whale,
+                profit_amount,
+                target,
+            )
+
+            # check our current status
+            print("\nAfter yswaps extra harvest")
+            strategy_params = check_status(strategy, vault)
+
+            # make sure we recorded our gain properly
+            if not no_profit:
+                assert profit > 0
+
+        # simulate seven days of waiting for share price to bump back up and LPs to unlock
+        chain.sleep(86400 * 7)
+        chain.mine(1)
     else:
         # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
-        gasOracle.setMaxAcceptableBaseFee(10000 * 1e9, {"from": strategist_ms})
         currentDebtRatio = vault.strategies(strategy)["debtRatio"]
         vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
-        strategy.harvest({"from": gov})
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
         tx = strategy.harvestTrigger(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
         vault.updateStrategyDebtRatio(strategy, currentDebtRatio, {"from": gov})
 
-        ## deposit to the vault after approving
-        startingWhale = token.balanceOf(whale)
+        ## deposit to the vault after approving, no harvest yet
+        starting_whale = token.balanceOf(whale)
         token.approve(vault, 2**256 - 1, {"from": whale})
         vault.deposit(amount, {"from": whale})
         newWhale = token.balanceOf(whale)
@@ -123,20 +188,34 @@ def test_triggers(
         assert tx == True
         strategy.setCreditThreshold(1e24, {"from": gov})
 
-        # harvest the credit
-        chain.sleep(1)
-        strategy.harvest({"from": gov})
-        chain.sleep(1)
-        chain.mine(1)
+        # test our manual harvest trigger
+        strategy.setForceHarvestTriggerOnce(True, {"from": gov})
+        tx = strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
 
-        # should trigger false, nothing is ready yet
+        # harvest the credit
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        # should trigger false, nothing is ready yet, just harvested
         tx = strategy.harvestTrigger(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
 
         # simulate earnings
         chain.sleep(sleep_time)
-        chain.mine(1)
+
+        ################# GENERATE CLAIMABLE PROFIT HERE AS NEEDED #################
+        # we simulate minting LUSD fees from liquity's borrower operations to the staking contract so we have claimable yield
+        # for curve vaults, we shouldn't have to worry about a lack of claimable profit, should auto-generate
 
         # set our max delay to 1 day so we trigger true, then set it back to 21 days
         strategy.setMaxReportDelay(sleep_time - 1)
@@ -162,17 +241,29 @@ def test_triggers(
             strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
 
             if not (is_slippery and no_profit):
+                # check that we have claimable profit, need this for min and max profit checks below
+                claimable_profit = strategy.claimableProfitInUsdc()
+                assert claimable_profit > 0
+                print("🤑 Claimable profit >0")
+
                 # update our minProfit so our harvest triggers true
-                strategy.setHarvestTriggerParams(1, 1000000e6, False, {"from": gov})
+                strategy.setHarvestTriggerParams(
+                    1, 1000000e6, strategy.checkEarmark(), {"from": gov}
+                )
                 tx = strategy.harvestTrigger(0, {"from": gov})
                 print("\nShould we harvest? Should be true.", tx)
                 assert tx == True
 
                 # update our maxProfit so harvest triggers true
-                strategy.setHarvestTriggerParams(1000000e6, 1, False, {"from": gov})
+                strategy.setHarvestTriggerParams(
+                    1000000e6, 1, strategy.checkEarmark(), {"from": gov}
+                )
                 tx = strategy.harvestTrigger(0, {"from": gov})
                 print("\nShould we harvest? Should be true.", tx)
                 assert tx == True
+                strategy.setHarvestTriggerParams(
+                    90000e6, 150000e6, strategy.checkEarmark(), {"from": gov}
+                )
 
             # earmark should be false now (it's been too long), turn it off after
             chain.sleep(86400 * 21)
@@ -192,31 +283,54 @@ def test_triggers(
             assert tx == True
 
         # harvest, wait
-        chain.sleep(1)
-        token.transfer(strategy, profit_amount, {"from": profit_whale})
-        tx = strategy.harvest({"from": gov})
-        print("Harvest info:", tx.events["Harvested"])
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+        print("Profit:", profit, "Loss:", loss)
         chain.sleep(sleep_time)
-        chain.mine(1)
 
         # harvest should trigger false because of oracle
-        gasOracle.setManualBaseFeeBool(False, {"from": gov})
+        base_fee_oracle.setManualBaseFeeBool(False, {"from": gov})
         tx = strategy.harvestTrigger(0, {"from": gov})
         print("\nShould we harvest? Should be false.", tx)
         assert tx == False
-        gasOracle.setManualBaseFeeBool(True, {"from": gov})
+        base_fee_oracle.setManualBaseFeeBool(True, {"from": gov})
 
-    if which_strategy == 2:
-        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
-        chain.sleep(86400 * 7)
+        # harvest again to get the last of our profit with ySwaps
+        if use_yswaps:
+            (profit, loss) = harvest_strategy(
+                use_yswaps,
+                strategy,
+                token,
+                gov,
+                profit_whale,
+                profit_amount,
+                target,
+            )
+
+            # check our current status
+            print("\nAfter yswaps extra harvest")
+            strategy_params = check_status(strategy, vault)
+
+            # make sure we recorded our gain properly
+            if not no_profit:
+                assert profit > 0
+
+        # simulate five days of waiting for share price to bump back up
+        chain.sleep(86400 * 5)
         chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same
     vault.withdraw({"from": whale})
-    if is_slippery and no_profit:
+    if no_profit:
         assert (
-            math.isclose(token.balanceOf(whale), startingWhale, abs_tol=10)
-            or token.balanceOf(whale) >= startingWhale
+            pytest.approx(token.balanceOf(whale), rel=RELATIVE_APPROX) == starting_whale
         )
     else:
-        assert token.balanceOf(whale) >= startingWhale
+        assert token.balanceOf(whale) > starting_whale

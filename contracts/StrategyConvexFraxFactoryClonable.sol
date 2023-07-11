@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
-pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -14,9 +13,19 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    function getPriceUsdcRecommended(
-        address tokenAddress
-    ) external view returns (uint256);
+    function latestRoundData(
+        address,
+        address
+    )
+        external
+        view
+        returns (
+            uint80 roundId,
+            uint256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
 }
 
 interface IDetails {
@@ -120,9 +129,6 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     /// @notice The address of our Frax token (FXS).
     IERC20 public fxs;
-
-    // we use this to be able to adjust our strategy's name
-    string internal stratName;
 
     /// @notice Minimum profit size in USDC that we want to harvest.
     /// @dev Only used in harvestTrigger.
@@ -325,33 +331,32 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(userVault), type(uint256).max);
 
-        // set up our max delay
+        // set up our baseStrategy vars
         maxReportDelay = 365 days;
+        creditThreshold = 50_000e18;
 
         // setup our default frax LP management vars
         maxKeks = 5;
         lockTime = stakingAddress.lock_time_min(); // default to current minimum
         maxSingleDeposit = 500_000e18;
-        minDeposit = 10_000e18;
+        minDeposit = 100e18;
 
         // set up rewards and trade factory
         _updateRewards();
         _setUpTradeFactory();
-
-        // set our strategy's name
-        stratName = string(
-            abi.encodePacked(
-                "StrategyConvexFraxFactory-",
-                IDetails(address(want)).symbol()
-            )
-        );
     }
 
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
     function name() external view override returns (string memory) {
-        return stratName;
+        return
+            string(
+                abi.encodePacked(
+                    "StrategyConvexFraxFactory-",
+                    IDetails(address(want)).symbol()
+                )
+            );
     }
 
     /// @notice Balance of want staked in Convex Frax.
@@ -386,10 +391,12 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
+        uint256 _sendToVoter;
         if (_localKeepCRV > 0 && _curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 _sendToVoter = (crvBalance * _localKeepCRV) /
-                FEE_DENOMINATOR;
+            unchecked {
+                _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 crv.safeTransfer(_curveVoter, _sendToVoter);
             }
@@ -400,8 +407,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _convexVoter = convexVoter;
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
             uint256 cvxBalance = convexToken.balanceOf(address(this));
-            uint256 _sendToVoter = (cvxBalance * _localKeepCVX) /
-                FEE_DENOMINATOR;
+            unchecked {
+                _sendToVoter = (cvxBalance * _localKeepCVX) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
             }
@@ -412,8 +420,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         address _fraxVoter = fraxVoter;
         if (_localKeepFXS > 0 && _fraxVoter != address(0)) {
             uint256 fxsBalance = fxs.balanceOf(address(this));
-            uint256 _sendToVoter = (fxsBalance * _localKeepFXS) /
-                FEE_DENOMINATOR;
+            unchecked {
+                _sendToVoter = (fxsBalance * _localKeepFXS) / FEE_DENOMINATOR;
+            }
             if (_sendToVoter > 0) {
                 fxs.safeTransfer(_fraxVoter, _sendToVoter);
             }
@@ -506,7 +515,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     require(
                         stakedBalance() - stillLockedStake() >=
                             _neededFromStaked,
-                        "Need to wait until most recent deposit unlocks"
+                        "Need to wait until oldest deposit unlocks"
                     );
                 }
                 // no need to check for >0, we know _neededFromStaked has to be at least 1 wei
@@ -797,14 +806,26 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 claimableCvx = tokenAmounts[rewardLength - 1];
         uint256 claimableCrv = tokenAmounts[rewardLength - 2];
 
-        IOracle yearnOracle = IOracle(
-            0x83d95e0D5f402511dB06817Aff3f9eA88224B030
-        ); // yearn lens oracle
-        uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
-        uint256 cvxPrice = yearnOracle.getPriceUsdcRecommended(
-            address(convexToken)
-        );
-        uint256 fxsPrice = yearnOracle.getPriceUsdcRecommended(address(fxs));
+        (, uint256 crvPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(crv),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
+
+        (, uint256 cvxPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(convexToken),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
+
+        (, uint256 fxsPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(fxs),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
 
         return
             (crvPrice *
@@ -812,7 +833,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 cvxPrice *
                 claimableCvx +
                 fxsPrice *
-                claimableFxs) / 1e18;
+                claimableFxs) / 1e20;
     }
 
     /// @notice Convert our keeper's eth cost into want

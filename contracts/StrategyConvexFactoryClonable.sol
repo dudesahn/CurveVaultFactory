@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.15;
-pragma experimental ABIEncoderV2;
 
 // These are the core Yearn libraries
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -14,10 +13,19 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    // pull our asset price, in usdc, via yearn's oracle
-    function getPriceUsdcRecommended(
-        address tokenAddress
-    ) external view returns (uint256);
+    function latestRoundData(
+        address,
+        address
+    )
+        external
+        view
+        returns (
+            uint80 roundId,
+            uint256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        );
 }
 
 interface IConvexRewards {
@@ -113,9 +121,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     /// @notice The address of our Convex token (CVX for Curve, AURA for Balancer, etc.).
     IERC20 public convexToken;
-
-    // we use this to be able to adjust our strategy's name
-    string internal stratName;
 
     /// @notice Whether we should claim rewards when withdrawing, generally this should be false.
     bool public claimRewards;
@@ -289,8 +294,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // want = Curve LP
         want.approve(address(_booster), type(uint256).max);
 
-        // set up our max delay
+        // set up our baseStrategy vars
         maxReportDelay = 365 days;
+        creditThreshold = 50_000e18;
 
         // use the booster contract to pull more info needed
         IConvexDeposit booster = IConvexDeposit(_booster);
@@ -306,21 +312,19 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // set up rewards and trade factory
         _updateRewards();
         _setUpTradeFactory();
-
-        // set our strategy's name
-        stratName = string(
-            abi.encodePacked(
-                "StrategyConvexFactory-",
-                IDetails(address(want)).symbol()
-            )
-        );
     }
 
     /* ========== VIEWS ========== */
 
     /// @notice Strategy name.
     function name() external view override returns (string memory) {
-        return stratName;
+        return
+            string(
+                abi.encodePacked(
+                    "StrategyConvexFactory-",
+                    IDetails(address(want)).symbol()
+                )
+            );
     }
 
     /// @notice Balance of want staked in Convex.
@@ -360,9 +364,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCRV = localKeepCRV;
         address _curveVoter = curveVoter;
+        uint256 _sendToVoter;
         if (_localKeepCRV > 0 && _curveVoter != address(0)) {
             uint256 crvBalance = crv.balanceOf(address(this));
-            uint256 _sendToVoter;
             unchecked {
                 _sendToVoter = (crvBalance * _localKeepCRV) / FEE_DENOMINATOR;
             }
@@ -376,7 +380,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _convexVoter = convexVoter;
         if (_localKeepCVX > 0 && _convexVoter != address(0)) {
             uint256 cvxBalance = convexToken.balanceOf(address(this));
-            uint256 _sendToVoter;
             unchecked {
                 _sendToVoter = (cvxBalance * _localKeepCVX) / FEE_DENOMINATOR;
             }
@@ -519,10 +522,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @dev Do this before updating trade factory if we have extra rewards.
     ///  Can only be called by governance.
     function updateRewards() external onlyGovernance {
+        // store this to save our tradefactory address before tearing it down
         address tf = tradeFactory;
         _removeTradeFactoryPermissions(true);
-        _updateRewards();
 
+        // set things up again
+        _updateRewards();
         tradeFactory = tf;
         _setUpTradeFactory();
     }
@@ -540,9 +545,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                 .rewardToken();
 
             // we only need to approve the new token and turn on rewards if the extra reward isn't CVX
-            if (_rewardsToken != _convexToken) {
-                rewardsTokens.push(_rewardsToken);
+            if (_rewardsToken == _convexToken) {
+                continue;
             }
+
+            // add our approved token to our rewards token array
+            rewardsTokens.push(_rewardsToken);
         }
     }
 
@@ -573,12 +581,40 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // enable for any rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
+
+            // set approval to max uint, but only if it's a standard token
+            bool success = _callApproveRewardTokens(
+                _rewardsToken,
+                _tradeFactory,
+                type(uint256).max
+            );
+
+            // skip a token we can't approve
+            if (!success) {
+                continue;
+            }
+
             tf.enable(_rewardsToken, _want);
         }
 
         convexToken.approve(_tradeFactory, type(uint256).max);
         tf.enable(address(convexToken), _want);
+    }
+
+    function _callApproveRewardTokens(
+        address _token,
+        address _spender,
+        uint256 _amount
+    ) internal returns (bool success) {
+        // make sure a given reward token has the approve() method
+        bytes memory data = abi.encodeWithSignature(
+            "approve(address,uint256)",
+            _spender,
+            _amount
+        );
+
+        // if this works, then our reward token will be approved on our tradeFactory
+        (success, ) = _token.call(data);
     }
 
     /// @notice Use this to remove permissions from our current trade factory.
@@ -607,7 +643,19 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // disable for all rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, 0);
+
+            // set approval to zero, but only if it's a standard token
+            bool success = _callApproveRewardTokens(
+                _rewardsToken,
+                _tradeFactory,
+                0
+            );
+
+            // skip a token we can't approve
+            if (!success) {
+                continue;
+            }
+
             if (_disableTf) {
                 tf.disable(_rewardsToken, _want);
             }
@@ -688,16 +736,22 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     }
 
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
-    /// @dev Uses yearn's lens oracle, if returned values are strange then troubleshoot there.
+    /// @dev Uses Chainlink's feed registry.
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
-        IOracle yearnOracle = IOracle(
-            0x83d95e0D5f402511dB06817Aff3f9eA88224B030
-        ); // yearn lens oracle
-        uint256 crvPrice = yearnOracle.getPriceUsdcRecommended(address(crv));
-        uint256 convexTokenPrice = yearnOracle.getPriceUsdcRecommended(
-            address(convexToken)
-        );
+        (, uint256 crvPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(crv),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
+
+        (, uint256 cvxPrice, , , ) = IOracle(
+            0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
+        ).latestRoundData(
+                address(convexToken),
+                address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
+            );
 
         // calculations pulled directly from CVX's contract for minting CVX per CRV claimed
         uint256 totalCliffs = 1_000;
@@ -739,8 +793,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
 
         // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
-        return
-            (crvPrice * _claimableBal + convexTokenPrice * mintableCvx) / 1e18;
+        return (crvPrice * _claimableBal + cvxPrice * mintableCvx) / 1e20;
     }
 
     /// @notice Convert our keeper's eth cost into want

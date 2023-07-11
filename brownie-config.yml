@@ -1,15 +1,15 @@
 # use Ganache's forked mainnet mode as the default network
 # NOTE: You don't *have* to do this, but it is often helpful for testing
 networks:
-  default: strategy-testing
+  default: mainnet-fork
 
 # automatically fetch contract sources from Etherscan
 autofetch_sources: True
 
 # require OpenZepplin Contracts
 dependencies:
-  - yearn/yearn-vaults@0.4.5
-  - OpenZeppelin/openzeppelin-contracts@4.7.0
+  - yearn/yearn-vaults@0.4.6
+  - OpenZeppelin/openzeppelin-contracts@4.7.1
   - OpenZeppelin/openzeppelin-contracts@3.1.0
 
 # path remapping to support imports from GitHub/NPM
@@ -17,10 +17,16 @@ compiler:
   solc:
     version:
     remappings:
-      - "@yearnvaults=yearn/yearn-vaults@0.4.5"
-      - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@4.7.0"
+      - "@yearnvaults=yearn/yearn-vaults@0.4.6"
+      - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@4.7.1"
       - "@openzeppelinLegacy=OpenZeppelin/openzeppelin-contracts@3.1.0"
 
 reports:
   exclude_contracts:
     - Math
+    - Vault
+    - Ownable
+    - Address
+    - BaseStrategy
+    - SafeERC20
+    - StrategyProxy
