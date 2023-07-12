@@ -57,6 +57,16 @@ interface IConvexFrax {
             uint256[] memory total_earned
         );
 
+    // returns FXS first, then any other reward token, then CRV and CVX
+    function earned(
+        address
+    ) external view returns (uint256[] memory total_earned);
+
+    function getAllRewardTokens()
+        external
+        view
+        returns (address[] memory token_addresses);
+
     function fxs() external view returns (address);
 
     function crv() external view returns (address);
@@ -376,6 +386,31 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         return balanceOfWant() + stakedBalance();
     }
 
+    /// @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
+    /// @dev We use staticcall here, as on newer userVaults, earned is a write function.
+    /// @return tokenAddresses Array of our reward token addresses.
+    /// @return tokenAmounts Amounts of our corresponding reward tokens.
+    function getEarnedTokens()
+        public
+        view
+        returns (address[] memory tokenAddresses, uint256[] memory tokenAmounts)
+    {
+        bytes memory data = abi.encodeWithSignature("earned()");
+        (bool success, bytes memory returnBytes) = address(userVault)
+            .staticcall(data);
+
+        // this is for our older pools
+        if (success) {
+            (tokenAddresses, tokenAmounts) = abi.decode(
+                returnBytes,
+                (address[], uint256[])
+            );
+        } else {
+            tokenAmounts = stakingAddress.earned(address(userVault));
+            tokenAddresses = stakingAddress.getAllRewardTokens();
+        }
+    }
+
     /* ========== CORE STRATEGY FUNCTIONS ========== */
 
     function prepareReturn(
@@ -642,7 +677,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         delete rewardsTokens;
 
         // check our user vault to see what rewards we have
-        (address[] memory tokenAddresses, ) = userVault.earned();
+        (address[] memory tokenAddresses, ) = getEarnedTokens();
         uint256 rewardsLength = tokenAddresses.length;
 
         // if we have rewards other than CRV, CVX, and FXS then add them too
@@ -799,41 +834,43 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
     /// @return Total return in USDC from selling claimable CRV, CVX, and FXS.
     function claimableProfitInUsdc() public view returns (uint256) {
-        (, uint256[] memory tokenAmounts) = userVault.earned();
-        // get our balances of fxs, crv, cvx. fxs always first, crv + cvx always last two
-        uint256 claimableFxs = tokenAmounts[0];
-        uint256 rewardLength = tokenAmounts.length;
-        uint256 claimableCvx = tokenAmounts[rewardLength - 1];
-        uint256 claimableCrv = tokenAmounts[rewardLength - 2];
+        (
+            address[] memory _tokenAddresses,
+            uint256[] memory _tokenAmounts
+        ) = getEarnedTokens();
 
-        (, uint256 crvPrice, , , ) = IOracle(
+        uint256 tokensLength = _tokenAddresses.length;
+
+        // occasionally we may have more than just FXS/CRV/CVX. however, FXS is always index 0,
+        //  and CRV and CVX are always the last two
+        (, uint256 indexZeroPrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
         ).latestRoundData(
-                address(crv),
+                _tokenAddresses[0],
                 address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
             );
 
-        (, uint256 cvxPrice, , , ) = IOracle(
+        (, uint256 indexOnePrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
         ).latestRoundData(
-                address(convexToken),
+                _tokenAddresses[tokensLength - 2],
                 address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
             );
 
-        (, uint256 fxsPrice, , , ) = IOracle(
+        (, uint256 indexTwoPrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
         ).latestRoundData(
-                address(fxs),
+                _tokenAddresses[tokensLength - 1],
                 address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
             );
 
         return
-            (crvPrice *
-                claimableCrv +
-                cvxPrice *
-                claimableCvx +
-                fxsPrice *
-                claimableFxs) / 1e20;
+            (indexZeroPrice *
+                _tokenAmounts[0] +
+                indexOnePrice *
+                _tokenAmounts[tokensLength - 2] +
+                indexTwoPrice *
+                _tokenAmounts[tokensLength - 1]) / 1e20;
     }
 
     /// @notice Convert our keeper's eth cost into want
