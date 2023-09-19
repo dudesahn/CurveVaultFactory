@@ -49,7 +49,7 @@ interface IConvexFrax {
     function lockAdditionalCurveLp(bytes32 _kek_id, uint256 _addl_liq) external; // add want to an existing lock/kek
 
     // returns FXS first, then any other reward token, then CRV and CVX
-    // we access thjs directly via our staticcall
+    // we access this directly via our staticcall
     function earned()
         external
         view
