@@ -1,26 +1,52 @@
 # README
 
-## CurveGlobal.sol
+## Tests
 
-https://github.com/flashfish0x/StrategyConvexTemplate/blob/e992dc01c5f31d6b5a7392b6ed731f1b8d594168/contracts/CurveGlobal.sol
+To run the test suite with detailed printouts
 
-This is our factory for creating yVaults for Curve pool tokens, with one strategy to farm via Convex.
-There are lots of setters that we can use to make changes to future vaults/strategies created by the factory.
-The createNewVaultsAndStrategies function allows any user to create a yVault for a Curve LP token by entering a gauge (provided one doesn't already exist).
-The gauge is used to identify the lpToken and the Convex pid.
-Then we create the new automated vault and the Convex strategy.
-Finally we add the strategy to the vault.
+```
+brownie test -s
+```
 
-## StrategyConvexFactoryClonable.sol
+Note that due to limitations of Brownie/Ganache-CLI, certain aspects of these contracts may cause reverts unless using a different RPC such as
+tenderly. For instance, Frax strategy testing will fail with ganache unless [this line](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/StrategyConvexFraxFactoryClonable.sol#L360) is commented out.
 
-https://github.com/flashfish0x/StrategyConvexTemplate/blob/e992dc01c5f31d6b5a7392b6ed731f1b8d594168/contracts/StrategyConvexFactoryClonable.sol
+## Core Contracts
 
-This is our Convex strategy that is created by CurveGlobal and automatically added to each vault it creates.
-It's a simple auto-compounder for Convex.
-It deposits Curve pool tokens into Convex and then periodically claims CRV and CVX rewards, swaps them for the vault's Curve pool tokens, and deposits those back into Convex to earn more rewards.
+### [CurveGlobal.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/CurveGlobal.sol)
 
-## KeeperWrapper.sol
+This is our factory for creating yVaults for Curve pool tokens, with up to three strategies. One deposits directly to Convex,
+another deposits directly to the Curve gauge via Yearn's Voter (using Yearn's veCRV boost), and strategies with FXS rewards
+from Frax (typically those paired with FRAXBP or other Frax tokens) utilize a third strategy to deposit to Frax Convex and farm
+their FXS boost.
 
-https://github.com/flashfish0x/StrategyConvexTemplate/blob/e992dc01c5f31d6b5a7392b6ed731f1b8d594168/contracts/KeeperWrapper.sol
+The `createNewVaultsAndStrategies` function allows any user to create a yVault for a Curve LP token by entering a gauge
+(provided one doesn't already exist). The gauge is used to identify the LP Token and the Convex PID. If a PID doesn't already exist,
+a new Convex pool is deployed. Then we create the new automated vault along with the corresponding strategies. If a vault has a Convex
+Frax pool available, it is auto-detected and the Frax strategy is added. As Frax pools are continually added, it's possible that a vault
+has a Frax strategy become an option after it has already been deployed. In this case, the strategy must be manually deployed and added
+to the vault by governance.
 
-If set as the keeper of the strategy, this contract will make keeper functions (like harvest) public.
+### [StrategyConvexFactoryClonable.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/StrategyConvexFactoryClonable.sol)
+
+Our Convex strategy is a simple auto-compounder for Convex. It deposits Curve pool tokens into Convex and then periodically claims
+CRV and CVX rewards, swaps them for the vault's Curve pool tokens, and deposits those back into Convex to earn more rewards.
+
+### [StrategyCurveBoostedFactoryClonable.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/StrategyCurveBoostedFactoryClonable.sol)
+
+Our Curve strategy deposits LP tokens to Yearn's [Voter](https://etherscan.io/address/0xf147b8125d2ef93fb6965db97d6746952a133934) via a
+strategy proxy. All Curve strategy LP tokens are held by the voter, and are staked in the Curve gauge. CRV token emissions are boosted by
+Yearn's veCRV holdings. Typically, this strategy is more favorable than Convex, unless Yearn holds large (>20%) of the total LP tokens in our voter.
+
+### [StrategyConvexFraxFactoryClonable.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/StrategyConvexFraxFactoryClonable.sol)
+
+Our Convex Frax strategy is very similar to the Convex strategy, except LP tokens receive the benefit of not only Convex's veCRV position,
+but also their veFXS position for those pools that have FXS emissions. Frax LP deposits utilize a helper `userVault` contract that tracks deposits,
+as Frax deposits also can be locked for increased time periods for higher APR (minimum of 7 days). The strategy can manage multiple deposits at once
+(called `keks` by Frax), and can also be configured to redeposit to the same keks over and over, meaning that past the initial 7-day period there
+is effectively no lock.
+
+### [KeeperWrapper.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/KeeperWrapper.sol)
+
+If set as the keeper of the strategy, this contract will make harvest public. Factory harvests do not swap atomically,
+but instead do so asynchronously, using TradeFactory and SeaSolver, Yearn's in-house CoWSwap solver.
