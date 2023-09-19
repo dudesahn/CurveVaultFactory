@@ -15,7 +15,10 @@ def isolate(fn_isolation):
 # we want to do each test individually with tenderly
 use_tenderly = False
 
+# because of the staticcall we now use, need to use tenderly when testing the strategy, unless we remove this function
+# actually, easier just to comment out the _updateRewards() call in the constructor and then everything is cool
 
+#
 #     /// @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
 #     /// @dev We use staticcall here, as on newer userVaults, earned is a write function.
 #     /// @return tokenAddresses Array of our reward token addresses.
@@ -430,7 +433,7 @@ def strategy(
         strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
         # for testing, let's deposit anything above 1e18
-        strategy.setDepositParams(1e18, 5_000_000e18, {"from": gov})
+        strategy.setDepositParams(1e18, 5_000_000e18, False, {"from": gov})
 
     # turn our oracle into testing mode by setting the provider to 0x00, then forcing true
     strategy.setBaseFeeOracle(base_fee_oracle, {"from": management})
@@ -577,7 +580,7 @@ def booster():  # this is the deposit contract
 
 @pytest.fixture(scope="session")
 def frax_booster():
-    yield Contract("0x569f5B842B5006eC17Be02B8b94510BA8e79FbCa")
+    yield Contract("0x2B8b301B90Eb8801f1eEFe73285Eec117D2fFC95")
 
 
 @pytest.fixture(scope="session")

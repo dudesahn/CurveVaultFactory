@@ -49,6 +49,7 @@ interface IConvexFrax {
     function lockAdditionalCurveLp(bytes32 _kek_id, uint256 _addl_liq) external; // add want to an existing lock/kek
 
     // returns FXS first, then any other reward token, then CRV and CVX
+    // we access thjs directly via our staticcall
     function earned()
         external
         view
@@ -172,6 +173,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice Maximum size for a single deposit (in want).
     /// @dev Prevents large imbalances in our kek sizes following a large deposit.
     uint256 public maxSingleDeposit;
+
+    /// @notice Determines whether every new deposit (adjustPosition call) goes to an existing kek or not
+    bool public addToExistingKeks;
 
     /// @notice This is the time the tokens are locked for when staked.
     /// @dev Initially set to the min time, ~1 week, and can be updated later if desired.
@@ -350,6 +354,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         lockTime = stakingAddress.lock_time_min(); // default to current minimum
         maxSingleDeposit = 500_000e18;
         minDeposit = 100e18;
+        addToExistingKeks = true; // this allows us to not worry about locking
 
         // set up rewards and trade factory
         _updateRewards();
@@ -511,26 +516,57 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             _toInvest = maxSingleDeposit;
         }
 
-        // If we have already locked the max amount of keks, we need
-        // to withdraw the oldest one and reinvest that alongside the new funds
+        // If we have already locked the max amount of keks, first check if we
+        //  want to just add to existing keks or not
         if (nextKek >= maxKeks) {
-            // Get the oldest kek that could have funds in it
-            IConvexFrax.LockedStake memory stake = stakingAddress
-                .lockedStakesOf(address(userVault))[nextKek - maxKeks];
-            // Make sure it hasn't already been withdrawn
-            if (stake.amount > 0) {
-                // Withdraw funds and add them to the amount to deposit
-                userVault.withdrawLockedAndUnwrap(stake.kek_id);
-                unchecked {
-                    _toInvest += stake.amount;
+            // only add to existing if we've maxxed out our number of keks
+            if (addToExistingKeks) {
+                // figure out which is our lowest TVL kek
+                IConvexFrax.LockedStake memory stake = stakingAddress
+                    .lockedStakesOf(address(userVault))[nextKek - 1];
+                bytes32 smallestKek = stake.kek_id;
+                uint256 smallestKekSize = stake.amount;
+                if (maxKeks != 1) {
+                    for (uint256 i = 2; i <= maxKeks; ++i) {
+                        stake = stakingAddress.lockedStakesOf(
+                            address(userVault)
+                        )[nextKek - i];
+                        // if a kek is smaller in size than our previous smallest, it
+                        //   is now smallest
+                        if (stake.amount < smallestKekSize) {
+                            smallestKekSize = stake.amount;
+                            smallestKek = stake.kek_id;
+                        }
+                    }
                 }
-            }
-        }
+                // deposit our assets to our smallest kek
+                userVault.lockAdditionalCurveLp(smallestKek, _toInvest);
+            } else {
+                // if not, we need to withdraw the oldest one and reinvest
+                //  that alongside the new funds
 
-        userVault.stakeLockedCurveLp(_toInvest, lockTime);
+                // Get the oldest kek that could have funds in it
+                IConvexFrax.LockedStake memory stake = stakingAddress
+                    .lockedStakesOf(address(userVault))[nextKek - maxKeks];
+                // Make sure it hasn't already been withdrawn
+                if (stake.amount > 0) {
+                    // Withdraw funds and add them to the amount to deposit
+                    userVault.withdrawLockedAndUnwrap(stake.kek_id);
+                    unchecked {
+                        _toInvest += stake.amount;
+                    }
+                }
+                // deposit, increment our next kek
+                userVault.stakeLockedCurveLp(_toInvest, lockTime);
+                nextKek++;
+            }
+        } else {
+            // deposit, increment our next kek
+            userVault.stakeLockedCurveLp(_toInvest, lockTime);
+            nextKek++;
+        }
         lastDeposit = block.timestamp;
         lastDepositAmount = _toInvest;
-        nextKek++;
     }
 
     function liquidatePosition(
@@ -967,9 +1003,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     ///  max is how large we allow one kek to be.
     /// @param _minDeposit Minimum want needed to create a new kek.
     /// @param _maxSingleDeposit Maximum size of a single kek.
+    /// @param _addToExistingKeks Whether new deposits go to an existing or new kek.
     function setDepositParams(
         uint256 _minDeposit,
-        uint256 _maxSingleDeposit
+        uint256 _maxSingleDeposit,
+        bool _addToExistingKeks
     ) external onlyVaultManagers {
         require(
             _maxSingleDeposit > _minDeposit,
@@ -977,6 +1015,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         );
         minDeposit = _minDeposit;
         maxSingleDeposit = _maxSingleDeposit;
+        addToExistingKeks = _addToExistingKeks;
     }
 
     /// @notice This can be used to update how long the tokens are locked when staked.

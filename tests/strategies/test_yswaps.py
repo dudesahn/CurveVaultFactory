@@ -120,9 +120,12 @@ def test_keepers_and_trade_handler(
     strategy.updateTradeFactory(trade_factory, {"from": gov})
 
     # update our rewards again, shouldn't really change things
-    if which_strategy != 1:
+    # skip doing frax here if not tenderly because of how our updateRewards will crash ganache **********
+    if tests_using_tenderly and which_strategy == 2:
         tx = strategy.updateRewards({"from": gov})
-    else:
+    elif which_strategy == 0:
+        tx = strategy.updateRewards({"from": gov})
+    elif which_strategy == 1:
         strategy.updateRewards([], {"from": gov})
 
     # check out our rewardsTokens
