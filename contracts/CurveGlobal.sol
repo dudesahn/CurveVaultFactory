@@ -224,7 +224,7 @@ contract CurveGlobal {
     /// @notice Address of our Convex pool manager.
     /// @dev Used to add new pools to Convex.
     address public convexPoolManager =
-        0xD1f9b3de42420A295C33c07aa5C9e04eDC6a4447;
+        0xc461E1CE3795Ee30bA2EC59843d5fAe14d5782D5;
 
     /// @notice Address of our Convex Frax pool registry.
     /// @dev Used to determine if a Convex pool has a Convex Frax pool.
@@ -240,7 +240,7 @@ contract CurveGlobal {
 
     /// @notice Address of Convex's Frax booster.
     IBooster public fraxBooster =
-        IBooster(0x569f5B842B5006eC17Be02B8b94510BA8e79FbCa);
+        IBooster(0x2B8b301B90Eb8801f1eEFe73285Eec117D2fFC95);
 
     /// @notice Address to use for vault governance.
     address public governance = 0xFEB4acf3df3cDEA7399794D0869ef76A6EfAff52;
@@ -255,13 +255,13 @@ contract CurveGlobal {
     address public treasury = 0x93A62dA5a14C80f265DAbC077fCEE437B1a0Efde;
 
     /// @notice Address to use for strategy keepers.
-    address public keeper = 0x256e6a486075fbAdbB881516e9b6b507fd082B5D;
+    address public keeper = 0x0D26E894C2371AB6D20d99A65E991775e3b5CAd7;
 
     /// @notice Address to use for strategy health check.
     address public healthCheck = 0xDDCea799fF1699e98EDF118e0629A974Df7DF012;
 
     /// @notice Address to use for strategy trade factory.
-    address public tradeFactory = 0xd6a8ae62f4d593DAf72E2D7c9f7bDB89AB069F06;
+    address public tradeFactory = 0xb634316E06cC0B358437CbadD4dC94F1D3a92B3b;
 
     /// @notice Address to use for our network's base fee oracle.
     address public baseFeeOracle = 0x1E7eFAbF282614Aa2543EDaA50517ef5a23c868b;
