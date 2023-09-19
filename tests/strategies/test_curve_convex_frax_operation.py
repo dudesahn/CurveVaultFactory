@@ -1044,7 +1044,7 @@ def test_lower_keks_add_to_existing(
     strategy.setDepositParams(1e18, 5_000_000e18, True, {"from": gov})
 
     # since we do so many harvests here, reduce our profit_amount
-    profit_amount = 10
+    profit_amount = profit_amount / 2.5
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
@@ -1488,7 +1488,7 @@ def test_keks_add_to_existing(
     strategy.setDepositParams(1e18, 5_000_000e18, True, {"from": gov})
 
     # since we do so many harvests here, reduce our profit_amount
-    profit_amount = 10
+    profit_amount = profit_amount / 2.5
 
     ## deposit to the vault after approving
     startingWhale = token.balanceOf(whale)
