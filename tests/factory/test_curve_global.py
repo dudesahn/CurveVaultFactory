@@ -51,7 +51,7 @@ def test_vault_deployment(
     # new_proxy.setFactory(curve_global.address, {"from": gov})
 
     #############
-    
+
     # this will crash if we're not using tenderly
     if not tests_using_tenderly:
         return
@@ -413,7 +413,7 @@ def test_permissioned_vault(
     # new_proxy.setFactory(curve_global.address, {"from": gov})
 
     #############
-    
+
     # this will crash if we're not using tenderly
     if not tests_using_tenderly:
         return

@@ -772,10 +772,10 @@ def curve_global(CurveGlobal):
 
 
 @pytest.fixture(scope="session")
-def new_proxy(StrategyProxy):
-    yield StrategyProxy.at("0xda18f789a1D9AD33E891253660Fcf1332d236b29")
+def new_proxy():
+    yield Contract("0xda18f789a1D9AD33E891253660Fcf1332d236b29")
 
 
 @pytest.fixture(scope="session")
 def new_registry(VaultRegistry):
-    yield VaultRegistry.at("0xaF1f5e1c19cB68B30aAD73846eFfDf78a5863319")
+    yield Contract("0xaF1f5e1c19cB68B30aAD73846eFfDf78a5863319")
