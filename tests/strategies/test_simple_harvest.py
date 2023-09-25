@@ -22,6 +22,7 @@ def test_simple_harvest(
     rewards_token,
     crv_whale,
     rewards_contract,
+    tests_using_tenderly,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -52,6 +53,12 @@ def test_simple_harvest(
 
     # simulate profits
     chain.sleep(sleep_time)
+
+    # check our pending profit for frax, but only if using tenderly
+    if tests_using_tenderly and which_strategy == 2:
+        pending = strategy.getEarnedTokens()
+        print("Strategy", strategy.name(), "pid:", strategy.fraxPid())
+        print("Pending:", pending.dict())
 
     # harvest, store new asset amount
     (profit, loss) = harvest_strategy(

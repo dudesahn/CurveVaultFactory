@@ -49,16 +49,7 @@ interface IConvexFrax {
     function lockAdditionalCurveLp(bytes32 _kek_id, uint256 _addl_liq) external; // add want to an existing lock/kek
 
     // returns FXS first, then any other reward token, then CRV and CVX
-    // we access this directly via our staticcall
-    function earned()
-        external
-        view
-        returns (
-            address[] memory token_addresses,
-            uint256[] memory total_earned
-        );
-
-    // returns FXS first, then any other reward token, then CRV and CVX
+    // this is used on newer pools
     function earned(
         address
     ) external view returns (uint256[] memory total_earned);
@@ -392,7 +383,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     /// @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
-    /// @dev We use staticcall here, as on newer userVaults, earned is a write function.
+    /// @dev We use staticcall here, as on newer userVaults, earned() is a write function. So on
+    ///  newer pools, we instead pull the reward tokens and amounts from the staking contract.
     /// @return tokenAddresses Array of our reward token addresses.
     /// @return tokenAmounts Amounts of our corresponding reward tokens.
     function getEarnedTokens()
@@ -400,11 +392,12 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         view
         returns (address[] memory tokenAddresses, uint256[] memory tokenAmounts)
     {
+        // on older pools, we can read directly from our user vault
+        // returns FXS, CRV, CVX addresses with amounts
         bytes memory data = abi.encodeWithSignature("earned()");
         (bool success, bytes memory returnBytes) = address(userVault)
             .staticcall(data);
 
-        // this is for our older pools
         if (success) {
             (tokenAddresses, tokenAmounts) = abi.decode(
                 returnBytes,
