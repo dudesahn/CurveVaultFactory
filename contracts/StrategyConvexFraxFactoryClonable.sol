@@ -512,23 +512,26 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // If we have already locked the max amount of keks, first check if we
         //  want to just add to existing keks or not
         if (nextKek >= maxKeks) {
+            // pull our current stake data
+            IConvexFrax.LockedStake[] memory stake = stakingAddress
+                .lockedStakesOf(address(userVault));
+
             // only add to existing if we've maxxed out our number of keks
             if (addToExistingKeks) {
-                // figure out which is our lowest TVL kek
-                IConvexFrax.LockedStake memory stake = stakingAddress
-                    .lockedStakesOf(address(userVault))[nextKek - 1];
-                bytes32 smallestKek = stake.kek_id;
-                uint256 smallestKekSize = stake.amount;
+                // figure out which is our lowest TVL kek, start with our latest one
+                IConvexFrax.LockedStake memory latestStake = stake[nextKek - 1];
+                bytes32 smallestKek = latestStake.kek_id;
+                uint256 smallestKekSize = latestStake.amount;
+
+                // if only 1 kek, no need to check which is the smallest
                 if (maxKeks != 1) {
                     for (uint256 i = 2; i <= maxKeks; ++i) {
-                        stake = stakingAddress.lockedStakesOf(
-                            address(userVault)
-                        )[nextKek - i];
+                        latestStake = stake[nextKek - i];
                         // if a kek is smaller in size than our previous smallest, it
                         //   is now smallest
-                        if (stake.amount < smallestKekSize) {
-                            smallestKekSize = stake.amount;
-                            smallestKek = stake.kek_id;
+                        if (latestStake.amount < smallestKekSize) {
+                            smallestKekSize = latestStake.amount;
+                            smallestKek = latestStake.kek_id;
                         }
                     }
                 }
@@ -539,14 +542,15 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 //  that alongside the new funds
 
                 // Get the oldest kek that could have funds in it
-                IConvexFrax.LockedStake memory stake = stakingAddress
-                    .lockedStakesOf(address(userVault))[nextKek - maxKeks];
+                IConvexFrax.LockedStake memory firstStake = stake[
+                    nextKek - maxKeks
+                ];
                 // Make sure it hasn't already been withdrawn
-                if (stake.amount > 0) {
+                if (firstStake.amount > 0) {
                     // Withdraw funds and add them to the amount to deposit
-                    userVault.withdrawLockedAndUnwrap(stake.kek_id);
+                    userVault.withdrawLockedAndUnwrap(firstStake.kek_id);
                     unchecked {
-                        _toInvest += stake.amount;
+                        _toInvest += firstStake.amount;
                     }
                 }
                 // deposit, increment our next kek
