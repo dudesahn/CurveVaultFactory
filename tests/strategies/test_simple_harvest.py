@@ -30,6 +30,10 @@ def test_simple_harvest(
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
 
+    # for frax, we should have an adjustable minDeposit
+    if which_strategy == 2:
+        strategy.setDepositParams(0, amount / 10, False, {"from": gov})
+
     # harvest, store asset amount
     (profit, loss) = harvest_strategy(
         use_yswaps,
@@ -42,10 +46,47 @@ def test_simple_harvest(
     )
     old_assets = vault.totalAssets()
     assert old_assets > 0
-    assert token.balanceOf(strategy) == 0
     assert strategy.estimatedTotalAssets() > 0
+    if which_strategy != 2:
+        assert token.balanceOf(strategy) == 0
 
     if which_strategy == 2:
+        assert vault.creditAvailable() == 0
+        assert strategy.claimableProfitInUsdc() < strategy.harvestProfitMinInUsdc()
+        assert strategy.claimableProfitInUsdc() < strategy.harvestProfitMaxInUsdc()
+        assert strategy.balanceOfWant() > 0
+        assert strategy.forceHarvestTriggerOnce() == False
+
+        assert (
+            chain.time() - vault.strategies(strategy.address)["lastReport"]
+            < strategy.maxReportDelay()
+        )
+        chain.sleep(2)
+
+        assert (
+            chain.time() - vault.strategies(strategy.address)["lastReport"]
+            > strategy.minReportDelay()
+        )
+
+        strategy.setMinReportDelay(2**256 - 1, {"from": gov})
+
+        assert (
+            chain.time() - vault.strategies(strategy.address)["lastReport"]
+            < strategy.minReportDelay()
+        )
+
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+
+        chain.sleep(50)
+
+        strategy.setMinReportDelay(49, {"from": gov})
+
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
+
         staking_contract = Contract(staking_address)
         liq = staking_contract.lockedLiquidityOf(strategy.userVault())
         print("Locked stakes:", liq)

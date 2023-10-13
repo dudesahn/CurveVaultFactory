@@ -552,6 +552,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     unchecked {
                         _toInvest += firstStake.amount;
                     }
+
+                    // don't want a single kek too large vs others
+                    if (_toInvest > maxSingleDeposit) {
+                        _toInvest = maxSingleDeposit;
+                    }
                 }
                 // deposit, increment our next kek
                 userVault.stakeLockedCurveLp(_toInvest, lockTime);
@@ -857,6 +862,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // harvest our credit if it's above our threshold
         if (vault.creditAvailable() > creditThreshold) {
+            return true;
+        }
+
+        // harvest if we have loose want in the strategy and are past our minDelay
+        if (
+            (balanceOfWant() > minDeposit) &&
+            (block.timestamp - params.lastReport > minReportDelay)
+        ) {
             return true;
         }
 

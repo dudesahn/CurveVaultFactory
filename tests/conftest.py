@@ -13,10 +13,12 @@ def isolate(fn_isolation):
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
 # note that for curve factory we should use tenderly with 2/3 factory tests, and update our earned function as below unless
 # we want to do each test individually with tenderly
+# having to deploy our frax strategy also reverts now
 use_tenderly = False
 
+
 # because of the staticcall we now use, need to use tenderly when testing the strategy, unless we remove this function
-# actually, easier just to comment out the _updateRewards() call in the constructor and then everything is cool
+# 🚨🚨🚨 actually, easier just to comment out the _updateRewards() call in the constructor and then everything is cool
 # to test the getEarnedTokens() fxn, we call in in test_simple_harvest
 
 #
@@ -99,11 +101,11 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     whale = accounts.at(
-        "0xF4D36Cbf5fb6b3003e1f97E58E4a9122ee28B5F0", force=True
+        "0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c", force=True
     )  # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
     # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
-    # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0xF4D36Cbf5fb6b3003e1f97E58E4a9122ee28B5F0 crvUSD-FRAX, 88.5k
+    # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
