@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity ^0.8.15;
+pragma solidity 0.8.19;
 
 // These are the core Yearn libraries
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
 import "./interfaces/curve.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
@@ -198,7 +198,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     ) external returns (address newStrategy) {
         // don't clone a clone
         if (!isOriginal) {
-            revert();
+            revert("Can't clone a clone'");
         }
 
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -280,7 +280,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     ) internal {
         // make sure that we haven't initialized this before
         if (depositContract != address(0)) {
-            revert(); // already initialized.
+            revert("Already initialized");
         }
 
         // 1:1 assignments

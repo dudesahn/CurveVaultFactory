@@ -90,7 +90,7 @@ def test_simple_harvest(
         staking_contract = Contract(staking_address)
         liq = staking_contract.lockedLiquidityOf(strategy.userVault())
         print("Locked stakes:", liq)
-        print("Next kek:", strategy.nextKek())
+        print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # simulate profits
     chain.sleep(sleep_time)
@@ -118,7 +118,7 @@ def test_simple_harvest(
         staking_address = Contract(strategy.stakingAddress())
         liq = staking_address.lockedLiquidityOf(strategy.userVault())
         print("Locked stakes:", liq)
-        print("Next kek:", strategy.nextKek())
+        print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # harvest again so the strategy reports the profit
     if use_yswaps:

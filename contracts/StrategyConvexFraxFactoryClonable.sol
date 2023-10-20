@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
-pragma solidity ^0.8.15;
+pragma solidity 0.8.19;
 
-// These are the core Yearn libraries
-import "@openzeppelin/contracts/utils/math/Math.sol";
-import "./interfaces/curve.sol";
+import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
 import "@yearnvaults/contracts/BaseStrategy.sol";
 
 interface ITradeFactory {
@@ -88,6 +86,34 @@ interface IConvexFrax {
 
 contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
+
+    struct KekInfo {
+        /**
+         * @notice This is the max number of keks we will allow the strategy to have
+         *  open at one time to limit withdraw loops.
+         * @dev A new kek (position) is created each time we stake the LP token. A whole
+         *  kek must be withdrawn during any withdrawals.
+         */
+        uint128 maxKeks;
+        /// @notice The index of the next kek to be deposited to for deposit/withdrawal tracking.
+        uint128 nextKek;
+    }
+
+    struct DepositInfo {
+        /**
+         * @notice Minimum size required for deposit (in want).
+         * @dev Prevents us from creating a new kek for only dust.
+         */
+        uint120 minDeposit;
+        /**
+         * @notice Maximum size for a single deposit (in want).
+         * @dev Prevents large imbalances in our kek sizes following a large deposit.
+         */
+        uint120 maxSingleDeposit;
+        /// @notice Determines whether every new deposit (adjustPosition call) goes to an existing kek or not
+        bool addToExistingKeks;
+    }
+
     /* ========== STATE VARIABLES ========== */
 
     /// @notice This is the Frax Booster.
@@ -132,12 +158,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice The address of our Frax token (FXS).
     IERC20 public fxs;
 
-    /// @notice Minimum profit size in USDC that we want to harvest.
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Minimum profit size in USDC that we want to harvest.
+     * @dev Only used in harvestTrigger.
+     */
     uint256 public harvestProfitMinInUsdc;
 
-    /// @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
+     * @dev Only used in harvestTrigger.
+     */
     uint256 public harvestProfitMaxInUsdc;
 
     // ySwaps stuff
@@ -154,32 +184,17 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice Timestamp of the most recent deposit to track when all funds will become liquid.
     uint256 public lastDeposit;
 
-    /// @notice Most recent amount deposited.
-    uint256 public lastDepositAmount;
-
-    /// @notice Minimum size required for deposit (in want).
-    /// @dev Prevents us from creating a new kek for only dust.
-    uint256 public minDeposit;
-
-    /// @notice Maximum size for a single deposit (in want).
-    /// @dev Prevents large imbalances in our kek sizes following a large deposit.
-    uint256 public maxSingleDeposit;
-
-    /// @notice Determines whether every new deposit (adjustPosition call) goes to an existing kek or not
-    bool public addToExistingKeks;
-
-    /// @notice This is the time the tokens are locked for when staked.
-    /// @dev Initially set to the min time, ~1 week, and can be updated later if desired.
+    /**
+     * @notice This is the time the tokens are locked for when staked.
+     * @dev Initially set to the min time, ~1 week, and can be updated later if desired.
+     */
     uint256 public lockTime;
 
-    /// @notice This is the max number of keks we will allow the strategy to have
-    ///  open at one time to limit withdraw loops.
-    /// @dev A new kek (position) is created each time we stake the LP token. A whole
-    ///  kek must be withdrawn during any withdrawals.
-    uint256 public maxKeks;
+    /// @notice Info about our deposits. See struct NatSpec for more details.
+    DepositInfo public depositInfo;
 
-    /// @notice The index of the next kek to be deposited to for deposit/withdrawal tracking.
-    uint256 public nextKek;
+    /// @notice Info about our keks. See struct NatSpec for more details.
+    KekInfo public kekInfo;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -206,18 +221,20 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     event Cloned(address indexed clone);
 
-    /// @notice Use this to clone an exact copy of this strategy on another vault.
-    /// @dev In practice, this will only be called by the factory on the template contract.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _fraxPid Our frax pool id (pid) for this strategy.
-    /// @param _stakingAddress Convex staking address for our want token.
-    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _booster Address of the convex frax booster/deposit contract.
+    /**
+     * @notice Use this to clone an exact copy of this strategy on another vault.
+     * @dev In practice, this will only be called by the factory on the template contract.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _fraxPid Our frax pool id (pid) for this strategy.
+     * @param _stakingAddress Convex staking address for our want token.
+     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+     * @param _booster Address of the convex frax booster/deposit contract.
+     */
     function cloneStrategyConvexFrax(
         address _vault,
         address _strategist,
@@ -232,7 +249,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     ) external returns (address newStrategy) {
         // don't clone a clone
         if (!isOriginal) {
-            revert();
+            revert("Can't clone a clone'");
         }
 
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -268,18 +285,20 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         emit Cloned(newStrategy);
     }
 
-    /// @notice Initialize the strategy.
-    /// @dev This should only be called by the clone function above.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _fraxPid Our frax pool id (pid) for this strategy.
-    /// @param _stakingAddress Convex staking address for our want token.
-    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _booster Address of the convex frax booster/deposit contract.
+    /**
+     * @notice Initialize the strategy.
+     * @dev This should only be called by the clone function above.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _fraxPid Our frax pool id (pid) for this strategy.
+     * @param _stakingAddress Convex staking address for our want token.
+     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+     * @param _booster Address of the convex frax booster/deposit contract.
+     */
     function initialize(
         address _vault,
         address _strategist,
@@ -314,7 +333,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     ) internal {
         // make sure that we haven't initialized this before
         if (fraxBooster != address(0)) {
-            revert(); // already initialized.
+            revert("Already initialized");
         }
 
         // 1:1 assignments
@@ -341,11 +360,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         creditThreshold = 50_000e18;
 
         // setup our default frax LP management vars
-        maxKeks = 5;
+        kekInfo.maxKeks = 5;
         lockTime = stakingAddress.lock_time_min(); // default to current minimum
-        maxSingleDeposit = 500_000e18;
-        minDeposit = 100e18;
-        addToExistingKeks = true; // this allows us to not worry about locking
+        depositInfo.maxSingleDeposit = 500_000e18;
+        depositInfo.minDeposit = 100e18;
+        depositInfo.addToExistingKeks = true; // this allows us to not worry about locking
 
         // set up rewards and trade factory
         _updateRewards();
@@ -354,8 +373,16 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     /* ========== VIEWS ========== */
 
-    /// @notice Strategy name.
-    function name() external view override returns (string memory) {
+    /**
+     * @notice Strategy name.
+     * @return strategyName Strategy name.
+     */
+    function name()
+        external
+        view
+        override
+        returns (string memory strategyName)
+    {
         return
             string(
                 abi.encodePacked(
@@ -365,35 +392,48 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             );
     }
 
-    /// @notice Balance of want staked in Convex Frax.
-    function stakedBalance() public view returns (uint256) {
-        // how much want we have staked in Convex-Frax
-        return stakingAddress.lockedLiquidityOf(address(userVault));
+    /**
+     * @notice Balance of want staked in Convex Frax.
+     * @return balanceStaked Balance of want staked in Convex Frax.
+     */
+    function stakedBalance() public view returns (uint256 balanceStaked) {
+        balanceStaked = stakingAddress.lockedLiquidityOf(address(userVault));
     }
 
-    /// @notice Balance of want sitting in our strategy.
-    function balanceOfWant() public view returns (uint256) {
-        // balance of want sitting in our strategy
-        return want.balanceOf(address(this));
+    /**
+     * @notice Balance of want sitting in our strategy.
+     * @return wantBalance Balance of want sitting in our strategy.
+     */
+    function balanceOfWant() public view returns (uint256 wantBalance) {
+        wantBalance = want.balanceOf(address(this));
     }
 
-    /// @notice Total assets the strategy holds, sum of loose and staked want.
-    function estimatedTotalAssets() public view override returns (uint256) {
-        return balanceOfWant() + stakedBalance();
+    /**
+     * @notice Total assets the strategy holds, sum of loose and staked want.
+     * @return totalAssets Total assets the strategy holds, sum of loose and staked want.
+     */
+    function estimatedTotalAssets()
+        public
+        view
+        override
+        returns (uint256 totalAssets)
+    {
+        totalAssets = balanceOfWant() + stakedBalance();
     }
 
-    /// @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
-    /// @dev We use staticcall here, as on newer userVaults, earned() is a write function. So on
-    ///  newer pools, we instead pull the reward tokens and amounts from the staking contract.
-    /// @return tokenAddresses Array of our reward token addresses.
-    /// @return tokenAmounts Amounts of our corresponding reward tokens.
+    /**
+     * @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
+     * @dev We use staticcall here, as on newer userVaults, earned() is a write function. So on newer pools, we instead
+     *  pull the reward tokens and amounts from the staking contract.
+     * @return tokenAddresses Array of our reward token addresses.
+     * @return tokenAmounts Amounts of our corresponding reward tokens.
+     */
     function getEarnedTokens()
         public
         view
         returns (address[] memory tokenAddresses, uint256[] memory tokenAmounts)
     {
-        // on older pools, we can read directly from our user vault
-        // returns FXS, CRV, CVX addresses with amounts
+        // on older pools, we can read directly from our user vault returns FXS, CRV, CVX addresses with amounts
         bytes memory data = abi.encodeWithSignature("earned()");
         (bool success, bytes memory returnBytes) = address(userVault)
             .staticcall(data);
@@ -461,7 +501,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             }
         }
 
-        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
+        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it
         uint256 assets = estimatedTotalAssets();
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
@@ -500,33 +540,40 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 _toInvest = balanceOfWant();
 
         // don't bother with dust
-        if (_toInvest < minDeposit) {
+        uint256 _minDeposit = uint256(depositInfo.minDeposit);
+        if (_toInvest < _minDeposit) {
             return;
         }
 
         // don't want a single kek too large vs others
-        if (_toInvest > maxSingleDeposit) {
-            _toInvest = maxSingleDeposit;
+        uint256 _maxSingleDeposit = uint256(depositInfo.maxSingleDeposit);
+        if (_toInvest > _maxSingleDeposit) {
+            _toInvest = _maxSingleDeposit;
         }
 
-        // If we have already locked the max amount of keks, first check if we
-        //  want to just add to existing keks or not
-        if (nextKek >= maxKeks) {
+        // pull down our kek info
+        uint256 _nextKek = uint256(kekInfo.nextKek);
+        uint256 _maxKeks = uint256(kekInfo.maxKeks);
+
+        // If we have already locked the max amount of keks, first check if we want to just add to existing keks or not
+        if (_nextKek >= _maxKeks) {
             // pull our current stake data
             IConvexFrax.LockedStake[] memory stake = stakingAddress
                 .lockedStakesOf(address(userVault));
 
             // only add to existing if we've maxxed out our number of keks
-            if (addToExistingKeks) {
+            if (depositInfo.addToExistingKeks) {
                 // figure out which is our lowest TVL kek, start with our latest one
-                IConvexFrax.LockedStake memory latestStake = stake[nextKek - 1];
+                IConvexFrax.LockedStake memory latestStake = stake[
+                    _nextKek - 1
+                ];
                 bytes32 smallestKek = latestStake.kek_id;
                 uint256 smallestKekSize = latestStake.amount;
 
                 // if only 1 kek, no need to check which is the smallest
-                if (maxKeks != 1) {
-                    for (uint256 i = 2; i <= maxKeks; ++i) {
-                        latestStake = stake[nextKek - i];
+                if (_maxKeks != 1) {
+                    for (uint256 i = 2; i <= _maxKeks; ++i) {
+                        latestStake = stake[_nextKek - i];
                         // if a kek is smaller in size than our previous smallest, it
                         //   is now smallest
                         if (latestStake.amount < smallestKekSize) {
@@ -538,12 +585,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 // deposit our assets to our smallest kek
                 userVault.lockAdditionalCurveLp(smallestKek, _toInvest);
             } else {
-                // if not, we need to withdraw the oldest one and reinvest
-                //  that alongside the new funds
+                // if not, we need to withdraw the oldest one and reinvest that alongside the new funds
 
                 // Get the oldest kek that could have funds in it
                 IConvexFrax.LockedStake memory firstStake = stake[
-                    nextKek - maxKeks
+                    _nextKek - _maxKeks
                 ];
                 // Make sure it hasn't already been withdrawn
                 if (firstStake.amount > 0) {
@@ -554,21 +600,20 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     }
 
                     // don't want a single kek too large vs others
-                    if (_toInvest > maxSingleDeposit) {
-                        _toInvest = maxSingleDeposit;
+                    if (_toInvest > _maxSingleDeposit) {
+                        _toInvest = _maxSingleDeposit;
                     }
                 }
                 // deposit, increment our next kek
                 userVault.stakeLockedCurveLp(_toInvest, lockTime);
-                nextKek++;
+                kekInfo.nextKek++;
             }
         } else {
             // deposit, increment our next kek
             userVault.stakeLockedCurveLp(_toInvest, lockTime);
-            nextKek++;
+            kekInfo.nextKek++;
         }
         lastDeposit = block.timestamp;
-        lastDepositAmount = _toInvest;
     }
 
     function liquidatePosition(
@@ -611,11 +656,15 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             address(userVault)
         );
 
-        uint256 i = nextKek > maxKeks ? nextKek - maxKeks : 0;
+        // pull down our kek info
+        uint256 _nextKek = uint256(kekInfo.nextKek);
+        uint256 _maxKeks = uint256(kekInfo.maxKeks);
+
+        uint256 i = _nextKek > _maxKeks ? _nextKek - _maxKeks : 0;
         uint256 needed = Math.min(_amount, stakedBalance());
         IConvexFrax.LockedStake memory stake;
         uint256 liquidity;
-        while (needed > 0 && i < nextKek) {
+        while (needed > 0 && i < _nextKek) {
             stake = stakes[i];
             liquidity = stake.amount;
 
@@ -642,11 +691,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
      * @notice Liquidate everything we can during emergencyExit.
      *
      * @dev
-     *  Will liquidate as much as possible at the time. May not be able
-     *  to liquidate all if anything has been deposited in the last week.
-     *  Would then have to be called again after locked period has expired.
-     *  Note that when this is called (only during emergencyExit) any
-     *  funds not retrieved at the time will be treated as a loss.
+     *  Will liquidate as much as possible at the time. May not be able to liquidate all if anything has been deposited
+     *  in the last week. Would then have to be called again after locked period has expired. Note that when this is
+     *  called (only during emergencyExit) any funds not retrieved at the time will be treated as a loss.
      */
     function liquidateAllPositions() internal override returns (uint256) {
         withdrawSome(type(uint256).max);
@@ -657,14 +704,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
      * @notice Migrate want and reward tokens to our new strategy.
      *
      * @dev
-     *  Migration should only be called if all funds are completely liquid.
-     *  In an emergency,first try manually withdrawing any liquid keks using
-     *  manualWithdraw() and wait until the remainder becomes liquid.
-     *  This will allow as much of the liquid position to be withdrawn
-     *  while allowing future withdraws for still locked tokens with no loss.
-     *  Setting emergencyExit to true and harvesting is another option,
-     *  but in this case funds not retrieved at the time will be recorded
-     *  as a loss.
+     *  Migration should only be called if all funds are completely liquid. In an emergency,first try manually
+     *  withdrawing any liquid keks using manualWithdraw() and wait until the remainder becomes liquid. This will allow
+     *  as much of the liquid position to be withdrawn while allowing future withdraws for still locked tokens with no
+     *  loss. Setting emergencyExit to true and harvesting is another option, but in this case funds not retrieved at
+     *  the time will be recorded as a loss.
      */
     function prepareMigration(address _newStrategy) internal override {
         require(
@@ -698,9 +742,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     /* ========== YSWAPS ========== */
 
-    /// @notice Use to add or update rewards, rebuilds tradefactory too
-    /// @dev Do this before updating trade factory if we have extra rewards.
-    ///  Can only be called by governance.
+    /**
+     * @notice Use to add or update rewards, rebuilds tradefactory too
+     * @dev Do this before updating trade factory if we have extra rewards. Can only be called by governance.
+     */
     function updateRewards() external onlyGovernance {
         address tf = tradeFactory;
         _removeTradeFactoryPermissions(true);
@@ -728,9 +773,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
     }
 
-    /// @notice Use to update our trade factory.
-    /// @dev Can only be called by governance.
-    /// @param _newTradeFactory Address of new trade factory.
+    /**
+     * @notice Use to update our trade factory.
+     * @dev Can only be called by governance.
+     * @param _newTradeFactory Address of new trade factory.
+     */
     function updateTradeFactory(
         address _newTradeFactory
     ) external onlyGovernance {
@@ -766,10 +813,12 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         tf.enable(address(fxs), _want);
     }
 
-    /// @notice Use this to remove permissions from our current trade factory.
-    /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
-    /// @param _disableTf Specify whether to disable the tradefactory when removing.
-    ///  Option given in case we need to get around a reverting disable.
+    /**
+     * @notice Use this to remove permissions from our current trade factory.
+     * @dev Once this is called, setUpTradeFactory must be called to get things working again.
+     * @param _disableTf Specify whether to disable the tradefactory when removing. Option given in case we need to get
+     *  around a reverting disable.
+     */
     function removeTradeFactoryPermissions(
         bool _disableTf
     ) external onlyVaultManagers {
@@ -818,17 +867,17 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
      *  Provide a signal to the keeper that harvest() should be called.
      *
      *  Don't harvest if a strategy is inactive.
-     *  If our profit exceeds our upper limit, then harvest no matter what. For
-     *  our lower profit limit, credit threshold, max delay, and manual force trigger,
-     *  only harvest if our gas price is acceptable.
+     *  If our profit exceeds our upper limit, then harvest no matter what. For our lower profit limit, credit
+     *  threshold, max delay, and manual force trigger, only harvest if our gas price is acceptable.
      *
-     * @param callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
+     * @param _callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
      * @return True if harvest() should be called, false otherwise.
      */
     function harvestTrigger(
-        uint256 callCostinEth
+        uint256 _callCostinEth
     ) public view override returns (bool) {
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust
+        //  keeper job.
         if (!isActive()) {
             return false;
         }
@@ -867,7 +916,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
         // harvest if we have loose want in the strategy and are past our minDelay
         if (
-            (balanceOfWant() > minDeposit) &&
+            (balanceOfWant() > uint256(depositInfo.minDeposit)) &&
             (block.timestamp - params.lastReport > minReportDelay)
         ) {
             return true;
@@ -877,8 +926,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         return false;
     }
 
-    /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
-    /// @return Total return in USDC from selling claimable CRV, CVX, and FXS.
+    /**
+     * @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+     * @return Total return in USDC from selling claimable CRV, CVX, and FXS.
+     */
     function claimableProfitInUsdc() public view returns (uint256) {
         (
             address[] memory _tokenAddresses,
@@ -919,27 +970,33 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 _tokenAmounts[tokensLength - 1]) / 1e20;
     }
 
-    /// @notice Convert our keeper's eth cost into want
-    /// @dev We don't use this since we don't factor call cost into our harvestTrigger.
-    /// @param _ethAmount Amount of ether spent.
-    /// @return Value of ether in want.
+    /**
+     * @notice Convert our keeper's eth cost into want
+     * @dev We don't use this since we don't factor call cost into our harvestTrigger.
+     * @param _ethAmount Amount of ether spent.
+     * @return Value of ether in want.
+     */
     function ethToWant(
         uint256 _ethAmount
     ) public view override returns (uint256) {}
 
     /* ========== FRAX-SPECIFIC FUNCTIONS ========== */
 
-    /// @notice Check how much want we have locked (not just deposited) in the staking contract.
-    /// @return stillLocked The total amount of want that cannot yet be withdrawn from the staking contract.
+    /**
+     * @notice Check how much want we have locked (not just deposited) in the staking contract.
+     * @return stillLocked The total amount of want that cannot yet be withdrawn from the staking contract.
+     */
     function stillLockedStake() public view returns (uint256 stillLocked) {
         IConvexFrax.LockedStake[] memory stakes = stakingAddress.lockedStakesOf(
             address(userVault)
         );
 
+        // pull down our kek info
+        uint256 _nextKek = uint256(kekInfo.nextKek);
+        uint256 _maxKeks = uint256(kekInfo.maxKeks);
+
         IConvexFrax.LockedStake memory stake;
         uint256 time = block.timestamp;
-        uint256 _nextKek = nextKek;
-        uint256 _maxKeks = maxKeks;
         uint256 i = _nextKek > _maxKeks ? _nextKek - _maxKeks : 0;
 
         for (i; i < _nextKek; ++i) {
@@ -953,28 +1010,32 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         }
     }
 
-    /// @notice This function allows manual withdrawal of a specific kek.
-    /// @dev Available if the counter or loops fail.
-    /// @param index Index of the kek to withdraw.
-    //Pass the index of the kek to withdraw as the param
-    function manualWithdraw(uint256 index) external onlyVaultManagers {
+    /**
+     * @notice This function allows manual withdrawal of a specific kek.
+     * @dev Available if the counter or loops fail.
+     * @param _index Index of the kek to withdraw.
+     */
+    function manualWithdraw(uint256 _index) external onlyVaultManagers {
         userVault.withdrawLockedAndUnwrap(
-            stakingAddress.lockedStakesOf(address(userVault))[index].kek_id
+            stakingAddress.lockedStakesOf(address(userVault))[_index].kek_id
         );
     }
 
     /* ========== SETTERS ========== */
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    /// @notice Changes the maximum amount of keks we can deposit into at once.
-    /// @dev Will withdraw funds if lowering the max. Ideally should harvest
-    ///  after adjusting to prevent loose funds sitting idle.
-    /// @param _newMaxKeks New number of maxKeks.
+    /**
+     * @notice Changes the maximum amount of keks we can deposit into at once.
+     * @dev Will withdraw funds if lowering the max. Ideally should harvest after adjusting to prevent loose funds
+     *  sitting idle.
+     * @param _newMaxKeks New number of maxKeks.
+     */
     function setMaxKeks(uint256 _newMaxKeks) external onlyVaultManagers {
         require(_newMaxKeks > 0, "Must be >0");
 
-        uint256 _maxKeks = maxKeks;
-        uint256 _nextKek = nextKek;
+        // pull down our kek info
+        uint256 _nextKek = uint256(kekInfo.nextKek);
+        uint256 _maxKeks = uint256(kekInfo.maxKeks);
 
         // If we are lowering the max we need to withdraw the diff,
         // but only if we are already over the new max
@@ -983,7 +1044,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             if (_newMaxKeks < _nextKek) {
                 uint256 toWithdraw = _nextKek > _maxKeks
                     ? _maxKeks - _newMaxKeks
-                    : nextKek - _newMaxKeks;
+                    : _nextKek - _newMaxKeks;
                 IConvexFrax.LockedStake[] memory stakes = stakingAddress
                     .lockedStakesOf(address(userVault));
                 IConvexFrax.LockedStake memory stake;
@@ -1005,33 +1066,37 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 }
             }
         }
-        maxKeks = _newMaxKeks;
+        kekInfo.maxKeks = uint128(_newMaxKeks);
     }
 
-    /// @notice Set the lower and upper bounds of our deposit size.
-    /// @dev Min prevents us from harvesting in dust for a kek, and
-    ///  max is how large we allow one kek to be.
-    /// @param _minDeposit Minimum want needed to create a new kek.
-    /// @param _maxSingleDeposit Maximum size of a single kek.
-    /// @param _addToExistingKeks Whether new deposits go to an existing or new kek.
+    /**
+     * @notice Set the lower and upper bounds of our deposit size.
+     * @dev Min prevents us from harvesting in dust for a kek, and max is how large we allow one kek to be. We use
+     *  uint120 here to be able to more efficiently pack our struct
+     * @param _minDeposit Minimum want needed to create a new kek.
+     * @param _maxSingleDeposit Maximum size of a single kek.
+     * @param _addToExistingKeks Whether new deposits go to an existing or new kek.
+     */
     function setDepositParams(
-        uint256 _minDeposit,
-        uint256 _maxSingleDeposit,
+        uint120 _minDeposit,
+        uint120 _maxSingleDeposit,
         bool _addToExistingKeks
     ) external onlyVaultManagers {
         require(
             _maxSingleDeposit > _minDeposit,
             "Max must be greater than min"
         );
-        minDeposit = _minDeposit;
-        maxSingleDeposit = _maxSingleDeposit;
-        addToExistingKeks = _addToExistingKeks;
+        depositInfo.minDeposit = _minDeposit;
+        depositInfo.maxSingleDeposit = _maxSingleDeposit;
+        depositInfo.addToExistingKeks = _addToExistingKeks;
     }
 
-    /// @notice This can be used to update how long the tokens are locked when staked.
-    /// @dev Care should be taken when increasing the time to only update directly
-    ///  before a harvest, otherwise timestamp checks when withdrawing could be inaccurate.
-    /// @param _lockTime Time to lock our LP (in seconds). By default bound to 1 week < t < 1 year.
+    /**
+     * @notice This can be used to update how long the tokens are locked when staked.
+     * @dev Care should be taken when increasing the time to only update directly before a harvest, otherwise timestamp
+     *  checks when withdrawing could be inaccurate.
+     * @param _lockTime Time to lock our LP (in seconds). By default bound to 1 week < t < 1 year.
+     */
     function setLockTime(uint256 _lockTime) external onlyVaultManagers {
         require(
             stakingAddress.lock_time_min() <= _lockTime &&
@@ -1041,30 +1106,32 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         lockTime = _lockTime;
     }
 
-    /// @notice Use this to set or update our keep amounts for this strategy.
-    /// @dev Must be less than 10,000. Set in basis points. Only governance can set this.
-    /// @param _keepCrv Percent of each CRV harvest to send to our voter.
-    /// @param _keepCvx Percent of each CVX harvest to send to our voter.
-    /// @param _keepFxs Percent of each FXS harvest to send to our voter.
+    /**
+     * @notice Use this to set or update our keep amounts for this strategy.
+     * @dev Must be less than 10,000. Set in basis points. Only governance can set this.
+     * @param _keepCrv Percent of each CRV harvest to send to our voter.
+     * @param _keepCvx Percent of each CVX harvest to send to our voter.
+     * @param _keepFxs Percent of each FXS harvest to send to our voter.
+     */
     function setLocalKeepCrvs(
         uint256 _keepCrv,
         uint256 _keepCvx,
         uint256 _keepFxs
     ) external onlyGovernance {
         if (_keepCrv > 10_000 || _keepCvx > 10_000 || _keepFxs > 10_000) {
-            revert();
+            revert("Keep max is 10,000");
         }
 
         if (_keepCrv > 0 && curveVoter == address(0)) {
-            revert();
+            revert("Set voter when keep >0");
         }
 
         if (_keepCvx > 0 && convexVoter == address(0)) {
-            revert();
+            revert("Set voter when keep >0");
         }
 
         if (_keepFxs > 0 && fraxVoter == address(0)) {
-            revert();
+            revert("Set voter when keep >0");
         }
 
         localKeepCRV = _keepCrv;
@@ -1072,12 +1139,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         localKeepFXS = _keepFxs;
     }
 
-    /// @notice Use this to set or update our voter contracts.
-    /// @dev For Convex Frax strategies, this is simply where we send our keepCRV, keepCVX and keepFXS.
-    ///  Only governance can set this.
-    /// @param _curveVoter Address of our curve voter.
-    /// @param _convexVoter Address of our convex voter.
-    /// @param _convexFraxVoter Address of our frax voter.
+    /**
+     * @notice Use this to set or update our voter contracts.
+     * @dev For Convex Frax strategies, this is simply where we send our keepCRV, keepCVX and keepFXS. Only governance
+     *  can set this.
+     * @param _curveVoter Address of our curve voter.
+     * @param _convexVoter Address of our convex voter.
+     * @param _convexFraxVoter Address of our frax voter.
+     */
     function setVoters(
         address _curveVoter,
         address _convexVoter,

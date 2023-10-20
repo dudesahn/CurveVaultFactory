@@ -443,8 +443,8 @@ def test_lower_keks(
         strategy.setMaxKeks(0, {"from": gov})
 
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
@@ -523,8 +523,8 @@ def test_lower_keks(
 
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # try to decrease our max keks again
     with brownie.reverts():
@@ -538,8 +538,8 @@ def test_lower_keks(
     # check how much locked stake we have (should be zero)
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # lower now
     strategy.setMaxKeks(3, {"from": gov})
@@ -760,8 +760,8 @@ def test_increase_keks(
     )
 
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
@@ -868,8 +868,8 @@ def test_withdraw_with_some_locked(
     )
 
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
@@ -991,14 +991,14 @@ def test_manual_withdrawal(
     )
 
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
     # test withdrawing 1 kek manually at a time
     assert strategy.balanceOfWant() == profit_amount
-    index_to_withdraw = strategy.nextKek() - 1
+    index_to_withdraw = strategy.kekInfo()["nextKek"] - 1
 
     # can't withdraw yet, need to wait
     with brownie.reverts():
@@ -1121,8 +1121,8 @@ def test_lower_keks_add_to_existing(
         strategy.setMaxKeks(0, {"from": gov})
 
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
@@ -1201,8 +1201,8 @@ def test_lower_keks_add_to_existing(
 
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # try to decrease our max keks again
     # ^^ again, doesn't revert like we expect since it's no longer new locking
@@ -1216,8 +1216,8 @@ def test_lower_keks_add_to_existing(
     # check how much locked stake we have (should be zero)
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # lower now
     strategy.setMaxKeks(3, {"from": gov})
@@ -1444,8 +1444,8 @@ def test_increase_keks_add_to_existing(
     )
 
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
@@ -1557,10 +1557,10 @@ def test_keks_add_to_existing(
         target,
     )
 
-    next_kek = strategy.nextKek()
+    next_kek = strategy.kekInfo()["nextKek"]
     print("First 5 harvests down")
-    print("Max keks:", strategy.maxKeks())
-    print("Next kek:", strategy.nextKek())
+    print("Max keks:", strategy.kekInfo()["maxKeks"])
+    print("Next kek:", strategy.kekInfo()["nextKek"])
     locked = strategy.stillLockedStake() / 1e18
     print("Locked stake:", locked)
 
@@ -1579,7 +1579,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
 
     # check visually that we are adding to a different kek each time using the output printout
@@ -1610,7 +1610,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
@@ -1639,7 +1639,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
@@ -1668,7 +1668,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
@@ -1697,7 +1697,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
@@ -1726,7 +1726,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
@@ -1755,7 +1755,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
@@ -1784,7 +1784,7 @@ def test_keks_add_to_existing(
         profit_amount,
         target,
     )
-    assert next_kek == strategy.nextKek()
+    assert next_kek == strategy.kekInfo()["nextKek"]
     output = staking.lockedStakesOf(strategy.userVault())
     print(
         "Kek info",
