@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
-import "@yearnvaults/contracts/BaseStrategy.sol";
+import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
 
 interface ITradeFactory {
     function enable(address, address) external;
