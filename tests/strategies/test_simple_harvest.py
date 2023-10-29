@@ -95,8 +95,8 @@ def test_simple_harvest(
     # simulate profits
     chain.sleep(sleep_time)
 
-    # check our pending profit for frax, but only if using tenderly
-    if tests_using_tenderly and which_strategy == 2:
+    # check our pending profit for frax
+    if which_strategy == 2:
         pending = strategy.getEarnedTokens()
         print("Strategy", strategy.name(), "pid:", strategy.fraxPid())
         print("Pending:", pending.dict())

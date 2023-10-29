@@ -52,6 +52,15 @@ interface IConvexFrax {
         address
     ) external view returns (uint256[] memory total_earned);
 
+    // this is used for our userVault on older pools
+    function earned()
+        external
+        view
+        returns (
+            address[] memory token_addresses,
+            uint256[] memory total_earned
+        );
+
     function getAllRewardTokens()
         external
         view
@@ -423,8 +432,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
 
     /**
      * @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
-     * @dev We use staticcall here, as on newer userVaults, earned() is a write function. So on newer pools, we instead
-     *  pull the reward tokens and amounts from the staking contract.
+     * @dev On older userVaults, earned() is a read function, but on newer ones it is a write. So on newer pools, we
+     *  instead pull the reward tokens and amounts from the staking contract.
      * @return tokenAddresses Array of our reward token addresses.
      * @return tokenAmounts Amounts of our corresponding reward tokens.
      */
@@ -434,16 +443,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         returns (address[] memory tokenAddresses, uint256[] memory tokenAmounts)
     {
         // on older pools, we can read directly from our user vault returns FXS, CRV, CVX addresses with amounts
-        bytes memory data = abi.encodeWithSignature("earned()");
-        (bool success, bytes memory returnBytes) = address(userVault)
-            .staticcall(data);
-
-        if (success) {
-            (tokenAddresses, tokenAmounts) = abi.decode(
-                returnBytes,
-                (address[], uint256[])
-            );
+        if (fraxPid < 44) {
+            (tokenAddresses, tokenAmounts) = userVault.earned();
         } else {
+            // on newer pools we just read from the staking address
             tokenAmounts = stakingAddress.earned(address(userVault));
             tokenAddresses = stakingAddress.getAllRewardTokens();
         }

@@ -11,42 +11,14 @@ def isolate(fn_isolation):
 
 
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
-# note that for curve factory we should use tenderly with 2/3 factory tests, and update our earned function as below unless
-# we want to do each test individually with tenderly, as having to deploy our frax strategy also reverts now
-# best to test our global using an undeployed underlying!!!! such as eUSD-FRAXBP
+# note that for curve factory we should use tenderly with 2/3 factory tests
 use_tenderly = False
 
+# tests to run (last 2 should be done with pool that we don't have a vault for yet)
+# brownie test -s
+# brownie test tests/factory/test_curve_global.py::test_vault_deployment -s --gas
+# brownie test tests/factory/test_curve_global.py::test_permissioned_vault -s --gas
 
-# because of the staticcall we now use, need to use tenderly when testing the strategy, unless we remove this function
-# 🚨🚨🚨 actually, easier just to comment out the _updateRewards() call in the constructor and then everything is cool
-# to test the getEarnedTokens() fxn, we call in in test_simple_harvest
-
-#
-#     /// @notice Use this helper function to handle v1 and v2 Convex Frax stakingToken wrappers
-#     /// @dev We use staticcall here, as on newer userVaults, earned is a write function.
-#     /// @return tokenAddresses Array of our reward token addresses.
-#     /// @return tokenAmounts Amounts of our corresponding reward tokens.
-#     function getEarnedTokens()
-#         public
-#         view
-#         returns (address[] memory tokenAddresses, uint256[] memory tokenAmounts)
-#     {
-# //         bytes memory data = abi.encodeWithSignature("earned()");
-# //         (bool success, bytes memory returnBytes) = address(userVault)
-# //             .staticcall(data);
-# //         if (success) {
-# //             (tokenAddresses, tokenAmounts) = abi.decode(
-# //                 returnBytes,
-# //                 (address[], uint256[])
-# //             );
-#         bool success = false;
-#         if (success) {
-#             (tokenAddresses, tokenAmounts) = userVault.earned();
-#         } else {
-#             tokenAmounts = stakingAddress.earned(address(userVault));
-#             tokenAddresses = stakingAddress.getAllRewardTokens();
-#         }
-#     }
 
 # use this to set what chain we use. 1 for ETH, 250 for fantom, 10 optimism, 42161 arbitrum
 chain_used = 1
@@ -106,6 +78,7 @@ def whale(accounts, amount, token):
     # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
     # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
+    # 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng 40k (gauge, not perfect for strat testing but good for factory testing)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -118,7 +91,7 @@ def whale(accounts, amount, token):
 def amount(token):
     amount = (
         5_000 * 10 ** token.decimals()
-    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX
+    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng
     yield amount
 
 
@@ -130,7 +103,7 @@ def profit_whale(accounts, profit_amount, token):
     )  # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
-    # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k
+    # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k, 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -142,7 +115,7 @@ def profit_whale(accounts, profit_amount, token):
 def profit_amount(token):
     profit_amount = (
         25 * 10 ** token.decimals()
-    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX
+    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng
     yield profit_amount
 
 
@@ -456,16 +429,14 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 156  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100
+    pid = 156  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
     yield pid
 
 
 # put our pool's frax pid here
 @pytest.fixture(scope="session")
 def frax_pid():
-    frax_pid = (
-        44  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH, 44 eUSD-FRAXBP, crvUSD-FRAX 49
-    )
+    frax_pid = 44  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH, 44 eUSD-FRAXBP, crvUSD-FRAX 49, frxETH-ng 63
     yield frax_pid
 
 
@@ -475,7 +446,7 @@ def staking_address():
     staking_address = "0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac"
     #  0xa537d64881b84faffb9Ae43c951EEbF368b71cdA frxETH, 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC,
     # 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP, 0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac eUSD-FRAXBP
-    # 0x67CC47cF82785728DD5E3AE9900873a074328658 crvUSD-FRAX
+    # 0x67CC47cF82785728DD5E3AE9900873a074328658 crvUSD-FRAX, 0xB4fdD7444E1d86b2035c97124C46b1528802DA35 frxETH-ng
     yield staking_address
 
 
