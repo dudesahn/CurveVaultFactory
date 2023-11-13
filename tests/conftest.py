@@ -2,6 +2,7 @@ import pytest
 from brownie import config, Contract, ZERO_ADDRESS, chain, interface, accounts
 from eth_abi import encode_single
 import requests
+import os
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(scope="function", autouse=True)
@@ -10,7 +11,16 @@ def isolate(fn_isolation):
 
 
 # set this for if we want to use tenderly or not; mostly helpful because with brownie.reverts fails in tenderly forks.
+# note that for curve factory we should use tenderly with 2/3 factory tests
 use_tenderly = False
+
+# tests to run; last 4 should be done with pool that we don't have a vault for yet, and also need tenderly
+# brownie test -s
+# brownie test tests/factory/test_curve_global.py::test_vault_deployment -s --gas
+# brownie test tests/factory/test_curve_global.py::test_permissioned_vault -s --gas
+# brownie test tests/strategies/test_simple_harvest.py -s --gas
+# brownie test tests/strategies/test_yswaps.py -s --gas
+
 
 # use this to set what chain we use. 1 for ETH, 250 for fantom, 10 optimism, 42161 arbitrum
 chain_used = 1
@@ -21,15 +31,31 @@ chain_used = 1
 # change autouse to True if we want to use this fork to help debug tests
 @pytest.fixture(scope="session", autouse=use_tenderly)
 def tenderly_fork(web3, chain):
-    fork_base_url = "https://simulate.yearn.network/fork"
-    payload = {"network_id": str(chain.id)}
-    resp = requests.post(fork_base_url, headers={}, json=payload)
-    fork_id = resp.json()["simulation_fork"]["id"]
+    # Get env variables
+    TENDERLY_ACCESS_KEY = os.environ.get("TENDERLY_ACCESS_KEY")
+    TENDERLY_USER = os.environ.get("TENDERLY_USER")
+    TENDERLY_PROJECT = os.environ.get("TENDERLY_PROJECT")
+
+    # Construct request
+    url = f"https://api.tenderly.co/api/v1/account/{TENDERLY_USER}/project/{TENDERLY_PROJECT}/fork"
+    headers = {"X-Access-Key": str(TENDERLY_ACCESS_KEY)}
+    data = {
+        "network_id": str(chain.id),
+    }
+
+    # Post request
+    response = requests.post(url, json=data, headers=headers)
+
+    # Parse response
+    fork_id = response.json()["simulation_fork"]["id"]
+
+    # Set provider to your new Tenderly fork
     fork_rpc_url = f"https://rpc.tenderly.co/fork/{fork_id}"
-    print(fork_rpc_url)
     tenderly_provider = web3.HTTPProvider(fork_rpc_url, {"timeout": 600})
     web3.provider = tenderly_provider
-    print(f"https://dashboard.tenderly.co/yearn/yearn-web/fork/{fork_id}")
+    print(
+        f"https://dashboard.tenderly.co/{TENDERLY_USER}/{TENDERLY_PROJECT}/fork/{fork_id}"
+    )
 
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
@@ -49,10 +75,12 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     whale = accounts.at(
-        "0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5", force=True
+        "0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784", force=True
     )  # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
-    # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
+    # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
+    # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
+    # 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng 40k (gauge, not perfect for strat testing but good for factory testing)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -65,7 +93,7 @@ def whale(accounts, amount, token):
 def amount(token):
     amount = (
         5_000 * 10 ** token.decimals()
-    )  # 500k for cvxCRV, 300 for stETH, 50k for frax, 5k for frxETH, 5 eCFX
+    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng
     yield amount
 
 
@@ -73,10 +101,11 @@ def amount(token):
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
     profit_whale = accounts.at(
-        "0x2CA3a2b525E75b2F20f59dEcCaE3ffa4bdf3EAa2", force=True
+        "0xf83deAdE1b0D2AfF07700C548a54700a082388bE", force=True
     )  # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
-    # frax 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x2CA3a2b525E75b2F20f59dEcCaE3ffa4bdf3EAa2 frxETH 70 tokens
-    # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
+    # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
+    # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
+    # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k, 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -87,8 +116,8 @@ def profit_whale(accounts, profit_amount, token):
 @pytest.fixture(scope="session")
 def profit_amount(token):
     profit_amount = (
-        10 * 10 ** token.decimals()
-    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 10 for frxETH, 1 eCFX
+        25 * 10 ** token.decimals()
+    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng
     yield profit_amount
 
 
@@ -383,7 +412,7 @@ def strategy(
         strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
 
         # for testing, let's deposit anything above 1e18
-        strategy.setDepositParams(1e18, 5_000_000e18, {"from": gov})
+        strategy.setDepositParams(1e18, 5_000_000e18, False, {"from": gov})
 
     # turn our oracle into testing mode by setting the provider to 0x00, then forcing true
     strategy.setBaseFeeOracle(base_fee_oracle, {"from": management})
@@ -402,21 +431,24 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 128  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160
+    pid = 156  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
     yield pid
 
 
 # put our pool's frax pid here
 @pytest.fixture(scope="session")
 def frax_pid():
-    frax_pid = 36  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH
+    frax_pid = 44  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH, 44 eUSD-FRAXBP, crvUSD-FRAX 49, frxETH-ng 63
     yield frax_pid
 
 
 # put our pool's staking address here
 @pytest.fixture(scope="session")
 def staking_address():
-    staking_address = "0xa537d64881b84faffb9Ae43c951EEbF368b71cdA"  #  0xa537d64881b84faffb9Ae43c951EEbF368b71cdA frxETH, 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC, 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP
+    staking_address = "0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac"
+    #  0xa537d64881b84faffb9Ae43c951EEbF368b71cdA frxETH, 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC,
+    # 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP, 0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac eUSD-FRAXBP
+    # 0x67CC47cF82785728DD5E3AE9900873a074328658 crvUSD-FRAX, 0xB4fdD7444E1d86b2035c97124C46b1528802DA35 frxETH-ng
     yield staking_address
 
 
@@ -528,7 +560,7 @@ def booster():  # this is the deposit contract
 
 @pytest.fixture(scope="session")
 def frax_booster():
-    yield Contract("0x569f5B842B5006eC17Be02B8b94510BA8e79FbCa")
+    yield Contract("0x2B8b301B90Eb8801f1eEFe73285Eec117D2fFC95")
 
 
 @pytest.fixture(scope="session")
@@ -543,7 +575,7 @@ def crv():
 
 @pytest.fixture(scope="session")
 def crv_whale():
-    yield accounts.at("0x32D03DB62e464c9168e41028FFa6E9a05D8C6451", force=True)
+    yield accounts.at("0xF977814e90dA44bFA03b6295A0616a897441aceC", force=True)
 
 
 @pytest.fixture(scope="session")
@@ -720,10 +752,10 @@ def curve_global(CurveGlobal):
 
 
 @pytest.fixture(scope="session")
-def new_proxy(StrategyProxy):
-    yield StrategyProxy.at("0xda18f789a1D9AD33E891253660Fcf1332d236b29")
+def new_proxy():
+    yield Contract("0xda18f789a1D9AD33E891253660Fcf1332d236b29")
 
 
 @pytest.fixture(scope="session")
-def new_registry(VaultRegistry):
-    yield VaultRegistry.at("0xaF1f5e1c19cB68B30aAD73846eFfDf78a5863319")
+def new_registry():
+    yield Contract("0xaF1f5e1c19cB68B30aAD73846eFfDf78a5863319")

@@ -35,6 +35,7 @@ def test_vault_deployment(
     convex_template,
     frax_template,
     curve_template,
+    frax_booster,
 ):
     ############# skip all of this since factory is already live
 
@@ -50,6 +51,15 @@ def test_vault_deployment(
     # new_proxy.setFactory(curve_global.address, {"from": gov})
 
     #############
+
+    # this will crash if we're not using tenderly
+    if not tests_using_tenderly:
+        return
+
+    # update our frax booster to v2
+    if curve_global.fraxBooster() != frax_booster.address:
+        curve_global.setFraxBooster(frax_booster, {"from": gov})
+        print("Updated Frax Booster")
 
     print("New proxy updated, factory added to proxy")
 
@@ -223,7 +233,7 @@ def test_vault_deployment(
         vault.updateStrategyDebtRatio(curve_strategy, 3000, {"from": gov})
         vault.updateStrategyDebtRatio(convex_strategy, 4000, {"from": gov})
         # for testing, let's deposit anything above 1e18 since we might be doing frxETH
-        frax_strategy.setDepositParams(1e18, 5_000_000e18, {"from": gov})
+        frax_strategy.setDepositParams(1e18, 5_000_000e18, True, {"from": gov})
     else:
         vault.updateStrategyDebtRatio(curve_strategy, 0, {"from": gov})
         vault.updateStrategyDebtRatio(convex_strategy, 0, {"from": gov})
@@ -383,6 +393,7 @@ def test_permissioned_vault(
     convex_template,
     frax_template,
     curve_template,
+    frax_booster,
 ):
     ############# skip all of this since factory is already live
 
@@ -402,6 +413,15 @@ def test_permissioned_vault(
     # new_proxy.setFactory(curve_global.address, {"from": gov})
 
     #############
+
+    # this will crash if we're not using tenderly
+    if not tests_using_tenderly:
+        return
+
+    # update our frax booster to v2
+    if curve_global.fraxBooster() != frax_booster.address:
+        curve_global.setFraxBooster(frax_booster, {"from": gov})
+        print("Updated Frax Booster")
 
     print("New proxy updated, factory added to proxy")
 

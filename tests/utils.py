@@ -54,8 +54,9 @@ def harvest_strategy(
     # assert there are no loose funds in strategy after a harvest (or less than our min amount if a frax strategy, or total stratey assets are more than our max deposit)
     if target == 2:
         assert (
-            strategy.balanceOfWant() < strategy.minDeposit()
-            or strategy.maxSingleDeposit() < strategy.estimatedTotalAssets()
+            strategy.balanceOfWant() < strategy.depositInfo()["minDeposit"]
+            or strategy.depositInfo()["maxSingleDeposit"]
+            < strategy.estimatedTotalAssets()
         )
     else:
         assert strategy.balanceOfWant() == 0

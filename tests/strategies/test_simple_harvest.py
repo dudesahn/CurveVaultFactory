@@ -22,12 +22,18 @@ def test_simple_harvest(
     rewards_token,
     crv_whale,
     rewards_contract,
+    tests_using_tenderly,
+    RELATIVE_APPROX,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
     token.approve(vault, 2**256 - 1, {"from": whale})
     vault.deposit(amount, {"from": whale})
     newWhale = token.balanceOf(whale)
+
+    # for frax, we should have an adjustable minDeposit
+    if which_strategy == 2:
+        strategy.setDepositParams(0, amount / 10, False, {"from": gov})
 
     # harvest, store asset amount
     (profit, loss) = harvest_strategy(
@@ -41,17 +47,60 @@ def test_simple_harvest(
     )
     old_assets = vault.totalAssets()
     assert old_assets > 0
-    assert token.balanceOf(strategy) == 0
     assert strategy.estimatedTotalAssets() > 0
+    if which_strategy != 2:
+        assert token.balanceOf(strategy) == 0
 
     if which_strategy == 2:
+        assert vault.creditAvailable() == 0
+        assert strategy.claimableProfitInUsdc() < strategy.harvestProfitMinInUsdc()
+        assert strategy.claimableProfitInUsdc() < strategy.harvestProfitMaxInUsdc()
+        assert strategy.balanceOfWant() > 0
+        assert strategy.forceHarvestTriggerOnce() == False
+
+        assert (
+            chain.time() - vault.strategies(strategy.address)["lastReport"]
+            < strategy.maxReportDelay()
+        )
+        chain.sleep(2)
+
+        assert (
+            chain.time() - vault.strategies(strategy.address)["lastReport"]
+            > strategy.minReportDelay()
+        )
+
+        strategy.setMinReportDelay(2**256 - 1, {"from": gov})
+
+        assert (
+            chain.time() - vault.strategies(strategy.address)["lastReport"]
+            < strategy.minReportDelay()
+        )
+
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be false.", tx)
+        assert tx == False
+
+        chain.sleep(50)
+
+        strategy.setMinReportDelay(49, {"from": gov})
+
+        tx = strategy.harvestTrigger.call(0, {"from": gov})
+        print("\nShould we harvest? Should be true.", tx)
+        assert tx == True
+
         staking_contract = Contract(staking_address)
         liq = staking_contract.lockedLiquidityOf(strategy.userVault())
         print("Locked stakes:", liq)
-        print("Next kek:", strategy.nextKek())
+        print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # simulate profits
     chain.sleep(sleep_time)
+
+    # check our pending profit for frax
+    if which_strategy == 2:
+        pending = strategy.getEarnedTokens()
+        print("Strategy", strategy.name(), "pid:", strategy.fraxPid())
+        print("Pending:", pending.dict())
 
     # harvest, store new asset amount
     (profit, loss) = harvest_strategy(
@@ -70,7 +119,7 @@ def test_simple_harvest(
         staking_address = Contract(strategy.stakingAddress())
         liq = staking_address.lockedLiquidityOf(strategy.userVault())
         print("Locked stakes:", liq)
-        print("Next kek:", strategy.nextKek())
+        print("Next kek:", strategy.kekInfo()["nextKek"])
 
     # harvest again so the strategy reports the profit
     if use_yswaps:
@@ -118,7 +167,9 @@ def test_simple_harvest(
             pytest.approx(token.balanceOf(whale), rel=RELATIVE_APPROX) == starting_whale
         )
     else:
-        assert token.balanceOf(whale) > starting_whale
+        if profit_whale != whale:
+            # note that if our profit whale and whale are the same we will have made no profits (since we just recycled funds around)
+            assert token.balanceOf(whale) > starting_whale
 
 
 # basic rewards check

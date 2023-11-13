@@ -227,9 +227,9 @@ def test_setters(
         # set our deposit params
         maxToStake = amount * 0.75
         minToStake = 100
-        strategy.setDepositParams(minToStake, maxToStake, {"from": gov})
+        strategy.setDepositParams(minToStake, maxToStake, False, {"from": gov})
         with brownie.reverts():
-            strategy.setDepositParams(maxToStake, minToStake, {"from": gov})
+            strategy.setDepositParams(maxToStake, minToStake, False, {"from": gov})
 
     # harvest our credit
     (profit, loss) = harvest_strategy(
@@ -249,7 +249,7 @@ def test_setters(
         # get the rest of our funds staked
         chain.sleep(1)
         chain.mine(1)
-        strategy.setDepositParams(1e21, 1e29, {"from": gov})
+        strategy.setDepositParams(1e21, 1e29, False, {"from": gov})
         strategy.harvest({"from": gov})
         assert strategy.estimatedTotalAssets() >= amount
 
