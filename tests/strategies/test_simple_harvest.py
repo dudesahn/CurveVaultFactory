@@ -23,6 +23,7 @@ def test_simple_harvest(
     crv_whale,
     rewards_contract,
     tests_using_tenderly,
+    RELATIVE_APPROX,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -166,7 +167,9 @@ def test_simple_harvest(
             pytest.approx(token.balanceOf(whale), rel=RELATIVE_APPROX) == starting_whale
         )
     else:
-        assert token.balanceOf(whale) > starting_whale
+        if profit_whale != whale:
+            # note that if our profit whale and whale are the same we will have made no profits (since we just recycled funds around)
+            assert token.balanceOf(whale) > starting_whale
 
 
 # basic rewards check

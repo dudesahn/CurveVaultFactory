@@ -14,10 +14,12 @@ def isolate(fn_isolation):
 # note that for curve factory we should use tenderly with 2/3 factory tests
 use_tenderly = False
 
-# tests to run (last 2 should be done with pool that we don't have a vault for yet)
+# tests to run; last 4 should be done with pool that we don't have a vault for yet, and also need tenderly
 # brownie test -s
 # brownie test tests/factory/test_curve_global.py::test_vault_deployment -s --gas
 # brownie test tests/factory/test_curve_global.py::test_permissioned_vault -s --gas
+# brownie test tests/strategies/test_simple_harvest.py -s --gas
+# brownie test tests/strategies/test_yswaps.py -s --gas
 
 
 # use this to set what chain we use. 1 for ETH, 250 for fantom, 10 optimism, 42161 arbitrum
