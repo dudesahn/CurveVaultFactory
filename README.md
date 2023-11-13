@@ -9,7 +9,7 @@ brownie test -s
 ```
 
 Note that due to limitations of Brownie/Ganache-CLI, certain aspects of these contracts may cause reverts unless using a different RPC such as
-tenderly. For instance, Frax strategy testing will fail with ganache unless [this line](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/StrategyConvexFraxFactoryClonable.sol#L360) is commented out.
+tenderly. For instance, Curve Global testing of deployments will fail because of the try-catch [here](https://github.com/dudesahn/CurveVaultFactory/blob/c370aa2b31fefc6f5b4a10f573b4500e4c834158/contracts/CurveGlobal.sol#L760).
 
 ## Core Contracts
 
