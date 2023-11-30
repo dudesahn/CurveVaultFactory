@@ -78,7 +78,7 @@ def test_emergency_exit(
     # set emergency and exit, then confirm that the strategy has no funds
     strategy.setEmergencyExit({"from": gov})
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -95,7 +95,7 @@ def test_emergency_exit(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 2:
+    if which_strategy == 4:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 

@@ -313,7 +313,6 @@ def test_change_debt_with_profit(
     assert strategy_params["totalLoss"] == 0
 
     # debtOutstanding should be zero, credit available will be much lower than 50% of vault but greater than zero (profits)
-    no_profit = True
     assert vault.debtOutstanding(strategy) == 0
     if not no_profit:
         assert 0 < vault.creditAvailable(strategy) < vault.totalAssets() / 2

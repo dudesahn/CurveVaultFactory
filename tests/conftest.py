@@ -191,7 +191,7 @@ def is_clonable():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = False
+    no_profit = True
     yield no_profit
 
 
@@ -497,6 +497,14 @@ def pid():
     pid = 260  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
     yield pid
 
+@pytest.fixture(scope="session")
+def prisma_receiver(pid, gauge, prisma_convex_factory, prisma_curve_factory, which_strategy):
+    address = ZERO_ADDRESS
+    if which_strategy == 2:
+        address = prisma_convex_factory.getDeterministicAddress(pid)
+    elif which_strategy == 3:
+        address = prisma_curve_factory.getDeterministicAddress(gauge)
+    yield address
 
 # put our pool's frax pid here
 @pytest.fixture(scope="session")
