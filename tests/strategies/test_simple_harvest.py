@@ -32,7 +32,7 @@ def test_simple_harvest(
     newWhale = token.balanceOf(whale)
 
     # for frax, we should have an adjustable minDeposit
-    if which_strategy == 2:
+    if which_strategy == 4:
         strategy.setDepositParams(0, amount / 10, False, {"from": gov})
 
     # harvest, store asset amount
@@ -51,7 +51,7 @@ def test_simple_harvest(
     if which_strategy != 2:
         assert token.balanceOf(strategy) == 0
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         assert vault.creditAvailable() == 0
         assert strategy.claimableProfitInUsdc() < strategy.harvestProfitMinInUsdc()
         assert strategy.claimableProfitInUsdc() < strategy.harvestProfitMaxInUsdc()
@@ -97,7 +97,7 @@ def test_simple_harvest(
     chain.sleep(sleep_time)
 
     # check our pending profit for frax
-    if which_strategy == 2:
+    if which_strategy == 4:
         pending = strategy.getEarnedTokens()
         print("Strategy", strategy.name(), "pid:", strategy.fraxPid())
         print("Pending:", pending.dict())
@@ -115,7 +115,7 @@ def test_simple_harvest(
     # record this here so it isn't affected if we donate via ySwaps
     strategy_assets = strategy.estimatedTotalAssets()
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         staking_address = Contract(strategy.stakingAddress())
         liq = staking_address.lockedLiquidityOf(strategy.userVault())
         print("Locked stakes:", liq)
@@ -155,7 +155,7 @@ def test_simple_harvest(
         ),
     )
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
         chain.mine(1)

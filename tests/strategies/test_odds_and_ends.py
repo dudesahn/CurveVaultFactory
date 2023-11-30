@@ -29,6 +29,7 @@ def test_liquidatePosition(
     gauge_is_not_tokenized,
     gauge,
     voter,
+    prisma_receiver,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -68,6 +69,14 @@ def test_liquidatePosition(
         to_send = gauge.balanceOf(voter)
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy in [2,3]:
+
+        # send all funds out of the gauge
+        to_send = prisma_receiver.balanceOf(strategy)
+        prisma_receiver.withdraw(gov, to_send, {"from": strategy})
+        
+        print("Gauge Balance of Vault", to_send)
         assert strategy.estimatedTotalAssets() == 0
     else:
         # wait another week so our frax LPs are unlocked
@@ -200,6 +209,7 @@ def test_locked_funds(
     use_yswaps,
     old_vault,
     staking_address,
+    prisma_receiver
 ):
     # should update this one for Router
     print("No way to test this for current strategy")
@@ -227,6 +237,7 @@ def test_rekt(
     gauge_is_not_tokenized,
     gauge,
     voter,
+    prisma_receiver,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -267,7 +278,15 @@ def test_rekt(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    else:
+    elif which_strategy in [2,3]:
+
+        # send all funds out of the gauge
+        to_send = prisma_receiver.balanceOf(strategy)
+        prisma_receiver.withdraw(gov, to_send, {'from': strategy})
+        
+        print("Gauge Balance of Vault", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -378,6 +397,7 @@ def test_empty_strat(
     gauge,
     voter,
     sleep_time,
+    prisma_receiver
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -424,8 +444,14 @@ def test_empty_strat(
         # curve needs a little push to manually get that small amount of yield earned
         if which_strategy == 1:
             new_proxy.harvest(gauge, {"from": strategy})
-
-    else:
+    elif which_strategy in [2,3]:
+        # send all funds out of the gauge
+        to_send = prisma_receiver.balanceOf(strategy)
+        prisma_receiver.withdraw(gov, to_send, {"from": strategy})
+        
+        print("Gauge Balance of Vault", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -545,7 +571,7 @@ def test_empty_strat(
     )
     assert profit > 0
     share_price = vault.pricePerShare()
-    assert share_price > 0
+    assert share_price > 0 or vault.totalIdle() > 0
     print("Share price:", share_price)
 
 

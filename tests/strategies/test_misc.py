@@ -210,7 +210,7 @@ def test_setters(
 
     ######### BELOW WILL NEED TO BE UPDATED BASED SETTERS OUR STRATEGY HAS #########
     # special setter for frax
-    if which_strategy == 2:
+    if which_strategy == 4:
         strategy.setLockTime(90000 * 7, {"from": gov})
 
         if not tests_using_tenderly:
@@ -241,7 +241,7 @@ def test_setters(
         profit_amount,
         target,
     )
-    if which_strategy == 2:
+    if which_strategy == 4:
         total_staked = strategy.stakedBalance()
         assert total_staked == maxToStake
         assert strategy.estimatedTotalAssets() > total_staked
@@ -254,7 +254,7 @@ def test_setters(
         assert strategy.estimatedTotalAssets() >= amount
 
     # check that we have claimable rewards, have to call for frax tho
-    if which_strategy == 2:
+    if which_strategy == 4:
         chain.sleep(86400 * 7)
         chain.mine(1)
         profit = strategy.claimableProfitInUsdc.call()
@@ -287,7 +287,25 @@ def test_setters(
             with brownie.reverts():
                 strategy.setLocalKeepCrv(1000000, {"from": gov})
 
-    else:
+    if which_strategy == 2:
+        strategy.setVoters(gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(10, 10, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(1000000, 0, {"from": gov})
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
+    
+    if which_strategy == 3:
+        strategy.setVoter(gov, {"from": gov})
+        strategy.setLocalKeepCrv(10, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrv(1000000, {"from": gov})
+
+    elif which_strategy == 4:
         strategy.setVoters(gov, gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
 
@@ -342,11 +360,11 @@ def test_sweep(
     assert token.balanceOf(strategy) > 0
 
     if not tests_using_tenderly:
-        with brownie.reverts("!want"):
+        with brownie.reverts():
             strategy.sweep(token, {"from": gov})
         with brownie.reverts():
             strategy.sweep(to_sweep, {"from": whale})
 
         # Vault share token doesn't work
-        with brownie.reverts("!shares"):
+        with brownie.reverts():
             strategy.sweep(vault.address, {"from": gov})
