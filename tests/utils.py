@@ -91,6 +91,7 @@ def trade_handler_action(
     fxsBalance = 0
     crvBalance = 0
     cvxBalance = 0
+    yprismaBalance = 0
 
     crv = interface.IERC20(strategy.crv())
     if target != 1:
@@ -101,7 +102,12 @@ def trade_handler_action(
         fxs = interface.IERC20(strategy.fxs())
         fxsBalance = fxs.balanceOf(strategy)
 
+    if target in [2,3]:
+        yprisma = interface.IERC20(strategy.yPrisma())
+        yprismaBalance = yprisma.balanceOf(strategy)
+
     crvBalance = crv.balanceOf(strategy)
+    
     if crvBalance > 0:
         crv.transfer(token, crvBalance, {"from": strategy})
         print("CRV rewards present")
@@ -117,8 +123,13 @@ def trade_handler_action(
         print("FXS rewards present")
         assert fxs.balanceOf(strategy) == 0
 
+    if yprismaBalance > 0:
+        yprisma.transfer(token, yprismaBalance, {"from": strategy})
+        print("yPRISMA rewards present")
+        assert yprisma.balanceOf(strategy) == 0
+
     # send our profits back in
-    if crvBalance > 0 or cvxBalance > 0 or fxsBalance > 0:
+    if crvBalance > 0 or cvxBalance > 0 or fxsBalance > 0 or yprismaBalance > 0:
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         print("Rewards converted into profit and returned")
         assert strategy.balanceOfWant() > 0

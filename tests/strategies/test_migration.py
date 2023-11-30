@@ -92,11 +92,17 @@ def test_migration(
         print("\nShould we harvest? Should be False.", tx)
         assert tx == False
 
+    if which_strategy != 2:
+        # can we harvest an unactivated strategy? should be no
+        tx = new_strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be False.", tx)
+        assert tx == False
+
     ######### ADD LOGIC TO TEST CLAIMING OF ASSETS FOR TRANSFER TO NEW STRATEGY AS NEEDED #########
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 2:
+    if which_strategy == 4:
         with brownie.reverts():
             vault.migrateStrategy(strategy, new_strategy, {"from": gov})
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing

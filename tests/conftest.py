@@ -504,7 +504,7 @@ def prisma_receiver(pid, gauge, prisma_convex_factory, prisma_curve_factory, whi
         address = prisma_convex_factory.getDeterministicAddress(pid)
     elif which_strategy == 3:
         address = prisma_curve_factory.getDeterministicAddress(gauge)
-    yield address
+    yield Contract(address)
 
 # put our pool's frax pid here
 @pytest.fixture(scope="session")

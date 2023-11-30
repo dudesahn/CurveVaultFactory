@@ -269,7 +269,7 @@ def test_emergency_exit_with_profit(
     # set emergency and exit
     strategy.setEmergencyExit({"from": gov})
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -277,7 +277,7 @@ def test_emergency_exit_with_profit(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 2:
+    if which_strategy == 4:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -401,6 +401,7 @@ def test_emergency_exit_with_loss(
     gauge_is_not_tokenized,
     gauge,
     voter,
+    prisma_receiver,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -442,7 +443,12 @@ def test_emergency_exit_with_loss(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    else:
+    elif which_strategy in [2,3]:
+        to_send = prisma_receiver.balanceOf(strategy)
+        prisma_receiver.withdraw(gov, to_send, {"from": strategy})
+        print("Balance of Strategy", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -463,7 +469,7 @@ def test_emergency_exit_with_loss(
     # set this true if no profit on this test. it is normal for a strategy to not generate profit here.
     # realistically only wrapped tokens or every-block earners will see profits (convex, etc).
     # also checked in test_change_debt
-    no_profit = False
+    # no_profit = True
 
     # check our current status
     print("\nBefore dust transfer, after main fund transfer")
@@ -509,7 +515,7 @@ def test_emergency_exit_with_loss(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 2:
+    if which_strategy == 4:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -606,7 +612,7 @@ def test_emergency_exit_with_loss(
     print("\nAfter sleep for share price")
     strategy_params = check_status(strategy, vault)
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -648,6 +654,7 @@ def test_emergency_exit_with_no_loss(
     gauge_is_not_tokenized,
     gauge,
     voter,
+    prisma_receiver,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -689,7 +696,11 @@ def test_emergency_exit_with_no_loss(
         print("Gauge Balance of Vault", to_send / 1e18)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    else:
+    elif which_strategy in [2,3]:
+        # send away all funds, will need to alter this based on strategy
+        to_send = prisma_receiver.balanceOf(strategy)
+        prisma_receiver.withdraw(gov, to_send, {"from": strategy})
+    elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -709,7 +720,7 @@ def test_emergency_exit_with_no_loss(
     # set this true if no profit on this test. it is normal for a strategy to not generate profit here.
     # realistically only wrapped tokens or every-block earners will see profits (convex, etc).
     # also checked in test_change_debt
-    no_profit = False
+    # no_profit = False
 
     # check our current status
     print("\nAfter sending funds away")
@@ -726,16 +737,16 @@ def test_emergency_exit_with_no_loss(
     assert vault.debtOutstanding(strategy) == 0
 
     ################# GOV SENDS IT BACK, ADJUST AS NEEDED. #################
-    if which_strategy == 0:
+    if which_strategy in [0,2,3]:
         # gov sends it back, glad someone was watching!
         token.transfer(strategy, to_send, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
-    elif which_strategy == 1:
+    elif which_strategy == 2:
         # gov unwraps and sends it back, glad someone was watching!
         gauge.withdraw(to_send, {"from": gov})
         token.transfer(strategy, to_send, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
-    else:
+    elif which_strategy == 4:
         # gov unwraps and sends it back, glad someone was watching!
         to_unwrap = staking_token.balanceOf(gov)
         staking_token.withdrawAndUnwrap(to_unwrap, {"from": gov})
@@ -762,7 +773,7 @@ def test_emergency_exit_with_no_loss(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 2:
+    if which_strategy == 4:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -879,7 +890,7 @@ def test_emergency_exit_with_no_loss(
         assert vault.pricePerShare() > starting_share_price
         assert strategy_params["totalLoss"] == 0
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -982,7 +993,7 @@ def test_emergency_shutdown_from_vault(
     assert vault.creditAvailable(strategy) == 0
     assert strategy_params["debtRatio"] == 10_000
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -1064,7 +1075,7 @@ def test_emergency_shutdown_from_vault(
         assert vault.pricePerShare() > starting_share_price
         assert strategy_params["totalLoss"] == 0
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -1144,7 +1155,7 @@ def test_emergency_withdraw_method_0(
     # set this true if no profit on this test. it is normal for a strategy to not generate profit here.
     # realistically only wrapped tokens or every-block earners will see profits (convex, etc).
     # also checked in test_change_debt
-    no_profit = False
+    # no_profit = False
 
     # check our current status
     print("\nBefore dust transfer, after main fund transfer")
@@ -1361,7 +1372,7 @@ def test_emergency_withdraw_method_1(
     # realistically only wrapped tokens or every-block earners will see profits (convex, etc).
     # also checked in test_change_debt
     # no profit since we don't claim any rewards on withdrawal
-    no_profit = True
+    # no_profit = True
 
     # check our current status
     print("\nBefore dust transfer, after main fund transfer")
