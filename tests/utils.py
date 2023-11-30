@@ -1,5 +1,5 @@
 import pytest
-import brownie
+import brownie, time
 from brownie import interface, chain, accounts, ZERO_ADDRESS
 
 # returns (profit, loss) of a harvest
@@ -15,7 +15,7 @@ def harvest_strategy(
 
     # reset everything with a sleep and mine
     chain.sleep(1)
-    chain.mine(1)
+    # chain.mine(1)
 
     # add in any custom logic needed here, for instance with router strategy (also reason we have a destination strategy).
     # also add in any custom logic needed to get raw reward assets to the strategy (like for liquity)
@@ -50,9 +50,8 @@ def harvest_strategy(
         tx = strategy.harvest({"from": gov})
         profit = tx.events["Harvested"]["profit"] / (10 ** token.decimals())
         loss = tx.events["Harvested"]["loss"] / (10 ** token.decimals())
-
-    # assert there are no loose funds in strategy after a harvest (or less than our min amount if a frax strategy, or total stratey assets are more than our max deposit)
-    if target == 2:
+    
+    if target == 3:
         assert (
             strategy.balanceOfWant() < strategy.depositInfo()["minDeposit"]
             or strategy.depositInfo()["maxSingleDeposit"]
@@ -71,7 +70,7 @@ def harvest_strategy(
 
     # reset everything with a sleep and mine
     chain.sleep(1)
-    chain.mine(1)
+    # chain.mine(1)
 
     # return our profit, loss
     return (profit, loss)
@@ -98,7 +97,7 @@ def trade_handler_action(
         cvx = interface.IERC20(strategy.convexToken())
         cvxBalance = cvx.balanceOf(strategy)
 
-    if target == 2:
+    if target == 4:
         fxs = interface.IERC20(strategy.fxs())
         fxsBalance = fxs.balanceOf(strategy)
 

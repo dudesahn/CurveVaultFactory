@@ -5,6 +5,8 @@ __pycache__
 build/
 reports/
 .env
+env
+venv
 
 # Node/npm
 node_modules/

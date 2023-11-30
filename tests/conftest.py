@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, Contract, ZERO_ADDRESS, chain, interface, accounts
+from brownie import web3, config, Contract, ZERO_ADDRESS, chain, interface, accounts
 from eth_abi import encode_single
 import requests
 import os
@@ -75,8 +75,10 @@ def whale(accounts, amount, token):
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
     whale = accounts.at(
-        "0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784", force=True
-    )  # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
+        "0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0", force=True
+    )  
+    # yPRISMA-f LP 0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0
+    # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
     # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
     # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
@@ -101,8 +103,9 @@ def amount(token):
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
     profit_whale = accounts.at(
-        "0xf83deAdE1b0D2AfF07700C548a54700a082388bE", force=True
-    )  # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
+        "0x6806D62AAdF2Ee97cd4BCE46BF5fCD89766EF246", force=True
+    )  
+    # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
     # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k, 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng
@@ -154,12 +157,18 @@ def contract_name(
     StrategyConvexFactoryClonable,
     StrategyConvexFraxFactoryClonable,
     StrategyCurveBoostedFactoryClonable,
+    StrategyPrismaConvexFactoryClonable,
+    # StrategyPrismaCurveFactoryClonable,
     which_strategy,
 ):
     if which_strategy == 0:
         contract_name = StrategyConvexFactoryClonable
     elif which_strategy == 1:
         contract_name = StrategyCurveBoostedFactoryClonable
+    elif which_strategy == 2:
+        contract_name = StrategyPrismaConvexFactoryClonable
+    # elif which_strategy == 3:
+    #     contract_name = StrategyPrismaCurveFactoryClonable
     else:
         contract_name = StrategyConvexFraxFactoryClonable
     yield contract_name
@@ -272,6 +281,21 @@ if chain_used == 1:  # mainnet
     def keeper_wrapper():
         yield Contract("0x0D26E894C2371AB6D20d99A65E991775e3b5CAd7")
 
+    @pytest.fixture(scope="session")
+    def prisma_vault():
+        yield Contract("0x06bDF212C290473dCACea9793890C5024c7Eb02c")
+
+    @pytest.fixture(scope="session")
+    def prisma_curve_factory():
+        yield Contract("0x2664a7B123e7E6b5CC5cf6a76Cf65e409BD1569F")
+
+    @pytest.fixture(scope="session")
+    def prisma_convex_factory():
+        yield Contract("0x3dA992F4694d1a1624c32CAFb5E57fE75B4Bc867")
+    
+    @pytest.fixture(scope="session")
+    def yprisma():
+        yield Contract("0xe3668873D944E4A949DA05fc8bDE419eFF543882")
 
 @pytest.fixture(scope="module")
 def vault(pm, gov, rewards, guardian, management, token, vault_address):
@@ -330,6 +354,10 @@ def strategy(
     frax_booster,
     frax_pid,
     staking_address,
+    prisma_convex_factory,
+    prisma_curve_factory,
+    yprisma,
+    prisma_vault,
 ):
     if which_strategy == 0:  # convex
         strategy = gov.deploy(
@@ -352,6 +380,28 @@ def strategy(
         )
         voter.setStrategy(new_proxy.address, {"from": gov})
         print("New Strategy Proxy setup")
+    elif which_strategy == 2:   # prisma convex
+        strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            10_000 * 1e6,
+            25_000 * 1e6,
+            prisma_vault,
+            prisma_convex_factory.getDeterministicAddress(pid), # This looks up the prisma receiver for the pool
+            yprisma,
+        )
+    # elif which_strategy == 3:   # prisma curve
+    #     strategy = gov.deploy(
+    #         contract_name,
+    #         vault,
+    #         trade_factory,
+    #         10_000 * 1e6,
+    #         25_000 * 1e6,
+    #         prisma_vault,
+    #         prisma_curve_factory.getDeterministicAddress(gauge.address), # This looks up the prisma receiver for the pool
+    #         yprisma,
+    #     )
     else:  # frax
         strategy = gov.deploy(
             contract_name,
@@ -402,6 +452,19 @@ def strategy(
         new_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
         assert new_proxy.strategies(gauge.address) == strategy.address
         assert voter.strategy() == new_proxy.address
+    elif which_strategy == 2:  # Prisma Convex
+        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
+        print("New Vault, Prisma Convex Strategy")
+
+        # this is the same for new or existing vaults
+        strategy.setHarvestTriggerParams(
+            90000e6, 150000e6, {"from": gov}
+        )
+    elif which_strategy == 3:  # Prisma Curve
+        vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
+        print("New Vault, Prisma Curve Strategy")
+        chain.sleep(1)
+        # chain.mine(1)
     else:  # frax
         vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Frax Strategy")
@@ -431,7 +494,7 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 156  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
+    pid = 260  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
     yield pid
 
 
@@ -477,6 +540,9 @@ def template_staking_address():
 @pytest.fixture(scope="session")
 def which_strategy():
     # must be 0, 1, or 2 for convex, curve, and frax. Only test 2 (Frax) for pools that actually have frax.
+    # prisma convex: 2
+    # prisma curve: 3
+    # frax: 4
     which_strategy = 2
     yield which_strategy
 

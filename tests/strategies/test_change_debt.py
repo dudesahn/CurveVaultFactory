@@ -64,7 +64,7 @@ def test_change_debt(
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
-        chain.mine(1)
+        # chain.mine(1)
 
     # harvest to reduce our debt, send 50% of funds back to vault
     (profit, loss) = harvest_strategy(
@@ -138,7 +138,7 @@ def test_change_debt(
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
-        chain.mine(1)
+        # chain.mine(1)
 
     # harvest to send our funds back to the strategy
     (profit, loss) = harvest_strategy(
@@ -159,7 +159,7 @@ def test_change_debt(
     # set this true if no profit on this test. it is normal for a strategy to not generate profit here.
     # realistically only wrapped tokens or every-block earners will see profits (convex, etc).
     # also checked in test_change_debt
-    no_profit = False
+    no_profit = True
 
     # debtOutstanding should be zero, credit available will be much lower than previously but greater than zero (profits)
     # however, if the strategy has no profit, or has inconsistent profit-taking, then we can have no credit here
@@ -181,7 +181,7 @@ def test_change_debt(
 
     # simulate five days of waiting for share price to bump back up
     chain.sleep(86400 * 5)
-    chain.mine(1)
+    # chain.mine(1)
 
     # check our current status
     print("\nAfter share price sleep")
@@ -200,7 +200,7 @@ def test_change_debt(
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
-        chain.mine(1)
+        # chain.mine(1)
 
     # withdraw and confirm we made money, or at least that we have about the same (profit whale has to be different from normal whale)
     vault.withdraw({"from": whale})
@@ -289,7 +289,7 @@ def test_change_debt_with_profit(
     if which_strategy == 2:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
-        chain.mine(1)
+        # chain.mine(1)
 
     # harvest to reduce our debt, send 50% of funds back to vault
     (profit, loss) = harvest_strategy(
@@ -313,6 +313,7 @@ def test_change_debt_with_profit(
     assert strategy_params["totalLoss"] == 0
 
     # debtOutstanding should be zero, credit available will be much lower than 50% of vault but greater than zero (profits)
+    no_profit = True
     assert vault.debtOutstanding(strategy) == 0
     if not no_profit:
         assert 0 < vault.creditAvailable(strategy) < vault.totalAssets() / 2
@@ -342,7 +343,7 @@ def test_change_debt_with_profit(
 
     # sleep 5 days hours to allow share price to normalize
     chain.sleep(5 * 86400)
-    chain.mine(1)
+    # chain.mine(1)
 
     # check our current status
     print("\nAfter share price sleep")

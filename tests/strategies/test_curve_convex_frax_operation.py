@@ -26,6 +26,7 @@ def test_keep(
     use_yswaps,
     which_strategy,
     new_proxy,
+    yprisma,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2**256 - 1, {"from": whale})
@@ -45,6 +46,18 @@ def test_keep(
             strategy.setLocalKeepCrv(1000, {"from": gov})
         strategy.setVoter(voter, {"from": gov})
         strategy.setLocalKeepCrv(1000, {"from": gov})
+    elif which_strategy == 2:
+        # need to set voters first if we're trying to set keep
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
+    elif which_strategy == 3:
+        # need to set voters first if we're trying to set keep
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, {"from": gov})
     else:
         with brownie.reverts():
             strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
@@ -103,6 +116,38 @@ def test_keep(
         treasury_after = crv.balanceOf(strategy.curveVoter())
         if not no_profit:
             assert treasury_after > treasury_before
+    elif which_strategy == 2:
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        if not no_profit:
+            assert treasury_after > treasury_before
+    elif which_strategy == 3:
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        if not no_profit:
+            assert treasury_after > treasury_before
     else:
         treasury_before = fxs.balanceOf(strategy.fraxVoter())
 
@@ -138,6 +183,38 @@ def test_keep(
         treasury_after = convex_token.balanceOf(strategy.convexVoter())
         assert treasury_after == treasury_before
     elif which_strategy == 1:
+        strategy.setLocalKeepCrv(0, {"from": gov})
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        assert treasury_after == treasury_before
+    elif which_strategy == 2:
+        strategy.setLocalKeepCrv(0, {"from": gov})
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        assert treasury_after == treasury_before
+    elif which_strategy == 3:
         strategy.setLocalKeepCrv(0, {"from": gov})
         treasury_before = crv.balanceOf(strategy.curveVoter())
 
