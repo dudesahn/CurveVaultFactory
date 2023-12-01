@@ -13,10 +13,7 @@ interface ITradeFactory {
 }
 
 interface IOracle {
-    function latestRoundData(
-        address,
-        address
-    )
+    function latestRoundData(address,address)
         external
         view
         returns (
