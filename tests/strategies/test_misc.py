@@ -296,7 +296,7 @@ def test_setters(
                 strategy.setLocalKeepCrvs(1000000, 0, {"from": gov})
             with brownie.reverts():
                 strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
-    
+
     if which_strategy == 3:
         strategy.setVoter(gov, {"from": gov})
         strategy.setLocalKeepCrv(10, {"from": gov})

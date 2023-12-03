@@ -1,61 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.19;
 
-// These are the core Yearn libraries
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
-import "./interfaces/curve.sol";
-import "@yearnvaults/contracts/BaseStrategy.sol";
-
-interface ITradeFactory {
-    function enable(address, address) external;
-
-    function disable(address, address) external;
-}
-
-interface IOracle {
-    function latestRoundData(address,address)
-        external
-        view
-        returns (
-            uint80 roundId,
-            uint256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        );
-}
-
-interface IDetails {
-    // get details from curve
-    function symbol() external view returns (string memory);
-}
-
-interface ICurveOracle {
-    function price_oracle() external view returns (uint256);
-}
-
-interface ISimpleOracle {
-    function latestAnswer() external view returns (uint256);
-}
-
-interface IPrismaVault {
-    function batchClaimRewards(
-        address receiver,
-        address boostDelegate,
-        address[] calldata rewardContracts,
-        uint256 maxFeePct
-    ) external returns (bool);
-}
-
-interface IPrismaReceiver {
-    function lpToken() external view returns (address);
-    function CRV() external view returns (address);
-    function CVX() external view returns (address);
-    function balanceOf(address a) external view returns (uint256);
-    function deposit(address receiver, uint256 amount) external returns (bool);
-    function withdraw(address receiver, uint256 amount) external returns (bool);
-    function claimableReward(address account) external view returns (uint256 prismaAmount, uint256 crvAmount, uint256 cvxAmount);
-}
+import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
+import "./interfaces/PrismaInterfaces.sol";
 
 contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
@@ -63,7 +11,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     // Fees are in basis points
     uint256 internal constant FEE_DENOMINATOR = 10_000;
 
-    address internal constant YEARN_LOCKER = 0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
+    address internal constant YEARN_LOCKER =
+        0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
 
     /* ========== STATE VARIABLES ========== */
 
@@ -398,7 +347,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
                 }
                 // withdraw whatever extra funds we need
                 uint256 toWithdraw = Math.min(_stakedBal, _neededFromStaked);
-                if (toWithdraw > 0) prismaReceiver.withdraw(address(this), toWithdraw);
+                if (toWithdraw > 0)
+                    prismaReceiver.withdraw(address(this), toWithdraw);
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
@@ -452,15 +402,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address[] memory rewardContracts = new address[](1);
         rewardContracts[0] = address(prismaReceiver);
         prismaVault.batchClaimRewards(
-            YEARN_LOCKER,       // receiver
-            YEARN_LOCKER,       // delegate
-            rewardContracts,    // rewards contracts
-            FEE_DENOMINATOR     // maxFee
+            YEARN_LOCKER, // receiver
+            YEARN_LOCKER, // delegate
+            rewardContracts, // rewards contracts
+            FEE_DENOMINATOR // maxFee
         );
     }
 
     /* ========== YSWAPS ========== */
-
 
     /// @notice Use to update our trade factory.
     /// @dev Can only be called by governance.
@@ -593,8 +542,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
         (
-            uint256 yPrismaAmount, 
-            uint256 crvAmount, 
+            uint256 yPrismaAmount,
+            uint256 crvAmount,
             uint256 cvxAmount
         ) = prismaReceiver.claimableReward(address(this)); // This doesn't include boost, but that's OK
 
@@ -612,25 +561,22 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
                 address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
             );
 
-        uint256 ethUsdPrice = ISimpleOracle(0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419).latestAnswer();
-        uint256 prismaEthPrice = ICurveOracle(0x322135Dd9cBAE8Afa84727d9aE1434b5B3EBA44B).price_oracle();
-        uint256 yprismaPrismaPrice = ICurveOracle(0x69833361991ed76f9e8DBBcdf9ea1520fEbFb4a7).price_oracle();
-        uint256 yPrismaPrice = ethUsdPrice * prismaEthPrice / 1e8 * yprismaPrismaPrice / 1e18; // usd price in 1e18
-
-        
-
+        uint256 ethUsdPrice = ISimpleOracle(
+            0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
+        ).latestAnswer();
+        uint256 prismaEthPrice = ICurveOracle(
+            0x322135Dd9cBAE8Afa84727d9aE1434b5B3EBA44B
+        ).price_oracle();
+        uint256 yprismaPrismaPrice = ICurveOracle(
+            0x69833361991ed76f9e8DBBcdf9ea1520fEbFb4a7
+        ).price_oracle();
+        uint256 yPrismaPrice = (((ethUsdPrice * prismaEthPrice) / 1e8) *
+            yprismaPrismaPrice) / 1e18; // usd price in 1e18
 
         // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
-        return (
-            (
-                crvPrice * crvAmount + 
-                cvxPrice * cvxAmount
-            ) / 1e20
-            +
-            (
-                yPrismaPrice * yPrismaAmount / 1e18
-            )
-        );
+        return ((crvPrice * crvAmount + cvxPrice * cvxAmount) /
+            1e20 +
+            ((yPrismaPrice * yPrismaAmount) / 1e18));
     }
 
     /// @notice Convert our keeper's eth cost into want

@@ -70,12 +70,12 @@ def test_liquidatePosition(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2,3]:
+    elif which_strategy in [2, 3]:
 
         # send all funds out of the gauge
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
-        
+
         print("Gauge Balance of Vault", to_send)
         assert strategy.estimatedTotalAssets() == 0
     else:
@@ -209,7 +209,7 @@ def test_locked_funds(
     use_yswaps,
     old_vault,
     staking_address,
-    prisma_receiver
+    prisma_receiver,
 ):
     # should update this one for Router
     print("No way to test this for current strategy")
@@ -278,12 +278,12 @@ def test_rekt(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2,3]:
+    elif which_strategy in [2, 3]:
 
         # send all funds out of the gauge
         to_send = prisma_receiver.balanceOf(strategy)
-        prisma_receiver.withdraw(gov, to_send, {'from': strategy})
-        
+        prisma_receiver.withdraw(gov, to_send, {"from": strategy})
+
         print("Gauge Balance of Vault", to_send)
         assert strategy.estimatedTotalAssets() == 0
     elif which_strategy == 4:
@@ -397,7 +397,7 @@ def test_empty_strat(
     gauge,
     voter,
     sleep_time,
-    prisma_receiver
+    prisma_receiver,
 ):
     ## deposit to the vault after approving
     starting_whale = token.balanceOf(whale)
@@ -444,11 +444,11 @@ def test_empty_strat(
         # curve needs a little push to manually get that small amount of yield earned
         if which_strategy == 1:
             new_proxy.harvest(gauge, {"from": strategy})
-    elif which_strategy in [2,3]:
+    elif which_strategy in [2, 3]:
         # send all funds out of the gauge
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
-        
+
         print("Gauge Balance of Vault", to_send)
         assert strategy.estimatedTotalAssets() == 0
     elif which_strategy == 4:

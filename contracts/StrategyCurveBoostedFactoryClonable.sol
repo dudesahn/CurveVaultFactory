@@ -1,24 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.19;
 
-// These are the core Yearn libraries
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
-import "./interfaces/yearn.sol";
-import "./interfaces/curve.sol";
-import "@yearnvaults/contracts/BaseStrategy.sol";
-
-interface ITradeFactory {
-    function enable(address, address) external;
-
-    function disable(address, address) external;
-}
-
-interface IDetails {
-    // get details from curve
-    function name() external view returns (string memory);
-
-    function symbol() external view returns (string memory);
-}
+import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
+import "./interfaces/CurveInterfaces.sol";
 
 contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;

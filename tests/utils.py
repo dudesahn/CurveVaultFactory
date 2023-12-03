@@ -50,7 +50,7 @@ def harvest_strategy(
         tx = strategy.harvest({"from": gov})
         profit = tx.events["Harvested"]["profit"] / (10 ** token.decimals())
         loss = tx.events["Harvested"]["loss"] / (10 ** token.decimals())
-    
+
     if target == 3:
         assert (
             strategy.balanceOfWant() < strategy.depositInfo()["minDeposit"]
@@ -102,12 +102,12 @@ def trade_handler_action(
         fxs = interface.IERC20(strategy.fxs())
         fxsBalance = fxs.balanceOf(strategy)
 
-    if target in [2,3]:
+    if target in [2, 3]:
         yprisma = interface.IERC20(strategy.yPrisma())
         yprismaBalance = yprisma.balanceOf(strategy)
 
     crvBalance = crv.balanceOf(strategy)
-    
+
     if crvBalance > 0:
         crv.transfer(token, crvBalance, {"from": strategy})
         print("CRV rewards present")

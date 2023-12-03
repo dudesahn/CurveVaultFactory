@@ -143,7 +143,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.events['Cloned']['clone'])
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -201,7 +201,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.events['Cloned']['clone'])
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -259,7 +259,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.events['Cloned']['clone'])
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -324,7 +324,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.events['Cloned']['clone'])
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():

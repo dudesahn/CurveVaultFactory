@@ -239,13 +239,16 @@ contract CurveGlobal {
     address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
 
     /// @notice Address of our yPRISMA token.
-    address public constant YPRISMA = 0xe3668873D944E4A949DA05fc8bDE419eFF543882;
+    address public constant YPRISMA =
+        0xe3668873D944E4A949DA05fc8bDE419eFF543882;
 
     /// @notice Address of Prisma's Convex factory.
-    IPrismaConvexFactory public constant PRISMA_CONVEX_FACTORY = IPrismaConvexFactory(0x3dA992F4694d1a1624c32CAFb5E57fE75B4Bc867);
+    IPrismaConvexFactory public constant PRISMA_CONVEX_FACTORY =
+        IPrismaConvexFactory(0x3dA992F4694d1a1624c32CAFb5E57fE75B4Bc867);
 
     /// @notice Address of Prisma's vault contract.
-    address public constant PRISMA_VAULT = 0x06bDF212C290473dCACea9793890C5024c7Eb02c;
+    address public constant PRISMA_VAULT =
+        0x06bDF212C290473dCACea9793890C5024c7Eb02c;
 
     /// @notice Address of our Convex pool manager.
     /// @dev Used to add new pools to Convex.
@@ -938,22 +941,13 @@ contract CurveGlobal {
 
         // setup our strategies as needed
         (
-            convexStrategy, 
-            curveStrategy, 
-            convexFraxStrategy, 
+            convexStrategy,
+            curveStrategy,
+            convexFraxStrategy,
             prismaConvexStrategy
-        ) = _setupStrategies(
-            vault,
-            _gauge,
-            pid
-        );
+        ) = _setupStrategies(vault, _gauge, pid);
 
-        emit NewAutomatedVault(
-            CATEGORY,
-            lptoken,
-            _gauge,
-            vault
-        );
+        emit NewAutomatedVault(CATEGORY, lptoken, _gauge, vault);
     }
 
     // permissioned users may pass custom name and symbol inputs
@@ -1198,8 +1192,7 @@ contract CurveGlobal {
         address receiver = PRISMA_CONVEX_FACTORY.getDeterministicAddress(_pid);
         try IPrismaReceiver(receiver).vault() returns (address vault) {
             require(vault == PRISMA_VAULT, "Failed sanity check.");
-        }
-        catch {
+        } catch {
             return address(0);
         }
         prismaConvexStrategy = IStrategy(prismaConvexStratImplementation)
@@ -1227,7 +1220,12 @@ contract CurveGlobal {
         }
 
         // convex debtRatio can always start at 0
-        Vault(_vault).addStrategy(prismaConvexStrategy, 0, 0, type(uint256).max, 0);
+        Vault(_vault).addStrategy(
+            prismaConvexStrategy,
+            0,
+            0,
+            type(uint256).max,
+            0
+        );
     }
-
 }

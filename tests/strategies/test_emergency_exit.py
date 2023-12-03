@@ -443,7 +443,7 @@ def test_emergency_exit_with_loss(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2,3]:
+    elif which_strategy in [2, 3]:
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
         print("Balance of Strategy", to_send)
@@ -696,7 +696,7 @@ def test_emergency_exit_with_no_loss(
         print("Gauge Balance of Vault", to_send / 1e18)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2,3]:
+    elif which_strategy in [2, 3]:
         # send away all funds, will need to alter this based on strategy
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
@@ -737,7 +737,7 @@ def test_emergency_exit_with_no_loss(
     assert vault.debtOutstanding(strategy) == 0
 
     ################# GOV SENDS IT BACK, ADJUST AS NEEDED. #################
-    if which_strategy in [0,2,3]:
+    if which_strategy in [0, 2, 3]:
         # gov sends it back, glad someone was watching!
         token.transfer(strategy, to_send, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
