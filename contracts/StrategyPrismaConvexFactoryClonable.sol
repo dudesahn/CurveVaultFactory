@@ -55,6 +55,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
 
+    /// @notice We use this flag to signal a desire to claim even if Yearn's locker cannot provide max boost.
+    bool public forceClaim;
+
     /// @notice Will only be true on the original deployed contract and not on clones; we don't want to clone a clone.
     bool public isOriginal = true;
 
@@ -399,6 +402,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     {}
 
     function _claimRewards() internal {
+        // We only claim if max boosted.
+        bool _forceClaim = forceClaim;
+        if(!claimsAreMaxBoosted() && !_forceClaim) return;
+
         address[] memory rewardContracts = new address[](1);
         rewardContracts[0] = address(prismaReceiver);
         prismaVault.batchClaimRewards(
@@ -407,6 +414,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             rewardContracts, // rewards contracts
             FEE_DENOMINATOR // maxFee
         );
+
+        if (_forceClaim) forceClaim = false;
+    }
+
+    function claimsAreMaxBoosted() public view returns (bool) {
+        (uint256 claimable,,) = prismaReceiver.claimableReward(address(this));
+        (uint256 maxBoostable,) = prismaVault.getClaimableWithBoost(YEARN_LOCKER);
+        return maxBoostable >= claimable;
     }
 
     /* ========== YSWAPS ========== */
@@ -497,10 +512,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             return false;
         }
 
-        // Should not trigger if after 1.5 days into any week. This maximizes our chance for full boost.
-        if (block.timestamp % 1 weeks > 1.5 days) {
-            return false;
-        }
         // harvest if we have a profit to claim at our upper limit without considering gas price
         uint256 claimableProfit = claimableProfitInUsdc();
         if (claimableProfit > harvestProfitMaxInUsdc) {
@@ -518,7 +529,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         }
 
         // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfit > harvestProfitMinInUsdc) {
+        if (
+            claimableProfit > harvestProfitMinInUsdc &&
+            (claimsAreMaxBoosted() || forceClaim)
+        ) {
             return true;
         }
 
@@ -634,12 +648,15 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
      *  that will trigger a harvest if gas price is acceptable.
      * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
      *  will trigger a harvest regardless of gas price.
+     @param _forceClaim True if we want to allow claims that are not max boosted.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc
+        uint256 _harvestProfitMaxInUsdc,
+        bool _forceClaim
     ) external onlyVaultManagers {
         harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
+        forceClaim = _forceClaim;
     }
 }
