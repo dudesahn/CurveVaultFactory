@@ -126,6 +126,19 @@ interface IStrategy {
         address _booster
     ) external returns (address newStrategy);
 
+    function cloneStrategyPrismaConvex(
+        address _vault,
+        address _strategist,
+        address _rewards,
+        address _keeper,
+        address _tradeFactory,
+        uint256 _harvestProfitMinInUsdc,
+        uint256 _harvestProfitMaxInUsdc,
+        address _prismaVault,
+        address _prismaReceiver,
+        address _yPrisma
+    ) external returns (address newStrategy);
+
     function setVoter(address _curveVoter) external;
 
     function setVoters(address _curveVoter, address _convexVoter) external;
@@ -190,15 +203,20 @@ interface Vault {
     function addStrategy(address, uint256, uint256, uint256, uint256) external;
 }
 
+interface IPrismaReceiver {
+    function vault() external returns (address);
+}
+
+interface IPrismaConvexFactory {
+    function getDeterministicAddress(uint _pid) external returns (address);
+}
+
 contract CurveGlobal {
     event NewAutomatedVault(
         uint256 indexed category,
         address indexed lpToken,
         address gauge,
-        address indexed vault,
-        address convexStrategy,
-        address curveStrategy,
-        address convexFraxStrategy
+        address indexed vault
     );
 
     /* ========== STATE VARIABLES ========== */
@@ -219,6 +237,18 @@ contract CurveGlobal {
 
     /// @notice Address of our Convex token.
     address public constant CVX = 0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B;
+
+    /// @notice Address of our yPRISMA token.
+    address public constant YPRISMA =
+        0xe3668873D944E4A949DA05fc8bDE419eFF543882;
+
+    /// @notice Address of Prisma's Convex factory.
+    IPrismaConvexFactory public constant PRISMA_CONVEX_FACTORY =
+        IPrismaConvexFactory(0x3dA992F4694d1a1624c32CAFb5E57fE75B4Bc867);
+
+    /// @notice Address of Prisma's vault contract.
+    address public constant PRISMA_VAULT =
+        0x06bDF212C290473dCACea9793890C5024c7Eb02c;
 
     /// @notice Address of our Convex pool manager.
     /// @dev Used to add new pools to Convex.
@@ -276,6 +306,10 @@ contract CurveGlobal {
     /// @notice Address of our Convex Frax strategy implementation.
     /// @dev If zero address, then factory will produce vaults without Convex Frax strategies.
     address public convexFraxStratImplementation;
+
+    /// @notice Address of our Prisma Convex strategy implementation.
+    /// @dev If zero address, then factory will produce vaults without this strategy.
+    address public prismaConvexStratImplementation;
 
     /// @notice The percentage of CRV we re-lock for boost (in basis points). Default is 0%.
     uint256 public keepCRV;
@@ -527,6 +561,18 @@ contract CurveGlobal {
             revert();
         }
         convexFraxStratImplementation = _convexFraxStratImplementation;
+    }
+
+    /// @notice Set Prisma Convex Implementaiton
+    /// @dev Must be called by owner.
+    /// @param _prismaConvexStratImplementation Address of latest Curve boosted strategy implementation.
+    function setPrismaConvexStratImplementation(
+        address _prismaConvexStratImplementation
+    ) external {
+        if (msg.sender != owner) {
+            revert();
+        }
+        prismaConvexStratImplementation = _prismaConvexStratImplementation;
     }
 
     /// @notice Direct a specified percentage of CRV from every harvest to Yearn's CRV voter.
@@ -795,7 +841,8 @@ contract CurveGlobal {
             address vault,
             address convexStrategy,
             address curveStrategy,
-            address convexFraxStrategy
+            address convexFraxStrategy,
+            address prismaConexStrategy
         )
     {
         if (!(msg.sender == owner || msg.sender == management)) {
@@ -821,7 +868,8 @@ contract CurveGlobal {
             address vault,
             address convexStrategy,
             address curveStrategy,
-            address convexFraxStrategy
+            address convexFraxStrategy,
+            address prismaConvexStrategy
         )
     {
         return
@@ -840,7 +888,8 @@ contract CurveGlobal {
             address vault,
             address convexStrategy,
             address curveStrategy,
-            address convexFraxStrategy
+            address convexFraxStrategy,
+            address prismaConvexStrategy
         )
     {
         // a curve gauge must have weight for a vault to be deployed
@@ -891,21 +940,14 @@ contract CurveGlobal {
         _setupVaultParams(vault);
 
         // setup our strategies as needed
-        (convexStrategy, curveStrategy, convexFraxStrategy) = _setupStrategies(
-            vault,
-            _gauge,
-            pid
-        );
-
-        emit NewAutomatedVault(
-            CATEGORY,
-            lptoken,
-            _gauge,
-            vault,
+        (
             convexStrategy,
             curveStrategy,
-            convexFraxStrategy
-        );
+            convexFraxStrategy,
+            prismaConvexStrategy
+        ) = _setupStrategies(vault, _gauge, pid);
+
+        emit NewAutomatedVault(CATEGORY, lptoken, _gauge, vault);
     }
 
     // permissioned users may pass custom name and symbol inputs
@@ -984,7 +1026,8 @@ contract CurveGlobal {
         returns (
             address convexStrategy,
             address curveStrategy,
-            address convexFraxStrategy
+            address convexFraxStrategy,
+            address prismaConvexStrategy
         )
     {
         // check if we can add a convex frax strategy for this pool, ganache can't handle this (use tenderly)
@@ -1006,6 +1049,8 @@ contract CurveGlobal {
                 stakingAddress
             );
         }
+
+        prismaConvexStrategy = _addPrismaConvexStrategy(_vault, _pid);
     }
 
     // deploy and attach a new convex strategy using our factory's existing implementation
@@ -1133,6 +1178,51 @@ contract CurveGlobal {
         Vault(_vault).addStrategy(
             convexFraxStrategy,
             8_000,
+            0,
+            type(uint256).max,
+            0
+        );
+    }
+
+    // deploy and attach a new Prisma Convex strategy using our factory's existing implementation
+    function _addPrismaConvexStrategy(
+        address _vault,
+        uint256 _pid
+    ) internal returns (address prismaConvexStrategy) {
+        address receiver = PRISMA_CONVEX_FACTORY.getDeterministicAddress(_pid);
+        try IPrismaReceiver(receiver).vault() returns (address vault) {
+            require(vault == PRISMA_VAULT, "Failed sanity check.");
+        } catch {
+            return address(0);
+        }
+        prismaConvexStrategy = IStrategy(prismaConvexStratImplementation)
+            .cloneStrategyPrismaConvex(
+                _vault,
+                management,
+                treasury,
+                keeper,
+                tradeFactory,
+                harvestProfitMinInUsdc,
+                harvestProfitMaxInUsdc,
+                address(PRISMA_VAULT),
+                receiver,
+                YPRISMA
+            );
+
+        // set up health check and the base fee oracle for our new strategy
+        IStrategy(prismaConvexStrategy).setHealthCheck(healthCheck);
+        IStrategy(prismaConvexStrategy).setBaseFeeOracle(baseFeeOracle);
+
+        // if we're keeping any tokens, then setup our voters
+        if (keepCRV > 0 || keepCVX > 0) {
+            IStrategy(prismaConvexStrategy).setVoters(curveVoter, convexVoter);
+            IStrategy(prismaConvexStrategy).setLocalKeepCrvs(keepCRV, keepCVX);
+        }
+
+        // convex debtRatio can always start at 0
+        Vault(_vault).addStrategy(
+            prismaConvexStrategy,
+            0,
             0,
             type(uint256).max,
             0
