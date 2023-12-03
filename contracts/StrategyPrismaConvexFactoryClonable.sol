@@ -55,10 +55,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
 
-    /// @notice We use this flag to signal a desire to claim even if Yearn's locker cannot provide max boost.
+    /// @notice We use this flag to signal a desire to claim even if Yearns locker cant provide max boost.
     bool public forceClaim;
 
-    /// @notice Will only be true on the original deployed contract and not on clones; we don't want to clone a clone.
+    /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
 
     /* ========== CONSTRUCTOR ========== */
@@ -110,9 +110,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address _prismaReceiver,
         address _yPrisma
     ) external returns (address newStrategy) {
-        // don't clone a clone
+        // dont clone a clone
         if (!isOriginal) {
-            revert("Cannot clone a clone'");
+            revert("Cant clone a clone");
         }
 
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -192,7 +192,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address _prismaReceiver,
         address _yPrisma
     ) internal {
-        // make sure that we haven't initialized this before
+        // make sure that we havent initialized this before
         if (address(prismaVault) != address(0)) {
             revert("Already initialized");
         }
@@ -286,7 +286,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             }
         }
 
-        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
+        // serious loss should never happen, but if it does (for instance, if Curve is hacked), lets record it accurately
         uint256 assets = estimatedTotalAssets();
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
@@ -313,7 +313,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
                 }
             }
         }
-        // if assets are less than debt, we are in trouble. don't worry about withdrawing here, just report losses
+        // if assets are less than debt, we are in trouble. dont worry about withdrawing here, just report losses
         else {
             unchecked {
                 _loss = debt - assets;
@@ -322,7 +322,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
-        // if in emergency exit, we don't want to deploy any more funds
+        // if in emergency exit, we dont want to deploy any more funds
         if (emergencyExit) {
             return;
         }
@@ -368,13 +368,13 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     function liquidateAllPositions() internal override returns (uint256) {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
-            // don't bother withdrawing zero, save gas where we can
+            // dont bother withdrawing zero, save gas where we can
             prismaReceiver.withdraw(address(this), _stakedBal);
         }
         return balanceOfWant();
     }
 
-    // migrate our want token to a new strategy if needed, claim rewards tokens as well unless it's an emergency
+    // migrate our want token to a new strategy if needed, claim rewards tokens as well unless its an emergency
     function prepareMigration(address _newStrategy) internal override {
         uint256 stakedBal = stakedBalance();
 
@@ -436,7 +436,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     ) external onlyGovernance {
         require(
             _newTradeFactory != address(0),
-            "Can't remove with this function"
+            "Cant remove with this function"
         );
         _removeTradeFactoryPermissions(true);
         tradeFactory = _newTradeFactory;
@@ -498,18 +498,18 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
      * @notice
      *  Provide a signal to the keeper that harvest() should be called.
      *
-     *  Don't harvest if a strategy is inactive.
+     *  Dont harvest if a strategy is inactive.
      *  If our profit exceeds our upper limit, then harvest no matter what. For
      *  our lower profit limit, credit threshold, max delay, and manual force trigger,
      *  only harvest if our gas price is acceptable.
      *
-     * @param callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
+     * @param callCostinEth The keepers estimated gas cost to call harvest() (in wei).
      * @return True if harvest() should be called, false otherwise.
      */
     function harvestTrigger(
         uint256 callCostinEth
     ) public view override returns (bool) {
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we dont need to adjust keeper job.
         if (!isActive()) {
             return false;
         }
@@ -544,24 +544,24 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // harvest our credit if it's above our threshold
+        // harvest our credit if its above our threshold
         if (vault.creditAvailable() > creditThreshold) {
             return true;
         }
 
-        // otherwise, we don't harvest
+        // otherwise, we dont harvest
         return false;
     }
 
     /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
-    /// @dev Uses Chainlink's feed registry.
+    /// @dev Uses Chainlinks feed registry.
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
         (
             uint256 yPrismaAmount,
             uint256 crvAmount,
             uint256 cvxAmount
-        ) = prismaReceiver.claimableReward(address(this)); // This doesn't include boost, but that's OK
+        ) = prismaReceiver.claimableReward(address(this)); // This doesnt include boost, but thats OK
 
         (, uint256 crvPrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
@@ -595,8 +595,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             ((yPrismaPrice * yPrismaAmount) / 1e18));
     }
 
-    /// @notice Convert our keeper's eth cost into want
-    /// @dev We don't use this since we don't factor call cost into our harvestTrigger.
+    /// @notice Convert our keepers eth cost into want
+    /// @dev We dont use this since we dont factor call cost into our harvestTrigger.
     /// @param _ethAmount Amount of ether spent.
     /// @return Value of ether in want.
     function ethToWant(
