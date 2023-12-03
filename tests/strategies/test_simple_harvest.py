@@ -48,7 +48,7 @@ def test_simple_harvest(
     old_assets = vault.totalAssets()
     assert old_assets > 0
     assert strategy.estimatedTotalAssets() > 0
-    if which_strategy != 2:
+    if which_strategy != 4:
         assert token.balanceOf(strategy) == 0
 
     if which_strategy == 4:
@@ -93,14 +93,24 @@ def test_simple_harvest(
         print("Locked stakes:", liq)
         print("Next kek:", strategy.kekInfo()["nextKek"])
 
-    # simulate profits
+    # simulate profits, the mine is needed for anvil
     chain.sleep(sleep_time)
+    chain.mine(1)
 
     # check our pending profit for frax
     if which_strategy == 4:
         pending = strategy.getEarnedTokens()
         print("Strategy", strategy.name(), "pid:", strategy.fraxPid())
         print("Pending:", pending.dict())
+
+    # check our claimable from prisma receiver
+    if which_strategy == 2:
+        receiver = Contract(strategy.prismaReceiver())
+        print("Claimable from receiver:", receiver.claimableReward(strategy))
+
+    print(
+        "🤑 Claimable profit for second harvest:", strategy.claimableProfitInUsdc() / 1e6
+    )
 
     # harvest, store new asset amount
     (profit, loss) = harvest_strategy(

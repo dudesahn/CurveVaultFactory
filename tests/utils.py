@@ -46,12 +46,16 @@ def harvest_strategy(
         strategy.setDoHealthCheck(False, {"from": vault.governance()})
         print("\nTurned off health check!\n")
 
+    # for PRISMA, force claims by default
+    if target in [2, 3]:
+        strategy.setForceClaimOnce(True, {"from": vault.governance()})
+
     if gov != 9:
         tx = strategy.harvest({"from": gov})
         profit = tx.events["Harvested"]["profit"] / (10 ** token.decimals())
         loss = tx.events["Harvested"]["loss"] / (10 ** token.decimals())
 
-    if target == 3:
+    if target == 4:
         assert (
             strategy.balanceOfWant() < strategy.depositInfo()["minDeposit"]
             or strategy.depositInfo()["maxSingleDeposit"]
@@ -70,7 +74,7 @@ def harvest_strategy(
 
     # reset everything with a sleep and mine
     chain.sleep(1)
-    # chain.mine(1)
+    chain.mine(1)
 
     # return our profit, loss
     return (profit, loss)
@@ -110,22 +114,22 @@ def trade_handler_action(
 
     if crvBalance > 0:
         crv.transfer(token, crvBalance, {"from": strategy})
-        print("CRV rewards present")
+        print("CRV rewards present:", crvBalance / 1e18)
         assert crv.balanceOf(strategy) == 0
 
     if cvxBalance > 0:
         cvx.transfer(token, cvxBalance, {"from": strategy})
-        print("CVX rewards present")
+        print("CVX rewards present:", cvxBalance / 1e18)
         assert cvx.balanceOf(strategy) == 0
 
     if fxsBalance > 0:
         fxs.transfer(token, fxsBalance, {"from": strategy})
-        print("FXS rewards present")
+        print("FXS rewards present:", fxsBalance / 1e18)
         assert fxs.balanceOf(strategy) == 0
 
     if yprismaBalance > 0:
         yprisma.transfer(token, yprismaBalance, {"from": strategy})
-        print("yPRISMA rewards present")
+        print("yPRISMA rewards present:", yprismaBalance / 1e18)
         assert yprisma.balanceOf(strategy) == 0
 
     # send our profits back in

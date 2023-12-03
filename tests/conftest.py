@@ -74,8 +74,8 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
-    whale = accounts.at("0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0", force=True)
-    # yPRISMA-f LP 0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0
+    whale = accounts.at("0x13E58C7b1147385D735a06D14F0456E54C2dEBC8", force=True)
+    # yPRISMA-f LP (gauge) 0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0, cvxPRISMA gauge: 0x13E58C7b1147385D735a06D14F0456E54C2dEBC8
     # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
     # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
@@ -92,19 +92,20 @@ def whale(accounts, amount, token):
 @pytest.fixture(scope="session")
 def amount(token):
     amount = (
-        5_000 * 10 ** token.decimals()
-    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng
+        100_000 * 10 ** token.decimals()
+    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng, 5000 yPRISMA, 100k cvxPRISMA
     yield amount
 
 
 @pytest.fixture(scope="session")
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
-    profit_whale = accounts.at("0x6806D62AAdF2Ee97cd4BCE46BF5fCD89766EF246", force=True)
+    profit_whale = accounts.at("0x5C21F24e5772f52DEfA4BB37f662120c50597b4f", force=True)
     # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
     # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k, 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng
+    # 0x6806D62AAdF2Ee97cd4BCE46BF5fCD89766EF246 yPRISMA LP, cvxPRISMA LP 0x5C21F24e5772f52DEfA4BB37f662120c50597b4f
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -115,8 +116,8 @@ def profit_whale(accounts, profit_amount, token):
 @pytest.fixture(scope="session")
 def profit_amount(token):
     profit_amount = (
-        25 * 10 ** token.decimals()
-    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng
+        100 * 10 ** token.decimals()
+    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng, 25 yPRISMA, 100 cvxPRISMA
     yield profit_amount
 
 
@@ -456,7 +457,7 @@ def strategy(
         print("New Vault, Prisma Convex Strategy")
 
         # this is the same for new or existing vaults
-        strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
+        strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
     elif which_strategy == 3:  # Prisma Curve
         vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Prisma Curve Strategy")
@@ -491,7 +492,8 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 260  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
+    pid = 258  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
+    # 258 cvxPRISMA LP, 260 yPRISMA LP
     yield pid
 
 

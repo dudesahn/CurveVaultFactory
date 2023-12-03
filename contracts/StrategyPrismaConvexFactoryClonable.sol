@@ -62,7 +62,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     address public tradeFactory;
 
     /// @notice We use this flag to signal a desire to claim even if Yearns locker cant provide max boost.
-    bool public forceClaim;
+    bool public forceClaimOnce;
 
     /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
@@ -423,24 +423,23 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     {}
 
     function _claimRewards() internal {
-        // We only claim if max boosted.
-        bool _forceClaim = forceClaim;
-        if (!claimsAreMaxBoosted() && !_forceClaim) {
-            return;
-        }
+        // By default, we only claim if max boosted. Force claim once if needed.
+        bool _forceClaimOnce = forceClaimOnce;
 
-        address[] memory rewardContracts = new address[](1);
-        rewardContracts[0] = address(prismaReceiver);
-        prismaVault.batchClaimRewards(
-            YEARN_LOCKER, // receiver
-            YEARN_LOCKER, // delegate
-            rewardContracts, // rewards contracts
-            FEE_DENOMINATOR // maxFee
-        );
+        if (claimsAreMaxBoosted() || _forceClaimOnce) {
+            address[] memory rewardContracts = new address[](1);
+            rewardContracts[0] = address(prismaReceiver);
+            prismaVault.batchClaimRewards(
+                YEARN_LOCKER, // receiver
+                YEARN_LOCKER, // delegate
+                rewardContracts, // rewards contracts
+                FEE_DENOMINATOR // maxFee
+            );
 
-        if (_forceClaim) {
-            // Set this back to false if its been used.
-            forceClaim = false;
+            // reset if we forced this one
+            if (_forceClaimOnce) {
+                forceClaimOnce = false;
+            }
         }
     }
 
@@ -559,7 +558,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         // harvest if we have a sufficient profit to claim and are max boosted.
         if (
             claimableProfit > harvestProfitMinInUsdc &&
-            (claimsAreMaxBoosted() || forceClaim)
+            (claimsAreMaxBoosted() || forceClaimOnce)
         ) {
             return true;
         }
@@ -568,7 +567,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         // harvest regardless of profit once we reach our maxDelay and are max boosted.
         if (
             block.timestamp - params.lastReport > maxReportDelay &&
-            (claimsAreMaxBoosted() || forceClaim)
+            (claimsAreMaxBoosted() || forceClaimOnce)
         ) {
             return true;
         }
@@ -590,7 +589,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             uint256 yPrismaAmount,
             uint256 crvAmount,
             uint256 cvxAmount
-        ) = prismaReceiver.claimableReward(address(this)); // This doesnt include boost, but thats OK
+        ) = prismaReceiver.claimableReward(address(this)); // This assumes 2x boost for prisma amount
 
         (, uint256 crvPrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
@@ -621,7 +620,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
         return ((crvPrice * crvAmount + cvxPrice * cvxAmount) /
             1e20 +
-            ((yPrismaPrice * yPrismaAmount) / 1e18));
+            ((yPrismaPrice * yPrismaAmount) / (1e18 * 1e12)));
     }
 
     /// @notice Convert our keepers eth cost into want
@@ -688,15 +687,23 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
      *  that will trigger a harvest if gas price is acceptable.
      * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
      *  will trigger a harvest regardless of gas price.
-     @param _forceClaim True if we want to allow claims that are not max boosted.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc,
-        bool _forceClaim
+        uint256 _harvestProfitMaxInUsdc
     ) external onlyVaultManagers {
         harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
-        forceClaim = _forceClaim;
+    }
+
+    /**
+     * @notice
+     *  Here we force a claim of yPRISMA on our next harvest, even if not fully boosted.
+     @param _forceClaimOnce True if we want to allow claims that are not max boosted.
+     */
+    function setForceClaimOnce(
+        bool _forceClaimOnce
+    ) external onlyVaultManagers {
+        forceClaimOnce = _forceClaimOnce;
     }
 }
