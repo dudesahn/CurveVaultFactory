@@ -293,9 +293,9 @@ def test_setters(
         if not tests_using_tenderly:
             # test our reverts as well
             with brownie.reverts():
-                strategy.setLocalKeepCrvs(1000000, 0, {"from": gov})
+                strategy.setLocalKeepCrvs(1000000, 0, 0, {"from": gov})
             with brownie.reverts():
-                strategy.setLocalKeepCrvs(0, 100000000, {"from": gov})
+                strategy.setLocalKeepCrvs(0, 100000000, 0, {"from": gov})
 
     if which_strategy == 3:
         strategy.setVoter(gov, {"from": gov})
@@ -303,7 +303,7 @@ def test_setters(
         if not tests_using_tenderly:
             # test our reverts as well
             with brownie.reverts():
-                strategy.setLocalKeepCrv(1000000, {"from": gov})
+                strategy.setLocalKeepCrv(1000000, 0, 0, {"from": gov})
 
     elif which_strategy == 4:
         strategy.setVoters(gov, gov, gov, {"from": gov})

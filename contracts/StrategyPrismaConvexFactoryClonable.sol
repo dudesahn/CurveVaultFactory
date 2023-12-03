@@ -31,6 +31,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The address of our Convex voter. This is where we send any keepCVX.
     address public convexVoter;
 
+    /// @notice The address of our yPRISMA POL contract. This is where we send any keepYPrisma.
+    address public yprismaVoter;
+
     /// @notice Where we claim emissions as yPRISMA
     IPrismaVault public prismaVault;
 
@@ -291,14 +294,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepYPrisma = localKeepYPrisma;
-        address _pol = ILocker(YEARN_LOCKER).governance();
-        if (_localKeepYPrisma > 0 && _pol != address(0)) {
+        address _yprismaVoter = yprismaVoter;
+        if (_localKeepYPrisma > 0 && _yprismaVoter != address(0)) {
             uint256 yprismaBalance = yPrisma.balanceOf(address(this));
             unchecked {
                 _sendToVoter = (yprismaBalance * _localKeepYPrisma) / FEE_DENOMINATOR;
             }
             if (_sendToVoter > 0) {
-                yPrisma.safeTransfer(_pol, _sendToVoter);
+                yPrisma.safeTransfer(_yprismaVoter, _sendToVoter);
             }
         }
 
@@ -650,6 +653,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             revert();
         }
 
+        if (_keepYPrisma > 0 && yprismaVoter == address(0)) {
+            revert();
+        }
+
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
         localKeepYPrisma = _keepYPrisma;
@@ -662,10 +669,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @param _convexVoter Address of our convex voter.
     function setVoters(
         address _curveVoter,
-        address _convexVoter
+        address _convexVoter,
+        address _yprismaVoter
     ) external onlyGovernance {
         curveVoter = _curveVoter;
         convexVoter = _convexVoter;
+        yprismaVoter = _yprismaVoter;
     }
 
     /**
