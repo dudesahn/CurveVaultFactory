@@ -28,6 +28,11 @@ interface IDetails {
     function symbol() external view returns (string memory);
 }
 
+interface ILocker {
+    // Get POL address.
+    function governance() external view returns (address);
+}
+
 interface ICurveOracle {
     function price_oracle() external view returns (uint256);
 }

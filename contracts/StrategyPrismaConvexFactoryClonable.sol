@@ -22,6 +22,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The percentage of CVX from each harvest that we send to our voter (out of 10,000).
     uint256 public localKeepCVX;
 
+    /// @notice The percentage of yPRISMA from each harvest that we send to our voter (out of 10,000).
+    uint256 public localKeepYPrisma;
+
     /// @notice The address of our Curve voter. This is where we send any keepCRV.
     address public curveVoter;
 
@@ -283,6 +286,19 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             }
             if (_sendToVoter > 0) {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
+            }
+        }
+
+        // by default this is zero, but if we want any for our voter this will be used
+        uint256 _localKeepYPrisma = localKeepYPrisma;
+        address _pol = ILocker(YEARN_LOCKER).governance();
+        if (_localKeepYPrisma > 0 && _pol != address(0)) {
+            uint256 yprismaBalance = yPrisma.balanceOf(address(this));
+            unchecked {
+                _sendToVoter = (yprismaBalance * _localKeepYPrisma) / FEE_DENOMINATOR;
+            }
+            if (_sendToVoter > 0) {
+                yPrisma.safeTransfer(_pol, _sendToVoter);
             }
         }
 
@@ -615,9 +631,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @param _keepCvx Percent of each CVX harvest to send to our voter.
     function setLocalKeepCrvs(
         uint256 _keepCrv,
-        uint256 _keepCvx
+        uint256 _keepCvx,
+        uint256 _keepYPrisma
     ) external onlyGovernance {
-        if (_keepCrv > 10_000 || _keepCvx > 10_000) {
+        if (
+            _keepCrv > 10_000 || 
+            _keepCvx > 10_000 ||
+            _keepYPrisma > 10_000
+        ) {
             revert();
         }
 
@@ -631,6 +652,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
+        localKeepYPrisma = _keepYPrisma;
     }
 
     /// @notice Use this to set or update our voter contracts.
