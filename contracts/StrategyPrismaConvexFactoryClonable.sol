@@ -291,14 +291,16 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
             }
         }
-        
+
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepYPrisma = localKeepYPrisma;
         address _yprismaVoter = yprismaVoter;
         if (_localKeepYPrisma > 0 && _yprismaVoter != address(0)) {
             uint256 yprismaBalance = yPrisma.balanceOf(address(this));
             unchecked {
-                _sendToVoter = (yprismaBalance * _localKeepYPrisma) / FEE_DENOMINATOR;
+                _sendToVoter =
+                    (yprismaBalance * _localKeepYPrisma) /
+                    FEE_DENOMINATOR;
             }
             if (_sendToVoter > 0) {
                 yPrisma.safeTransfer(_yprismaVoter, _sendToVoter);
@@ -423,7 +425,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     function _claimRewards() internal {
         // We only claim if max boosted.
         bool _forceClaim = forceClaim;
-        if (!claimsAreMaxBoosted() && !_forceClaim) return;
+        if (!claimsAreMaxBoosted() && !_forceClaim) {
+            return;
+        }
 
         address[] memory rewardContracts = new address[](1);
         rewardContracts[0] = address(prismaReceiver);
@@ -434,7 +438,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             FEE_DENOMINATOR // maxFee
         );
 
-        if (_forceClaim) forceClaim = false; // Set this back to false if its been used.
+        if (_forceClaim) {
+            // Set this back to false if its been used.
+            forceClaim = false;
+        }
     }
 
     function claimsAreMaxBoosted() public view returns (bool) {
@@ -637,11 +644,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         uint256 _keepCvx,
         uint256 _keepYPrisma
     ) external onlyGovernance {
-        if (
-            _keepCrv > 10_000 || 
-            _keepCvx > 10_000 ||
-            _keepYPrisma > 10_000
-        ) {
+        if (_keepCrv > 10_000 || _keepCvx > 10_000 || _keepYPrisma > 10_000) {
             revert();
         }
 
@@ -667,6 +670,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     ///  Only governance can set this.
     /// @param _curveVoter Address of our curve voter.
     /// @param _convexVoter Address of our convex voter.
+    /// @param _yprismaVoter Address of our yPRISMA voter.
     function setVoters(
         address _curveVoter,
         address _convexVoter,
