@@ -548,6 +548,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             return false;
         }
 
+        // Should not trigger if after 1.5 days into any week. This maximizes our chance for full boost.
+        if (block.timestamp % 1 weeks > 1.5 days) {
+            return false;
+        }
         // harvest if we have a profit to claim at our upper limit without considering gas price
         uint256 claimableProfit = claimableProfitInUsdc();
         if (claimableProfit > harvestProfitMaxInUsdc) {
