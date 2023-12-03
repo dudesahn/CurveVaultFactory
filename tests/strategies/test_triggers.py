@@ -95,17 +95,17 @@ def test_triggers(
 
         if not (is_slippery and no_profit):
             # update our minProfit so our harvest triggers true
-            strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+            strategy.setHarvestTriggerParams(1, 1000000e6, False, {"from": gov})
             tx = strategy.harvestTrigger.call(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
 
             # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+            strategy.setHarvestTriggerParams(1000000e6, 1, False, {"from": gov})
             tx = strategy.harvestTrigger.call(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
-            strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
 
         # set our max delay to 1 day so we trigger true, then set it back to 21 days
         strategy.setMaxReportDelay(sleep_time - 1)

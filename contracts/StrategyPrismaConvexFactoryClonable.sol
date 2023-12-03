@@ -22,11 +22,17 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The percentage of CVX from each harvest that we send to our voter (out of 10,000).
     uint256 public localKeepCVX;
 
+    /// @notice The percentage of yPRISMA from each harvest that we send to our voter (out of 10,000).
+    uint256 public localKeepYPrisma;
+
     /// @notice The address of our Curve voter. This is where we send any keepCRV.
     address public curveVoter;
 
     /// @notice The address of our Convex voter. This is where we send any keepCVX.
     address public convexVoter;
+
+    /// @notice The address of our yPRISMA POL contract. This is where we send any keepYPrisma.
+    address public yprismaVoter;
 
     /// @notice Where we claim emissions as yPRISMA
     IPrismaVault public prismaVault;
@@ -285,6 +291,19 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
             }
         }
+        
+        // by default this is zero, but if we want any for our voter this will be used
+        uint256 _localKeepYPrisma = localKeepYPrisma;
+        address _yprismaVoter = yprismaVoter;
+        if (_localKeepYPrisma > 0 && _yprismaVoter != address(0)) {
+            uint256 yprismaBalance = yPrisma.balanceOf(address(this));
+            unchecked {
+                _sendToVoter = (yprismaBalance * _localKeepYPrisma) / FEE_DENOMINATOR;
+            }
+            if (_sendToVoter > 0) {
+                yPrisma.safeTransfer(_yprismaVoter, _sendToVoter);
+            }
+        }
 
         // serious loss should never happen, but if it does (for instance, if Curve is hacked), lets record it accurately
         uint256 assets = estimatedTotalAssets();
@@ -415,7 +434,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             FEE_DENOMINATOR // maxFee
         );
 
-        if (_forceClaim) forceClaim = false; // Set this back to false if it's been used.
+        if (_forceClaim) forceClaim = false; // Set this back to false if its been used.
     }
 
     function claimsAreMaxBoosted() public view returns (bool) {
@@ -615,9 +634,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @param _keepCvx Percent of each CVX harvest to send to our voter.
     function setLocalKeepCrvs(
         uint256 _keepCrv,
-        uint256 _keepCvx
+        uint256 _keepCvx,
+        uint256 _keepYPrisma
     ) external onlyGovernance {
-        if (_keepCrv > 10_000 || _keepCvx > 10_000) {
+        if (
+            _keepCrv > 10_000 || 
+            _keepCvx > 10_000 ||
+            _keepYPrisma > 10_000
+        ) {
             revert();
         }
 
@@ -629,8 +653,13 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             revert();
         }
 
+        if (_keepYPrisma > 0 && yprismaVoter == address(0)) {
+            revert();
+        }
+
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
+        localKeepYPrisma = _keepYPrisma;
     }
 
     /// @notice Use this to set or update our voter contracts.
@@ -640,10 +669,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @param _convexVoter Address of our convex voter.
     function setVoters(
         address _curveVoter,
-        address _convexVoter
+        address _convexVoter,
+        address _yprismaVoter
     ) external onlyGovernance {
         curveVoter = _curveVoter;
         convexVoter = _convexVoter;
+        yprismaVoter = _yprismaVoter;
     }
 
     /**
