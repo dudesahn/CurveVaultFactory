@@ -415,7 +415,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             FEE_DENOMINATOR // maxFee
         );
 
-        if (_forceClaim) forceClaim = false;
+        if (_forceClaim) forceClaim = false; // Set this back to false if it's been used.
     }
 
     function claimsAreMaxBoosted() public view returns (bool) {
@@ -530,7 +530,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
+        // harvest if we have a sufficient profit to claim and are max boosted.
         if (
             claimableProfit > harvestProfitMinInUsdc &&
             (claimsAreMaxBoosted() || forceClaim)
@@ -539,8 +539,11 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         }
 
         StrategyParams memory params = vault.strategies(address(this));
-        // harvest regardless of profit once we reach our maxDelay
-        if (block.timestamp - params.lastReport > maxReportDelay) {
+        // harvest regardless of profit once we reach our maxDelay and are max boosted.
+        if (
+            block.timestamp - params.lastReport > maxReportDelay &&
+            (claimsAreMaxBoosted() || forceClaim)
+        ) {
             return true;
         }
 
