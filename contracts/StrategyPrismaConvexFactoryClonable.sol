@@ -404,7 +404,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     function _claimRewards() internal {
         // We only claim if max boosted.
         bool _forceClaim = forceClaim;
-        if(!claimsAreMaxBoosted() && !_forceClaim) return;
+        if (!claimsAreMaxBoosted() && !_forceClaim) return;
 
         address[] memory rewardContracts = new address[](1);
         rewardContracts[0] = address(prismaReceiver);
@@ -419,8 +419,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     }
 
     function claimsAreMaxBoosted() public view returns (bool) {
-        (uint256 claimable,,) = prismaReceiver.claimableReward(address(this));
-        (uint256 maxBoostable,) = prismaVault.getClaimableWithBoost(YEARN_LOCKER);
+        (uint256 claimable, , ) = prismaReceiver.claimableReward(address(this));
+        (uint256 maxBoostable, ) = prismaVault.getClaimableWithBoost(
+            YEARN_LOCKER
+        );
         return maxBoostable >= claimable;
     }
 

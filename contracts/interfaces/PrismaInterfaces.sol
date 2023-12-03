@@ -37,6 +37,10 @@ interface ISimpleOracle {
 }
 
 interface IPrismaVault {
+    function getClaimableWithBoost(
+        address
+    ) external view returns (uint256 maxBoosted, uint256 boosted);
+
     function batchClaimRewards(
         address receiver,
         address boostDelegate,
