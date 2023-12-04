@@ -11,6 +11,7 @@ def harvest_strategy(
     profit_whale,
     profit_amount,
     target,
+    force_claim=True
 ):
 
     # reset everything with a sleep and mine
@@ -48,7 +49,7 @@ def harvest_strategy(
 
     # for PRISMA, force claims by default
     if target in [2, 3]:
-        strategy.setForceClaimOnce(True, {"from": vault.governance()})
+        strategy.setForceClaimOnce(force_claim, {"from": vault.governance()})
 
     if gov != 9:
         tx = strategy.harvest({"from": gov})

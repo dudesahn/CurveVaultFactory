@@ -1,7 +1,77 @@
 import pytest
 from utils import harvest_strategy, check_status
 import brownie
-from brownie import ZERO_ADDRESS, chain, interface
+from brownie import ZERO_ADDRESS, chain, interface, Contract
+from utils import harvest_strategy
+
+def test_yprisma_claim(
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    amount,
+    sleep_time,
+    profit_whale,
+    profit_amount,
+    target,
+    use_yswaps,
+    yprisma
+):
+    ## deposit to the vault after approving
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    use_yswaps = False
+    receiver = Contract(strategy.prismaReceiver())
+    eid = receiver.emissionId()
+    prisma_vault = Contract(strategy.prismaVault(), owner=receiver)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False
+    )
+    claimable = receiver.claimableReward(strategy).dict()
+    # Check if any non-zero values
+    assert any(x for x in (claimable if isinstance(claimable, tuple) else (claimable,)))
+
+    # Now harvest again
+    
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False
+    )
+    assert yprisma.balanceOf(strategy) == 0 # This only works if we have exhausted our boost for current week
+    chain.sleep(60 * 60 * 24 * 7)
+    chain.mine()
+    
+    prisma_vault.allocateNewEmissions(eid)
+    receiver.claimableReward(strategy)
+    y = '0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7'
+    boosted = prisma_vault.getClaimableWithBoost(y)
+    assert boosted[0] > 0
+    assert strategy.claimsAreMaxBoosted()
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False
+    )
+    assert yprisma.balanceOf(strategy) > 0
 
 # test removing a strategy from the withdrawal queue
 def test_remove_from_withdrawal_queue(
