@@ -480,6 +480,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         ITradeFactory tf = ITradeFactory(_tradeFactory);
         tf.enable(address(convexToken), _want);
         tf.enable(address(crv), _want);
+        tf.enable(address(yPrisma), _want);
     }
 
     /// @notice Use this to remove permissions from our current trade factory.
