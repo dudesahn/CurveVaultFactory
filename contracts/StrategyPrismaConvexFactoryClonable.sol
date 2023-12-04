@@ -191,9 +191,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address _prismaReceiver
     ) internal {
         // make sure that we havent initialized this before
-        if (address(prismaVault) != address(0)) {
-            revert("Already initialized");
-        }
+        require(_prismaVault != address(0), "Non-zero required");
+        require(address(prismaVault) == address(0), "Already initialized");
 
         prismaReceiver = IPrismaReceiver(_prismaReceiver);
         prismaVault = IPrismaVault(_prismaVault);
@@ -360,8 +359,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
                 }
                 // withdraw whatever extra funds we need
                 uint256 toWithdraw = Math.min(_stakedBal, _neededFromStaked);
-                if (toWithdraw > 0)
+                if (toWithdraw > 0) {
                     prismaReceiver.withdraw(address(this), toWithdraw);
+                }
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
