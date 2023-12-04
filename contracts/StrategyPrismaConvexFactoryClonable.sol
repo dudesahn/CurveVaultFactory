@@ -11,8 +11,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     // Fees are in basis points
     uint256 internal constant FEE_DENOMINATOR = 10_000;
 
+    /// @notice Yearn's Prisma locker contract.
     address internal constant YEARN_LOCKER =
         0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
+    
+    /// @notice The address of the yPrisma token. This is minted to us as an alternative to creating a lock.
+    IERC20 public yPrisma = IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
 
     /* ========== STATE VARIABLES ========== */
 
@@ -40,14 +44,11 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The contract we deposit our LPs to that is approved for PRISMA emissions.
     IPrismaReceiver public prismaReceiver;
 
-    /// @notice The address of the yPrisma token. This is minted to us as an alternative to creating a lock.
-    IERC20 public yPrisma;
-
     /// @notice The address of our base token (CRV for Curve, BAL for Balancer, etc.).
-    IERC20 public crv;
+    IERC20 public constant crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     /// @notice The address of our Convex token (CVX for Curve, AURA for Balancer, etc.).
-    IERC20 public convexToken;
+    IERC20 public constant convexToken = IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
 
     /// @notice Minimum profit size in USDC that we want to harvest.
     /// @dev Only used in harvestTrigger.
@@ -75,16 +76,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
-        address _prismaReceiver,
-        address _yPrisma
+        address _prismaReceiver
     ) BaseStrategy(_vault) {
         _initializeStrat(
             _tradeFactory,
             _harvestProfitMinInUsdc,
             _harvestProfitMaxInUsdc,
             _prismaVault,
-            _prismaReceiver,
-            _yPrisma
+            _prismaReceiver
         );
     }
 
@@ -103,7 +102,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
     /// @param _prismaVault Address of the Prisma vault.
     /// @param _prismaReceiver Address of the Prisma receiver to farm.
-    /// @param _yPrisma Address of the yPRISMA token.
     function cloneStrategyPrismaConvex(
         address _vault,
         address _strategist,
@@ -113,8 +111,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
-        address _prismaReceiver,
-        address _yPrisma
+        address _prismaReceiver
     ) external returns (address newStrategy) {
         // dont clone a clone
         if (!isOriginal) {
@@ -147,8 +144,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             _harvestProfitMinInUsdc,
             _harvestProfitMaxInUsdc,
             _prismaVault,
-            _prismaReceiver,
-            _yPrisma
+            _prismaReceiver
         );
 
         emit Cloned(newStrategy);
@@ -165,7 +161,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
     /// @param _prismaVault Address of the Prisma vault to claim from.
     /// @param _prismaReceiver Address of the Prisma receiver to farm.
-    /// @param _yPrisma Address of the yPRISMA token.
     function initialize(
         address _vault,
         address _strategist,
@@ -175,8 +170,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
-        address _prismaReceiver,
-        address _yPrisma
+        address _prismaReceiver
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
@@ -184,8 +178,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             _harvestProfitMinInUsdc,
             _harvestProfitMaxInUsdc,
             _prismaVault,
-            _prismaReceiver,
-            _yPrisma
+            _prismaReceiver
         );
     }
 
@@ -195,8 +188,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
-        address _prismaReceiver,
-        address _yPrisma
+        address _prismaReceiver
     ) internal {
         // make sure that we havent initialized this before
         if (address(prismaVault) != address(0)) {
@@ -208,9 +200,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         tradeFactory = _tradeFactory;
         harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
-        yPrisma = IERC20(_yPrisma);
-        convexToken = IERC20(prismaReceiver.CVX());
-        crv = IERC20(prismaReceiver.CRV());
 
         // want = Curve LP
         want.approve(address(_prismaReceiver), type(uint256).max);

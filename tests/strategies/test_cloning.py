@@ -242,7 +242,6 @@ def test_cloning(
                     25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
-                    yprisma,
                     {"from": gov},
                 )
             tx = strategy.cloneStrategyPrismaConvex(
@@ -255,7 +254,6 @@ def test_cloning(
                 25_000 * 1e6,
                 prisma_vault,
                 prisma_receiver,
-                yprisma,
                 {"from": gov},
             )
 
@@ -289,7 +287,6 @@ def test_cloning(
                     25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
-                    yprisma,
                     {"from": gov},
                 )
 

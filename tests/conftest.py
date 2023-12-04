@@ -100,7 +100,7 @@ def amount(token):
 @pytest.fixture(scope="session")
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
-    profit_whale = accounts.at("0x5C21F24e5772f52DEfA4BB37f662120c50597b4f", force=True)
+    profit_whale = accounts.at("0xf76CB08792134aDb10F9cdeb0d1C7f9a59F0AA57", force=True)
     # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
@@ -389,7 +389,6 @@ def strategy(
             prisma_convex_factory.getDeterministicAddress(
                 pid
             ),  # This looks up the prisma receiver for the pool
-            yprisma,
         )
     # elif which_strategy == 3:   # prisma curve
     #     strategy = gov.deploy(
@@ -400,7 +399,6 @@ def strategy(
     #         25_000 * 1e6,
     #         prisma_vault,
     #         prisma_curve_factory.getDeterministicAddress(gauge.address), # This looks up the prisma receiver for the pool
-    #         yprisma,
     #     )
     else:  # frax
         strategy = gov.deploy(
