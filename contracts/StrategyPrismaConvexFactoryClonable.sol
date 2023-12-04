@@ -475,6 +475,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
         crv.approve(_tradeFactory, type(uint256).max);
         convexToken.approve(_tradeFactory, type(uint256).max);
+        yPrisma.approve(_tradeFactory, type(uint256).max);
 
         ITradeFactory tf = ITradeFactory(_tradeFactory);
         tf.enable(address(convexToken), _want);
