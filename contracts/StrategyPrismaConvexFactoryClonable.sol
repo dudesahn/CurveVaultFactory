@@ -508,6 +508,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         tradeFactory = address(0);
     }
 
+    function claimRewards() external onlyVaultManagers {
+        _claimRewards();
+    }
+
     /* ========== KEEP3RS ========== */
 
     /**
