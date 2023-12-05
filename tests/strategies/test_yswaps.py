@@ -81,7 +81,7 @@ def test_keepers_and_trade_handler(
         strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
     )
 
-    if which_strategy in [2,3]:
+    if which_strategy in [2, 3]:
         yprisma.transferFrom(
             strategy, whale, yprisma.balanceOf(strategy) / 2, {"from": trade_factory}
         )
@@ -97,12 +97,15 @@ def test_keepers_and_trade_handler(
             crv.transferFrom(
                 strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
             )
-        if which_strategy in [2,3]:
-            assert yprisma.allowance(strategy,trade_factory) == 0
+        if which_strategy in [2, 3]:
+            assert yprisma.allowance(strategy, trade_factory) == 0
             if yprisma.balanceOf(strategy) > 0:
                 with brownie.reverts():
                     yprisma.transferFrom(
-                        strategy, whale, yprisma.balanceOf(strategy) / 2, {"from": trade_factory}
+                        strategy,
+                        whale,
+                        yprisma.balanceOf(strategy) / 2,
+                        {"from": trade_factory},
                     )
 
     # give back those permissions, now trade factory can sweep
@@ -155,7 +158,7 @@ def test_keepers_and_trade_handler(
                 strategy.rewardsTokens(0)
 
         # only gov can update rewards
-        if which_strategy not in [2,3]:
+        if which_strategy not in [2, 3]:
             if which_strategy != 1:
                 with brownie.reverts():
                     strategy.updateRewards({"from": whale})

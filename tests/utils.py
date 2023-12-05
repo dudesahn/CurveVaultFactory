@@ -11,7 +11,7 @@ def harvest_strategy(
     profit_whale,
     profit_amount,
     target,
-    force_claim=True
+    force_claim=True,
 ):
 
     # reset everything with a sleep and mine

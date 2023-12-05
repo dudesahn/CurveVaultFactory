@@ -26,7 +26,7 @@ def test_triggers(
     which_strategy,
 ):
     # frax strategy gets stuck on these views, so we call them instead
-    if which_strategy == 2:
+    if which_strategy == 4:
         # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
         currentDebtRatio = vault.strategies(strategy)["debtRatio"]
         vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
@@ -213,6 +213,10 @@ def test_triggers(
 
         # simulate earnings
         chain.sleep(sleep_time)
+
+        # the rest of our trigger tests for the prisma receiver strategy is in test_misc
+        if which_strategy == 2:
+            return
 
         ################# GENERATE CLAIMABLE PROFIT HERE AS NEEDED #################
         # we simulate minting LUSD fees from liquity's borrower operations to the staking contract so we have claimable yield

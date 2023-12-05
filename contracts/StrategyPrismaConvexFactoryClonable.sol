@@ -14,7 +14,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice Yearn's Prisma locker contract.
     address internal constant YEARN_LOCKER =
         0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
-    
+
     /// @notice The address of the yPrisma token. This is minted to us as an alternative to creating a lock.
     IERC20 public yPrisma = IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
 
@@ -45,10 +45,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     IPrismaReceiver public prismaReceiver;
 
     /// @notice The address of our base token (CRV for Curve, BAL for Balancer, etc.).
-    IERC20 public constant crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+    IERC20 public constant crv =
+        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     /// @notice The address of our Convex token (CVX for Curve, AURA for Balancer, etc.).
-    IERC20 public constant convexToken = IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
+    IERC20 public constant convexToken =
+        IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
 
     /// @notice Minimum profit size in USDC that we want to harvest.
     /// @dev Only used in harvestTrigger.
@@ -612,10 +614,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         uint256 yPrismaPrice = (((ethUsdPrice * prismaEthPrice) / 1e8) *
             yprismaPrismaPrice) / 1e18; // usd price in 1e18
 
-        // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
+        // CRV and CVX prices are 1e8, yPRISMA is 1e18. All amounts are 1e18. Want to return as 1e6.
         return ((crvPrice * crvAmount + cvxPrice * cvxAmount) /
             1e20 +
-            ((yPrismaPrice * yPrismaAmount) / (1e18 * 1e12)));
+            ((yPrismaPrice * yPrismaAmount) / (1e30)));
     }
 
     /// @notice Convert our keepers eth cost into want

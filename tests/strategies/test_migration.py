@@ -34,7 +34,7 @@ def test_migration(
     prisma_convex_factory,
     yprisma,
     prisma_vault,
-    RELATIVE_APPROX
+    RELATIVE_APPROX,
 ):
 
     ## deposit to the vault after approving
@@ -76,7 +76,7 @@ def test_migration(
             new_proxy,
             gauge,
         )
-    elif which_strategy in [2,3]:  # prisma
+    elif which_strategy in [2, 3]:  # prisma
         new_strategy = gov.deploy(
             contract_name,
             vault,
@@ -146,7 +146,7 @@ def test_migration(
     if which_strategy != 2:
         assert crv.balanceOf(new_strategy) > 0
 
-    if which_strategy != 1 and which_strategy not in [2,3]:
+    if which_strategy != 1 and which_strategy not in [2, 3]:
         assert convex_token.balanceOf(strategy) == 0
         assert convex_token.balanceOf(new_strategy) > 0
 
@@ -275,7 +275,7 @@ def test_empty_migration(
             new_proxy,
             gauge,
         )
-    elif which_strategy in [2,3]:  # prisma
+    elif which_strategy in [2, 3]:  # prisma
         new_strategy = gov.deploy(
             contract_name,
             vault,

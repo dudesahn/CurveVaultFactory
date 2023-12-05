@@ -4,6 +4,7 @@ import brownie
 from brownie import ZERO_ADDRESS, chain, interface, Contract
 from utils import harvest_strategy
 
+
 def test_yprisma_claim(
     gov,
     token,
@@ -16,7 +17,7 @@ def test_yprisma_claim(
     profit_amount,
     target,
     use_yswaps,
-    yprisma
+    yprisma,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2**256 - 1, {"from": whale})
@@ -33,14 +34,69 @@ def test_yprisma_claim(
         profit_whale,
         profit_amount,
         target,
-        force_claim=False
+        force_claim=False,
     )
     claimable = receiver.claimableReward(strategy).dict()
-    # Check if any non-zero values
+    # Check if any non-zero values (shouldn't have any, should have small amounts for all assets)
     assert any(x for x in (claimable if isinstance(claimable, tuple) else (claimable,)))
 
+    chain.sleep(sleep_time)
+
+    # check that we have claimable profit, need this for min and max profit checks below
+    claimable_profit = strategy.claimableProfitInUsdc()
+    assert claimable_profit > 0
+    print("🤑 Claimable profit >0:", claimable_profit / 1e6)
+
+    # set our max delay to 1 day so we trigger true, then set it back to 21 days
+    # but will be false because no max boost
+    strategy.setMaxReportDelay(sleep_time - 1)
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be False.", tx)
+    assert tx == False
+    strategy.setMaxReportDelay(86400 * 21)
+
+    # we have tiny profit but that's okay; our triggers should be false because we don't have max boost
+    # update our minProfit so our harvest should trigger true
+    strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
+    # update our maxProfit so harvest should trigger true (max profit ignores whether we have full boost or not)
+    strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    strategy.setHarvestTriggerParams(2000e6, 25000e6, {"from": gov})
+
+    # turn on the force claim
+    strategy.setForceClaimOnce(True, {"from": vault.governance()})
+
+    # update our minProfit so our harvest triggers true
+    strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    # update our maxProfit so harvest triggers true
+    strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    strategy.setHarvestTriggerParams(2000e6, 25000e6, {"from": gov})
+
+    # set our max delay to 1 day so we trigger true, then set it back to 21 days
+    strategy.setMaxReportDelay(sleep_time - 1)
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be True.", tx)
+    assert tx == True
+    strategy.setMaxReportDelay(86400 * 21)
+
+    strategy.setForceClaimOnce(False, {"from": vault.governance()})
+
     # Now harvest again
-    
     (profit, loss) = harvest_strategy(
         use_yswaps,
         strategy,
@@ -49,18 +105,39 @@ def test_yprisma_claim(
         profit_whale,
         profit_amount,
         target,
-        force_claim=False
+        force_claim=False,
     )
-    assert yprisma.balanceOf(strategy) == 0 # This only works if we have exhausted our boost for current week
+    # This only works if we have exhausted our boost for current week (we won't have claimed any yPRISMA)
+    assert yprisma.balanceOf(strategy) == 0
+
+    # sleep to get to the new epoch
     chain.sleep(60 * 60 * 24 * 7)
     chain.mine()
-    
+
+    claimable_profit = strategy.claimableProfitInUsdc()
+    assert claimable_profit > 0
+    print("🤑 Claimable profit next epoch:", claimable_profit / 1e6)
+
     prisma_vault.allocateNewEmissions(eid)
     receiver.claimableReward(strategy)
-    y = '0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7'
+    y = "0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7"
     boosted = prisma_vault.getClaimableWithBoost(y)
     assert boosted[0] > 0
     assert strategy.claimsAreMaxBoosted()
+
+    # now we should be able to claim without forcing
+    # update our minProfit so our harvest triggers true
+    strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    # update our maxProfit so harvest triggers true
+    strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
     (profit, loss) = harvest_strategy(
         use_yswaps,
         strategy,
@@ -69,9 +146,10 @@ def test_yprisma_claim(
         profit_whale,
         profit_amount,
         target,
-        force_claim=False
+        force_claim=False,
     )
     assert yprisma.balanceOf(strategy) > 0
+
 
 # test removing a strategy from the withdrawal queue
 def test_remove_from_withdrawal_queue(
@@ -358,8 +436,8 @@ def test_setters(
                 strategy.setLocalKeepCrv(1000000, {"from": gov})
 
     if which_strategy == 2:
-        strategy.setVoters(gov, gov, {"from": gov})
-        strategy.setLocalKeepCrvs(10, 10, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
         if not tests_using_tenderly:
             # test our reverts as well
             with brownie.reverts():
