@@ -26,7 +26,7 @@ def test_triggers(
     which_strategy,
 ):
     # frax strategy gets stuck on these views, so we call them instead
-    if which_strategy == 2:
+    if which_strategy == 4:
         # inactive strategy (0 DR and 0 assets) shouldn't be touched by keepers
         currentDebtRatio = vault.strategies(strategy)["debtRatio"]
         vault.updateStrategyDebtRatio(strategy, 0, {"from": gov})
@@ -95,17 +95,17 @@ def test_triggers(
 
         if not (is_slippery and no_profit):
             # update our minProfit so our harvest triggers true
-            strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+            strategy.setHarvestTriggerParams(1, 1000000e6, False, {"from": gov})
             tx = strategy.harvestTrigger.call(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
 
             # update our maxProfit so harvest triggers true
-            strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+            strategy.setHarvestTriggerParams(1000000e6, 1, False, {"from": gov})
             tx = strategy.harvestTrigger.call(0, {"from": gov})
             print("\nShould we harvest? Should be true.", tx)
             assert tx == True
-            strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
+            strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
 
         # set our max delay to 1 day so we trigger true, then set it back to 21 days
         strategy.setMaxReportDelay(sleep_time - 1)
@@ -213,6 +213,10 @@ def test_triggers(
 
         # simulate earnings
         chain.sleep(sleep_time)
+
+        # the rest of our trigger tests for the prisma receiver strategy is in test_misc
+        if which_strategy == 2:
+            return
 
         ################# GENERATE CLAIMABLE PROFIT HERE AS NEEDED #################
         # we simulate minting LUSD fees from liquity's borrower operations to the staking contract so we have claimable yield

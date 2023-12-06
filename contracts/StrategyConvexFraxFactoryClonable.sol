@@ -3,95 +3,7 @@ pragma solidity 0.8.19;
 
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
 import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
-
-interface ITradeFactory {
-    function enable(address, address) external;
-
-    function disable(address, address) external;
-}
-
-interface IOracle {
-    function latestRoundData(
-        address,
-        address
-    )
-        external
-        view
-        returns (
-            uint80 roundId,
-            uint256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        );
-}
-
-interface IDetails {
-    // get details from curve
-    function name() external view returns (string memory);
-
-    function symbol() external view returns (string memory);
-}
-
-interface IConvexFrax {
-    // use this to create our personal convex frax vault for this strategy to get convex's FXS boost
-    function createVault(uint256 pid) external returns (address);
-
-    function getReward() external; // claim our rewards from the staking contract via our user vault
-
-    function stakeLockedCurveLp(
-        uint256 _liquidity,
-        uint256 _secs
-    ) external returns (bytes32 kek_id); // stake our frax convex LP as a new kek
-
-    function lockAdditionalCurveLp(bytes32 _kek_id, uint256 _addl_liq) external; // add want to an existing lock/kek
-
-    // returns FXS first, then any other reward token, then CRV and CVX
-    // this is used on newer pools
-    function earned(
-        address
-    ) external view returns (uint256[] memory total_earned);
-
-    // this is used for our userVault on older pools
-    function earned()
-        external
-        view
-        returns (
-            address[] memory token_addresses,
-            uint256[] memory total_earned
-        );
-
-    function getAllRewardTokens()
-        external
-        view
-        returns (address[] memory token_addresses);
-
-    function fxs() external view returns (address);
-
-    function crv() external view returns (address);
-
-    function cvx() external view returns (address);
-
-    function lock_time_for_max_multiplier() external view returns (uint256);
-
-    function lock_time_min() external view returns (uint256);
-
-    struct LockedStake {
-        bytes32 kek_id;
-        uint256 start_timestamp;
-        uint256 amount;
-        uint256 ending_timestamp;
-        uint256 multiplier; // 6 decimals of precision. 1x = 1000000
-    }
-
-    function lockedLiquidityOf(address user) external view returns (uint256);
-
-    function lockedStakesOf(
-        address _address
-    ) external view returns (LockedStake[] memory);
-
-    function withdrawLockedAndUnwrap(bytes32 _kek_id) external;
-}
+import "./interfaces/ConvexFraxInterfaces.sol";
 
 contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
@@ -134,7 +46,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice This is a unique numerical identifier for each Convex Frax pool.
     uint256 public fraxPid;
 
-    /// @notice This is the vault our strategy uses to stake on Frax and use Convex's boost.
+    /// @notice This is the vault our strategy uses to stake on Frax and use Convexs boost.
     IConvexFrax public userVault;
 
     /// @notice The percentage of CRV from each harvest that we send to our voter (out of 10,000).
@@ -186,7 +98,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice Array of any extra rewards tokens this Convex pool may have.
     address[] public rewardsTokens;
 
-    /// @notice Will only be true on the original deployed contract and not on clones; we don't want to clone a clone.
+    /// @notice Will only be true on the original deployed contract and not on clones; we do not want to clone a clone.
     bool public isOriginal = true;
 
     // Vars to track our frax deposits
@@ -259,9 +171,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) external returns (address newStrategy) {
-        // don't clone a clone
+        // dont clone a clone
         if (!isOriginal) {
-            revert("Can't clone a clone'");
+            revert("Cant clone a clone");
         }
 
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -343,7 +255,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 _harvestProfitMaxInUsdc,
         address _booster
     ) internal {
-        // make sure that we haven't initialized this before
+        // make sure that we havent initialized this before
         if (fraxBooster != address(0)) {
             revert("Already initialized");
         }
@@ -507,7 +419,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             }
         }
 
-        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it
+        // serious loss should never happen, but if it does (for instance, if Curve is hacked), lets record it
         uint256 assets = estimatedTotalAssets();
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
@@ -530,14 +442,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 }
             }
         }
-        // if assets are less than debt, we are in trouble. don't worry about withdrawing here, just report losses
+        // if assets are less than debt, we are in trouble. dont worry about withdrawing here, just report losses
         else {
             _loss = debt - assets;
         }
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
-        // if in emergency exit, we don't want to deploy any more funds
+        // if in emergency exit, we dont want to deploy any more funds
         if (emergencyExit) {
             return;
         }
@@ -545,13 +457,13 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
 
-        // don't bother with dust
+        // dont bother with dust
         uint256 _minDeposit = uint256(depositInfo.minDeposit);
         if (_toInvest < _minDeposit) {
             return;
         }
 
-        // don't want a single kek too large vs others
+        // dont want a single kek too large vs others
         uint256 _maxSingleDeposit = uint256(depositInfo.maxSingleDeposit);
         if (_toInvest > _maxSingleDeposit) {
             _toInvest = _maxSingleDeposit;
@@ -567,7 +479,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             IConvexFrax.LockedStake[] memory stake = stakingAddress
                 .lockedStakesOf(address(userVault));
 
-            // only add to existing if we've maxxed out our number of keks
+            // only add to existing if weve maxxed out our number of keks
             if (depositInfo.addToExistingKeks) {
                 // figure out which is our lowest TVL kek, start with our latest one
                 IConvexFrax.LockedStake memory latestStake = stake[
@@ -597,7 +509,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 IConvexFrax.LockedStake memory firstStake = stake[
                     _nextKek - _maxKeks
                 ];
-                // Make sure it hasn't already been withdrawn
+                // Make sure it hasnt already been withdrawn
                 if (firstStake.amount > 0) {
                     // Withdraw funds and add them to the amount to deposit
                     userVault.withdrawLockedAndUnwrap(firstStake.kek_id);
@@ -605,7 +517,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                         _toInvest += firstStake.amount;
                     }
 
-                    // don't want a single kek too large vs others
+                    // dont want a single kek too large vs others
                     if (_toInvest > _maxSingleDeposit) {
                         _toInvest = _maxSingleDeposit;
                     }
@@ -789,7 +701,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     ) external onlyGovernance {
         require(
             _newTradeFactory != address(0),
-            "Can't remove with this function"
+            "Cant remove with this function"
         );
         _removeTradeFactoryPermissions(true);
         tradeFactory = _newTradeFactory;
@@ -872,17 +784,17 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
      * @notice
      *  Provide a signal to the keeper that harvest() should be called.
      *
-     *  Don't harvest if a strategy is inactive.
+     *  Dont harvest if a strategy is inactive.
      *  If our profit exceeds our upper limit, then harvest no matter what. For our lower profit limit, credit
      *  threshold, max delay, and manual force trigger, only harvest if our gas price is acceptable.
      *
-     * @param _callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
+     * @param _callCostinEth The keepers estimated gas cost to call harvest() (in wei).
      * @return True if harvest() should be called, false otherwise.
      */
     function harvestTrigger(
         uint256 _callCostinEth
     ) public view override returns (bool) {
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we dont need to adjust
         //  keeper job.
         if (!isActive()) {
             return false;
@@ -915,7 +827,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // harvest our credit if it's above our threshold
+        // harvest our credit if its above our threshold
         if (vault.creditAvailable() > creditThreshold) {
             return true;
         }
@@ -928,7 +840,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // otherwise, we don't harvest
+        // otherwise, we dont harvest
         return false;
     }
 
@@ -977,8 +889,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     }
 
     /**
-     * @notice Convert our keeper's eth cost into want
-     * @dev We don't use this since we don't factor call cost into our harvestTrigger.
+     * @notice Convert our keepers eth cost into want
+     * @dev We dont use this since we dont factor call cost into our harvestTrigger.
      * @param _ethAmount Amount of ether spent.
      * @return Value of ether in want.
      */

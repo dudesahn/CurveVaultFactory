@@ -3,21 +3,22 @@ pragma solidity 0.8.19;
 
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
 import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
-import "./interfaces/ConvexInterfaces.sol";
+import "./interfaces/PrismaInterfaces.sol";
 
-contract StrategyConvexFactoryClonable is BaseStrategy {
+contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
 
+    // Fees are in basis points
+    uint256 internal constant FEE_DENOMINATOR = 10_000;
+
+    /// @notice Yearn's Prisma locker contract.
+    address internal constant YEARN_LOCKER =
+        0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
+
+    /// @notice The address of the yPrisma token. This is minted to us as an alternative to creating a lock.
+    IERC20 public yPrisma = IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
+
     /* ========== STATE VARIABLES ========== */
-
-    /// @notice This is the deposit contract that all Convex pools use, aka booster.
-    address public depositContract;
-
-    /// @notice This is unique to each pool and holds the rewards.
-    IConvexRewards public rewardsContract;
-
-    /// @notice This is a unique numerical identifier for each Convex pool.
-    uint256 public pid;
 
     /// @notice The percentage of CRV from each harvest that we send to our voter (out of 10,000).
     uint256 public localKeepCRV;
@@ -25,23 +26,31 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @notice The percentage of CVX from each harvest that we send to our voter (out of 10,000).
     uint256 public localKeepCVX;
 
+    /// @notice The percentage of yPRISMA from each harvest that we send to our voter (out of 10,000).
+    uint256 public localKeepYPrisma;
+
     /// @notice The address of our Curve voter. This is where we send any keepCRV.
     address public curveVoter;
 
     /// @notice The address of our Convex voter. This is where we send any keepCVX.
     address public convexVoter;
 
-    // this means all of our fee values are in basis points
-    uint256 internal constant FEE_DENOMINATOR = 10000;
+    /// @notice The address of our yPRISMA POL contract. This is where we send any keepYPrisma.
+    address public yprismaVoter;
+
+    /// @notice Where we claim emissions as yPRISMA
+    IPrismaVault public prismaVault;
+
+    /// @notice The contract we deposit our LPs to that is approved for PRISMA emissions.
+    IPrismaReceiver public prismaReceiver;
 
     /// @notice The address of our base token (CRV for Curve, BAL for Balancer, etc.).
-    IERC20 public crv;
+    IERC20 public constant crv =
+        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     /// @notice The address of our Convex token (CVX for Curve, AURA for Balancer, etc.).
-    IERC20 public convexToken;
-
-    /// @notice Whether we should claim rewards when withdrawing, generally this should be false.
-    bool public claimRewards;
+    IERC20 public constant convexToken =
+        IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
 
     /// @notice Minimum profit size in USDC that we want to harvest.
     /// @dev Only used in harvestTrigger.
@@ -51,16 +60,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @dev Only used in harvestTrigger.
     uint256 public harvestProfitMaxInUsdc;
 
-    /// @notice Check if we need to earmark rewards on Convex before harvesting, usually false.
-    /// @dev Only used in harvestTrigger.
-    bool public checkEarmark;
-
     // ySwaps stuff
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
 
-    /// @notice Array of any extra rewards tokens this Convex pool may have.
-    address[] public rewardsTokens;
+    /// @notice We use this flag to signal a desire to claim even if Yearns locker cant provide max boost.
+    bool public forceClaimOnce;
 
     /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
@@ -70,19 +75,17 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     constructor(
         address _vault,
         address _tradeFactory,
-        uint256 _pid,
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
-        address _booster,
-        address _convexToken
+        address _prismaVault,
+        address _prismaReceiver
     ) BaseStrategy(_vault) {
         _initializeStrat(
             _tradeFactory,
-            _pid,
             _harvestProfitMinInUsdc,
             _harvestProfitMaxInUsdc,
-            _booster,
-            _convexToken
+            _prismaVault,
+            _prismaReceiver
         );
     }
 
@@ -97,22 +100,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @param _rewards If we have any strategist rewards, send them here.
     /// @param _keeper Address to grant the keeper role.
     /// @param _tradeFactory Our trade factory address.
-    /// @param _pid Our pool id (pid) for this strategy.
     /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
     /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _booster Address of the convex booster/deposit contract.
-    /// @param _convexToken Address of our convex token.
-    function cloneStrategyConvex(
+    /// @param _prismaVault Address of the Prisma vault.
+    /// @param _prismaReceiver Address of the Prisma receiver to farm.
+    function cloneStrategyPrismaConvex(
         address _vault,
         address _strategist,
         address _rewards,
         address _keeper,
         address _tradeFactory,
-        uint256 _pid,
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
-        address _booster,
-        address _convexToken
+        address _prismaVault,
+        address _prismaReceiver
     ) external returns (address newStrategy) {
         // dont clone a clone
         if (!isOriginal) {
@@ -136,17 +137,16 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyConvexFactoryClonable(newStrategy).initialize(
+        StrategyPrismaConvexFactoryClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
             _keeper,
             _tradeFactory,
-            _pid,
             _harvestProfitMinInUsdc,
             _harvestProfitMaxInUsdc,
-            _booster,
-            _convexToken
+            _prismaVault,
+            _prismaReceiver
         );
 
         emit Cloned(newStrategy);
@@ -159,76 +159,58 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @param _rewards If we have any strategist rewards, send them here.
     /// @param _keeper Address to grant the keeper role.
     /// @param _tradeFactory Our trade factory address.
-    /// @param _pid Our pool id (pid) for this strategy.
     /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
     /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _booster Address of the convex booster/deposit contract.
-    /// @param _convexToken Address of our convex token.
+    /// @param _prismaVault Address of the Prisma vault to claim from.
+    /// @param _prismaReceiver Address of the Prisma receiver to farm.
     function initialize(
         address _vault,
         address _strategist,
         address _rewards,
         address _keeper,
         address _tradeFactory,
-        uint256 _pid,
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
-        address _booster,
-        address _convexToken
+        address _prismaVault,
+        address _prismaReceiver
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
         _initializeStrat(
             _tradeFactory,
-            _pid,
             _harvestProfitMinInUsdc,
             _harvestProfitMaxInUsdc,
-            _booster,
-            _convexToken
+            _prismaVault,
+            _prismaReceiver
         );
     }
 
     // this is called by our original strategy, as well as any clones via the above function
     function _initializeStrat(
         address _tradeFactory,
-        uint256 _pid,
         uint256 _harvestProfitMinInUsdc,
         uint256 _harvestProfitMaxInUsdc,
-        address _booster,
-        address _convexToken
+        address _prismaVault,
+        address _prismaReceiver
     ) internal {
         // make sure that we havent initialized this before
-        if (depositContract != address(0)) {
-            revert("Already initialized");
-        }
+        require(_prismaVault != address(0), "Non-zero required");
+        require(address(prismaVault) == address(0), "Already initialized");
 
-        // 1:1 assignments
+        prismaReceiver = IPrismaReceiver(_prismaReceiver);
+        prismaVault = IPrismaVault(_prismaVault);
         tradeFactory = _tradeFactory;
-        pid = _pid;
         harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
-        depositContract = _booster;
-        convexToken = IERC20(_convexToken);
 
         // want = Curve LP
-        want.approve(address(_booster), type(uint256).max);
+        want.approve(address(_prismaReceiver), type(uint256).max);
 
         // set up our baseStrategy vars
         maxReportDelay = 365 days;
         creditThreshold = 50_000e18;
 
-        // use the booster contract to pull more info needed
-        IConvexDeposit booster = IConvexDeposit(_booster);
-        crv = IERC20(booster.crv());
-        (address lptoken, , , address _rewardsContract, , ) = booster.poolInfo(
-            _pid
-        );
-        rewardsContract = IConvexRewards(_rewardsContract);
-        if (address(lptoken) != address(want)) {
-            revert();
-        }
+        require(address(want) == prismaReceiver.lpToken(), "Wrong LP.");
 
-        // set up rewards and trade factory
-        _updateRewards();
         _setUpTradeFactory();
     }
 
@@ -239,26 +221,21 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         return
             string(
                 abi.encodePacked(
-                    "StrategyConvexFactory-",
+                    "StrategyPrismaConvexFactory-",
                     IDetails(address(want)).symbol()
                 )
             );
     }
 
-    /// @notice Balance of want staked in Convex.
+    /// @notice Balance of want staked in Prisma.
     function stakedBalance() public view returns (uint256) {
-        return rewardsContract.balanceOf(address(this));
+        return prismaReceiver.balanceOf(address(this));
     }
 
     /// @notice Balance of want sitting in our strategy.
     function balanceOfWant() public view returns (uint256) {
         // balance of want sitting in our strategy
         return want.balanceOf(address(this));
-    }
-
-    /// @notice Balance of CRV we can claim from the staking contract.
-    function claimableBalance() public view returns (uint256) {
-        return rewardsContract.earned(address(this));
     }
 
     /// @notice Total assets the strategy holds, sum of loose and staked want.
@@ -275,9 +252,8 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         override
         returns (uint256 _profit, uint256 _loss, uint256 _debtPayment)
     {
-        // this claims our CRV, CVX, and any extra tokens like SNX or ANKR. no harm leaving this true even if no extra rewards currently
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
-        rewardsContract.getReward(address(this), true);
+        _claimRewards();
 
         // by default this is zero, but if we want any for our voter this will be used
         uint256 _localKeepCRV = localKeepCRV;
@@ -303,6 +279,21 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             }
             if (_sendToVoter > 0) {
                 convexToken.safeTransfer(_convexVoter, _sendToVoter);
+            }
+        }
+
+        // by default this is zero, but if we want any for our voter this will be used
+        uint256 _localKeepYPrisma = localKeepYPrisma;
+        address _yprismaVoter = yprismaVoter;
+        if (_localKeepYPrisma > 0 && _yprismaVoter != address(0)) {
+            uint256 yprismaBalance = yPrisma.balanceOf(address(this));
+            unchecked {
+                _sendToVoter =
+                    (yprismaBalance * _localKeepYPrisma) /
+                    FEE_DENOMINATOR;
+            }
+            if (_sendToVoter > 0) {
+                yPrisma.safeTransfer(_yprismaVoter, _sendToVoter);
             }
         }
 
@@ -350,10 +341,9 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // Send all of our Curve pool tokens to be deposited
         uint256 _toInvest = balanceOfWant();
 
-        // deposit into convex and stake immediately but only if we have something to invest
-        // the final true argument means we deposit + stake at the same time
+        // deposit into Prisma
         if (_toInvest > 0) {
-            IConvexDeposit(depositContract).deposit(pid, _toInvest, true);
+            prismaReceiver.deposit(address(this), _toInvest);
         }
     }
 
@@ -370,10 +360,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                     _neededFromStaked = _amountNeeded - _wantBal;
                 }
                 // withdraw whatever extra funds we need
-                rewardsContract.withdrawAndUnwrap(
-                    Math.min(_stakedBal, _neededFromStaked),
-                    claimRewards
-                );
+                uint256 toWithdraw = Math.min(_stakedBal, _neededFromStaked);
+                if (toWithdraw > 0) {
+                    prismaReceiver.withdraw(address(this), toWithdraw);
+                }
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
@@ -391,7 +381,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             // dont bother withdrawing zero, save gas where we can
-            rewardsContract.withdrawAndUnwrap(_stakedBal, claimRewards);
+            prismaReceiver.withdraw(address(this), _stakedBal);
         }
         return balanceOfWant();
     }
@@ -401,7 +391,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         uint256 stakedBal = stakedBalance();
 
         if (stakedBal > 0) {
-            rewardsContract.withdrawAndUnwrap(stakedBal, claimRewards);
+            prismaReceiver.withdraw(address(this), stakedBal);
         }
 
         uint256 crvBal = crv.balanceOf(address(this));
@@ -423,54 +413,36 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         returns (address[] memory)
     {}
 
-    /// @notice In case we need to emergency exit into the convex deposit
-    ///  token, this will allow us to do that.
-    /// @dev Make sure to check claimRewards before this step if needed, and
-    ///  plan to have gov sweep convex deposit tokens from strategy after this.
-    function withdrawToConvexDepositTokens() external onlyVaultManagers {
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            rewardsContract.withdraw(_stakedBal, claimRewards);
+    function _claimRewards() internal {
+        // By default, we only claim if max boosted. Force claim once if needed.
+        bool _forceClaimOnce = forceClaimOnce;
+
+        if (claimsAreMaxBoosted() || _forceClaimOnce) {
+            address[] memory rewardContracts = new address[](1);
+            rewardContracts[0] = address(prismaReceiver);
+            prismaVault.batchClaimRewards(
+                YEARN_LOCKER, // receiver
+                YEARN_LOCKER, // delegate
+                rewardContracts, // rewards contracts
+                FEE_DENOMINATOR // maxFee
+            );
+
+            // reset if we forced this one
+            if (_forceClaimOnce) {
+                forceClaimOnce = false;
+            }
         }
+    }
+
+    function claimsAreMaxBoosted() public view returns (bool) {
+        (uint256 claimable, , ) = prismaReceiver.claimableReward(address(this));
+        (uint256 maxBoostable, ) = prismaVault.getClaimableWithBoost(
+            YEARN_LOCKER
+        );
+        return maxBoostable >= claimable;
     }
 
     /* ========== YSWAPS ========== */
-
-    /// @notice Use to add or update rewards, rebuilds tradefactory too
-    /// @dev Do this before updating trade factory if we have extra rewards.
-    ///  Can only be called by governance.
-    function updateRewards() external onlyGovernance {
-        // store this to save our tradefactory address before tearing it down
-        address tf = tradeFactory;
-        _removeTradeFactoryPermissions(true);
-
-        // set things up again
-        _updateRewards();
-        tradeFactory = tf;
-        _setUpTradeFactory();
-    }
-
-    function _updateRewards() internal {
-        // empty the rewardsTokens and rebuild
-        delete rewardsTokens;
-
-        // convex provides us info on any extra tokens we may receive
-        uint256 length = rewardsContract.extraRewardsLength();
-        address _convexToken = address(convexToken);
-        for (uint256 i; i < length; ++i) {
-            address virtualRewardsPool = rewardsContract.extraRewards(i);
-            address _rewardsToken = IConvexRewards(virtualRewardsPool)
-                .rewardToken();
-
-            // we only need to approve the new token and turn on rewards if the extra reward isnt CVX
-            if (_rewardsToken == _convexToken) {
-                continue;
-            }
-
-            // add our approved token to our rewards token array
-            rewardsTokens.push(_rewardsToken);
-        }
-    }
 
     /// @notice Use to update our trade factory.
     /// @dev Can only be called by governance.
@@ -492,47 +464,14 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         address _tradeFactory = tradeFactory;
         address _want = address(want);
 
-        ITradeFactory tf = ITradeFactory(_tradeFactory);
         crv.approve(_tradeFactory, type(uint256).max);
-        tf.enable(address(crv), _want);
-
-        // enable for any rewards tokens too
-        for (uint256 i; i < rewardsTokens.length; ++i) {
-            address _rewardsToken = rewardsTokens[i];
-
-            // set approval to max uint, but only if its a standard token
-            bool success = _callApproveRewardTokens(
-                _rewardsToken,
-                _tradeFactory,
-                type(uint256).max
-            );
-
-            // skip a token we cant approve
-            if (!success) {
-                continue;
-            }
-
-            tf.enable(_rewardsToken, _want);
-        }
-
         convexToken.approve(_tradeFactory, type(uint256).max);
+        yPrisma.approve(_tradeFactory, type(uint256).max);
+
+        ITradeFactory tf = ITradeFactory(_tradeFactory);
         tf.enable(address(convexToken), _want);
-    }
-
-    function _callApproveRewardTokens(
-        address _token,
-        address _spender,
-        uint256 _amount
-    ) internal returns (bool success) {
-        // make sure a given reward token has the approve() method
-        bytes memory data = abi.encodeWithSignature(
-            "approve(address,uint256)",
-            _spender,
-            _amount
-        );
-
-        // if this works, then our reward token will be approved on our tradeFactory
-        (success, ) = _token.call(data);
+        tf.enable(address(crv), _want);
+        tf.enable(address(yPrisma), _want);
     }
 
     /// @notice Use this to remove permissions from our current trade factory.
@@ -558,33 +497,21 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             tf.disable(address(crv), _want);
         }
 
-        // disable for all rewards tokens too
-        for (uint256 i; i < rewardsTokens.length; ++i) {
-            address _rewardsToken = rewardsTokens[i];
-
-            // set approval to zero, but only if its a standard token
-            bool success = _callApproveRewardTokens(
-                _rewardsToken,
-                _tradeFactory,
-                0
-            );
-
-            // skip a token we cant approve
-            if (!success) {
-                continue;
-            }
-
-            if (_disableTf) {
-                tf.disable(_rewardsToken, _want);
-            }
-        }
-
         convexToken.approve(_tradeFactory, 0);
         if (_disableTf) {
             tf.disable(address(convexToken), _want);
         }
 
+        yPrisma.approve(_tradeFactory, 0);
+        if (_disableTf) {
+            tf.disable(address(yPrisma), _want);
+        }
+
         tradeFactory = address(0);
+    }
+
+    function claimRewards() external onlyVaultManagers {
+        _claimRewards();
     }
 
     /* ========== KEEP3RS ========== */
@@ -593,7 +520,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
      * @notice
      *  Provide a signal to the keeper that harvest() should be called.
      *
-     *  Dont harvest if a strategy is inactive, or if it needs an earmark first.
+     *  Dont harvest if a strategy is inactive.
      *  If our profit exceeds our upper limit, then harvest no matter what. For
      *  our lower profit limit, credit threshold, max delay, and manual force trigger,
      *  only harvest if our gas price is acceptable.
@@ -607,14 +534,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         // Should not trigger if strategy is not active (no assets and no debtRatio). This means we dont need to adjust keeper job.
         if (!isActive()) {
             return false;
-        }
-
-        // only check if we need to earmark on vaults we know are problematic
-        if (checkEarmark) {
-            // dont harvest if we need to earmark convex rewards
-            if (needsEarmarkReward()) {
-                return false;
-            }
         }
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
@@ -633,14 +552,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // harvest if we have a sufficient profit to claim, but only if our gas price is acceptable
-        if (claimableProfit > harvestProfitMinInUsdc) {
+        // harvest if we have a sufficient profit to claim and are max boosted.
+        if (
+            claimableProfit > harvestProfitMinInUsdc &&
+            (claimsAreMaxBoosted() || forceClaimOnce)
+        ) {
             return true;
         }
 
         StrategyParams memory params = vault.strategies(address(this));
-        // harvest regardless of profit once we reach our maxDelay
-        if (block.timestamp - params.lastReport > maxReportDelay) {
+        // harvest regardless of profit once we reach our maxDelay and are max boosted.
+        if (
+            block.timestamp - params.lastReport > maxReportDelay &&
+            (claimsAreMaxBoosted() || forceClaimOnce)
+        ) {
             return true;
         }
 
@@ -657,6 +582,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @dev Uses Chainlinks feed registry.
     /// @return Total return in USDC from selling claimable CRV and CVX.
     function claimableProfitInUsdc() public view returns (uint256) {
+        (
+            uint256 yPrismaAmount,
+            uint256 crvAmount,
+            uint256 cvxAmount
+        ) = prismaReceiver.claimableReward(address(this)); // This assumes 2x boost for prisma amount
+
         (, uint256 crvPrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
         ).latestRoundData(
@@ -671,47 +602,22 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
                 address(0x0000000000000000000000000000000000000348) // USD, returns 1e8
             );
 
-        // calculations pulled directly from CVXs contract for minting CVX per CRV claimed
-        uint256 totalCliffs = 1_000;
-        uint256 maxSupply; // 100mil
-        unchecked {
-            maxSupply = 100 * 1_000_000 * 1e18;
-        }
-        uint256 reductionPerCliff; // 100,000
-        unchecked {
-            reductionPerCliff = 100_000 * 1e18;
-        }
-        uint256 supply = convexToken.totalSupply();
-        uint256 mintableCvx;
+        uint256 ethUsdPrice = ISimpleOracle(
+            0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419
+        ).latestAnswer();
+        uint256 prismaEthPrice = ICurveOracle(
+            0x322135Dd9cBAE8Afa84727d9aE1434b5B3EBA44B
+        ).price_oracle();
+        uint256 yprismaPrismaPrice = ICurveOracle(
+            0x69833361991ed76f9e8DBBcdf9ea1520fEbFb4a7
+        ).price_oracle();
+        uint256 yPrismaPrice = (((ethUsdPrice * prismaEthPrice) / 1e8) *
+            yprismaPrismaPrice) / 1e18; // usd price in 1e18
 
-        uint256 cliff;
-        unchecked {
-            cliff = supply / reductionPerCliff;
-        }
-        uint256 _claimableBal = claimableBalance();
-
-        // mint if below total cliffs
-        if (cliff < totalCliffs) {
-            uint256 reduction; // for reduction% take inverse of current cliff
-            unchecked {
-                reduction = totalCliffs - cliff;
-            }
-            // reduce
-            unchecked {
-                mintableCvx = (_claimableBal * reduction) / totalCliffs;
-            }
-
-            uint256 amtTillMax; // supply cap check
-            unchecked {
-                amtTillMax = maxSupply - supply;
-            }
-            if (mintableCvx > amtTillMax) {
-                mintableCvx = amtTillMax;
-            }
-        }
-
-        // Oracle returns prices as 6 decimals, so multiply by claimable amount and divide by token decimals (1e18)
-        return (crvPrice * _claimableBal + cvxPrice * mintableCvx) / 1e20;
+        // CRV and CVX prices are 1e8, yPRISMA is 1e18. All amounts are 1e18. Want to return as 1e6.
+        return ((crvPrice * crvAmount + cvxPrice * cvxAmount) /
+            1e20 +
+            ((yPrismaPrice * yPrismaAmount) / (1e30)));
     }
 
     /// @notice Convert our keepers eth cost into want
@@ -722,17 +628,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         uint256 _ethAmount
     ) public view override returns (uint256) {}
 
-    /// @notice Check if someone needs to earmark rewards on Convex before keepers harvest again.
-    /// @dev Not worth harvesting if this is true as our rewards will be minimal.
-    /// @return needsEarmark Whether or not rewards need to be earmarked before flowing again.
-    function needsEarmarkReward() public view returns (bool needsEarmark) {
-        // check if there is any CRV we need to earmark
-        uint256 crvExpiry = rewardsContract.periodFinish();
-        if (crvExpiry < block.timestamp) {
-            return true;
-        }
-    }
-
     /* ========== SETTERS ========== */
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
@@ -742,9 +637,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @param _keepCvx Percent of each CVX harvest to send to our voter.
     function setLocalKeepCrvs(
         uint256 _keepCrv,
-        uint256 _keepCvx
+        uint256 _keepCvx,
+        uint256 _keepYPrisma
     ) external onlyGovernance {
-        if (_keepCrv > 10_000 || _keepCvx > 10_000) {
+        if (_keepCrv > 10_000 || _keepCvx > 10_000 || _keepYPrisma > 10_000) {
             revert();
         }
 
@@ -756,8 +652,13 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
             revert();
         }
 
+        if (_keepYPrisma > 0 && yprismaVoter == address(0)) {
+            revert();
+        }
+
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
+        localKeepYPrisma = _keepYPrisma;
     }
 
     /// @notice Use this to set or update our voter contracts.
@@ -765,19 +666,15 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     ///  Only governance can set this.
     /// @param _curveVoter Address of our curve voter.
     /// @param _convexVoter Address of our convex voter.
+    /// @param _yprismaVoter Address of our yPRISMA voter.
     function setVoters(
         address _curveVoter,
-        address _convexVoter
+        address _convexVoter,
+        address _yprismaVoter
     ) external onlyGovernance {
         curveVoter = _curveVoter;
         convexVoter = _convexVoter;
-    }
-
-    /// @notice Set whether we claim rewards on withdrawals.
-    /// @dev Usually false, but may set to true during migrations.
-    /// @param _claimRewards Whether we want to claim rewards on withdrawals.
-    function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
-        claimRewards = _claimRewards;
+        yprismaVoter = _yprismaVoter;
     }
 
     /**
@@ -787,16 +684,23 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
      *  that will trigger a harvest if gas price is acceptable.
      * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
      *  will trigger a harvest regardless of gas price.
-     * @param _checkEarmark Whether or not we should check Convexs
-     *  booster to see if we need to earmark before harvesting.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc,
-        bool _checkEarmark
+        uint256 _harvestProfitMaxInUsdc
     ) external onlyVaultManagers {
         harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
-        checkEarmark = _checkEarmark;
+    }
+
+    /**
+     * @notice
+     *  Here we force a claim of yPRISMA on our next harvest, even if not fully boosted.
+     @param _forceClaimOnce True if we want to allow claims that are not max boosted.
+     */
+    function setForceClaimOnce(
+        bool _forceClaimOnce
+    ) external onlyVaultManagers {
+        forceClaimOnce = _forceClaimOnce;
     }
 }

@@ -20,6 +20,7 @@ def test_keepers_and_trade_handler(
     crv_whale,
     which_strategy,
     tests_using_tenderly,
+    yprisma,
 ):
     # no testing needed if we're not using yswaps
     if not use_yswaps:
@@ -80,6 +81,11 @@ def test_keepers_and_trade_handler(
         strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
     )
 
+    if which_strategy in [2, 3]:
+        yprisma.transferFrom(
+            strategy, whale, yprisma.balanceOf(strategy) / 2, {"from": trade_factory}
+        )
+
     # remove our trade handler
     strategy.removeTradeFactoryPermissions(True, {"from": gov})
     assert strategy.tradeFactory() == ZERO_ADDRESS
@@ -91,6 +97,16 @@ def test_keepers_and_trade_handler(
             crv.transferFrom(
                 strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
             )
+        if which_strategy in [2, 3]:
+            assert yprisma.allowance(strategy, trade_factory) == 0
+            if yprisma.balanceOf(strategy) > 0:
+                with brownie.reverts():
+                    yprisma.transferFrom(
+                        strategy,
+                        whale,
+                        yprisma.balanceOf(strategy) / 2,
+                        {"from": trade_factory},
+                    )
 
     # give back those permissions, now trade factory can sweep
     strategy.updateTradeFactory(trade_factory, {"from": gov})
@@ -120,7 +136,7 @@ def test_keepers_and_trade_handler(
     strategy.updateTradeFactory(trade_factory, {"from": gov})
 
     # update our rewards again, shouldn't really change things
-    if which_strategy == 2:
+    if which_strategy == 4:
         tx = strategy.updateRewards({"from": gov})
         print("Tx ID:", tx)
     elif which_strategy == 0:
@@ -137,14 +153,15 @@ def test_keepers_and_trade_handler(
         if which_strategy == 1:
             with brownie.reverts():
                 strategy.rewardsTokens(0)
-        if which_strategy == 2:
+        if which_strategy == 4:
             with brownie.reverts():
                 strategy.rewardsTokens(0)
 
         # only gov can update rewards
-        if which_strategy != 1:
-            with brownie.reverts():
-                strategy.updateRewards({"from": whale})
-        else:
-            with brownie.reverts():
-                strategy.updateRewards([], {"from": whale})
+        if which_strategy not in [2, 3]:
+            if which_strategy != 1:
+                with brownie.reverts():
+                    strategy.updateRewards({"from": whale})
+            else:
+                with brownie.reverts():
+                    strategy.updateRewards([], {"from": whale})

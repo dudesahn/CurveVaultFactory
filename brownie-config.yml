@@ -1,7 +1,7 @@
 # use Ganache's forked mainnet mode as the default network
 # NOTE: You don't *have* to do this, but it is often helpful for testing
 networks:
-  default: mainnet-fork
+  default: mainnet-anvil-fork
 
 # automatically fetch contract sources from Etherscan
 autofetch_sources: True
@@ -17,11 +17,9 @@ compiler:
   solc:
     version:
     remappings:
-      - "@yearnvaults=yearn/yearn-vaults@0.4.6"
       - "github.com/yearn/yearn-vaults/blob/v0.4.6=yearn/yearn-vaults@0.4.6"
       - "@openzeppelin/contracts@4.9.3=OpenZeppelin/openzeppelin-contracts@4.9.3/contracts"
       - "@openzeppelin/contracts=OpenZeppelin/openzeppelin-contracts@4.9.3/contracts"
-      - "@openzeppelinLegacy=OpenZeppelin/openzeppelin-contracts@3.1.0"
 
 reports:
   exclude_contracts:

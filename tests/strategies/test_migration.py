@@ -31,6 +31,10 @@ def test_migration(
     frax_pid,
     staking_address,
     fxs,
+    prisma_convex_factory,
+    yprisma,
+    prisma_vault,
+    RELATIVE_APPROX,
 ):
 
     ## deposit to the vault after approving
@@ -72,7 +76,19 @@ def test_migration(
             new_proxy,
             gauge,
         )
-    else:  # frax
+    elif which_strategy in [2, 3]:  # prisma
+        new_strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            10_000 * 1e6,
+            25_000 * 1e6,
+            prisma_vault,
+            prisma_convex_factory.getDeterministicAddress(
+                pid
+            ),  # This looks up the prisma receiver for the pool
+        )
+    elif which_strategy == 4:  # frax
         new_strategy = gov.deploy(
             contract_name,
             vault,
@@ -92,11 +108,17 @@ def test_migration(
         print("\nShould we harvest? Should be False.", tx)
         assert tx == False
 
+    if which_strategy != 4:
+        # can we harvest an unactivated strategy? should be no
+        tx = new_strategy.harvestTrigger(0, {"from": gov})
+        print("\nShould we harvest? Should be False.", tx)
+        assert tx == False
+
     ######### ADD LOGIC TO TEST CLAIMING OF ASSETS FOR TRANSFER TO NEW STRATEGY AS NEEDED #########
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 2:
+    if which_strategy == 4:
         with brownie.reverts():
             vault.migrateStrategy(strategy, new_strategy, {"from": gov})
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
@@ -121,13 +143,14 @@ def test_migration(
 
     ####### ADD LOGIC TO MAKE SURE ASSET TRANSFER WENT AS EXPECTED #######
     assert crv.balanceOf(strategy) == 0
-    assert crv.balanceOf(new_strategy) > 0
+    if which_strategy != 2:
+        assert crv.balanceOf(new_strategy) > 0
 
-    if which_strategy != 1:
+    if which_strategy != 1 and which_strategy not in [2, 3]:
         assert convex_token.balanceOf(strategy) == 0
         assert convex_token.balanceOf(new_strategy) > 0
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         assert fxs.balanceOf(strategy) == 0
         assert fxs.balanceOf(new_strategy) > 0
 
@@ -208,6 +231,9 @@ def test_empty_migration(
     frax_booster,
     frax_pid,
     staking_address,
+    prisma_vault,
+    prisma_convex_factory,
+    yprisma,
 ):
 
     ## deposit to the vault after approving
@@ -249,7 +275,19 @@ def test_empty_migration(
             new_proxy,
             gauge,
         )
-    else:  # frax
+    elif which_strategy in [2, 3]:  # prisma
+        new_strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            10_000 * 1e6,
+            25_000 * 1e6,
+            prisma_vault,
+            prisma_convex_factory.getDeterministicAddress(
+                pid
+            ),  # This looks up the prisma receiver for the pool
+        )
+    elif which_strategy == 4:  # frax
         new_strategy = gov.deploy(
             contract_name,
             vault,
@@ -261,7 +299,7 @@ def test_empty_migration(
             frax_booster,
         )
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
         chain.mine(1)

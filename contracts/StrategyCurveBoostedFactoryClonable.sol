@@ -1,33 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity 0.8.19;
 
-// These are the core Yearn libraries
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
-import "./interfaces/yearn.sol";
-import "./interfaces/curve.sol";
-import "@yearnvaults/contracts/BaseStrategy.sol";
-
-interface ITradeFactory {
-    function enable(address, address) external;
-
-    function disable(address, address) external;
-}
-
-interface IDetails {
-    // get details from curve
-    function name() external view returns (string memory);
-
-    function symbol() external view returns (string memory);
-}
+import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
+import "./interfaces/CurveInterfaces.sol";
 
 contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
     /* ========== STATE VARIABLES ========== */
 
-    /// @notice Yearn's strategyProxy, needed for interacting with our Curve Voter.
+    /// @notice Yearns strategyProxy, needed for interacting with our Curve Voter.
     ICurveStrategyProxy public proxy;
 
-    /// @notice Curve gauge contract, most are tokenized, held by Yearn's voter.
+    /// @notice Curve gauge contract, most are tokenized, held by Yearns voter.
     address public gauge;
 
     /// @notice The percentage of CRV from each harvest that we send to our voter (out of 10,000).
@@ -50,7 +35,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     /// @notice Array of any extra rewards tokens this Convex pool may have.
     address[] public rewardsTokens;
 
-    /// @notice Will only be true on the original deployed contract and not on clones; we don't want to clone a clone.
+    /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
 
     /* ========== CONSTRUCTOR ========== */
@@ -87,9 +72,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _proxy,
         address _gauge
     ) external returns (address newStrategy) {
-        // don't clone a clone
+        // dont clone a clone
         if (!isOriginal) {
-            revert("Can't clone a clone'");
+            revert("Cant clone a clone");
         }
 
         // Copied from https://github.com/optionality/clone-factory/blob/master/contracts/CloneFactory.sol
@@ -150,7 +135,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _proxy,
         address _gauge
     ) internal {
-        // make sure that we haven't initialized this before
+        // make sure that we havent initialized this before
         if (gauge != address(0)) {
             revert("Already initialized");
         }
@@ -185,7 +170,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             );
     }
 
-    /// @notice Balance of want staked in Curve's gauge.
+    /// @notice Balance of want staked in Curves gauge.
     function stakedBalance() public view returns (uint256) {
         return proxy.balanceOf(gauge);
     }
@@ -237,7 +222,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             proxy.claimManyRewards(gauge, rewardsTokens);
         }
 
-        // serious loss should never happen, but if it does (for instance, if Curve is hacked), let's record it accurately
+        // serious loss should never happen, but if it does (for instance, if Curve is hacked), lets record it accurately
         uint256 assets = estimatedTotalAssets();
         uint256 debt = vault.strategies(address(this)).totalDebt;
 
@@ -264,7 +249,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
                 }
             }
         }
-        // if assets are less than debt, we are in trouble. don't worry about withdrawing here, just report losses
+        // if assets are less than debt, we are in trouble. dont worry about withdrawing here, just report losses
         else {
             unchecked {
                 _loss = debt - assets;
@@ -273,7 +258,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     }
 
     function adjustPosition(uint256 _debtOutstanding) internal override {
-        // if in emergency exit, we don't want to deploy any more funds
+        // if in emergency exit, we dont want to deploy any more funds
         if (emergencyExit) {
             return;
         }
@@ -320,7 +305,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     function liquidateAllPositions() internal override returns (uint256) {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
-            // don't bother withdrawing zero, save gas where we can
+            // dont bother withdrawing zero, save gas where we can
             proxy.withdraw(gauge, address(want), _stakedBal);
         }
         return balanceOfWant();
@@ -370,7 +355,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     ) external onlyGovernance {
         require(
             _newTradeFactory != address(0),
-            "Can't remove with this function"
+            "Cant remove with this function"
         );
         _removeTradeFactoryPermissions(true);
         tradeFactory = _newTradeFactory;
@@ -435,18 +420,18 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
      * @notice
      *  Provide a signal to the keeper that harvest() should be called.
      *
-     *  Don't harvest if a strategy is inactive.
+     *  Dont harvest if a strategy is inactive.
      *  If we exceed our max delay, then harvest no matter what. For
      *  our min delay, credit threshold, and manual force trigger,
      *  only harvest if our gas price is acceptable.
      *
-     * @param callCostinEth The keeper's estimated gas cost to call harvest() (in wei).
+     * @param callCostinEth The keepers estimated gas cost to call harvest() (in wei).
      * @return True if harvest() should be called, false otherwise.
      */
     function harvestTrigger(
         uint256 callCostinEth
     ) public view override returns (bool) {
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we don't need to adjust keeper job.
+        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we dont need to adjust keeper job.
         if (!isActive()) {
             return false;
         }
@@ -472,17 +457,17 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             return true;
         }
 
-        // harvest our credit if it's above our threshold
+        // harvest our credit if its above our threshold
         if (vault.creditAvailable() > creditThreshold) {
             return true;
         }
 
-        // otherwise, we don't harvest
+        // otherwise, we dont harvest
         return false;
     }
 
-    /// @notice Convert our keeper's eth cost into want
-    /// @dev We don't use this since we don't factor call cost into our harvestTrigger.
+    /// @notice Convert our keepers eth cost into want
+    /// @dev We dont use this since we dont factor call cost into our harvestTrigger.
     /// @param _ethAmount Amount of ether spent.
     /// @return Value of ether in want.
     function ethToWant(

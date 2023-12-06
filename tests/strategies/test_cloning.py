@@ -37,6 +37,10 @@ def test_cloning(
     frax_booster,
     has_rewards,
     rewards_token,
+    prisma_vault,
+    prisma_receiver,
+    yprisma,
+    RELATIVE_APPROX,
 ):
 
     # skip this test if we don't clone
@@ -139,7 +143,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.return_value)
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -197,7 +201,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.return_value)
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -222,6 +226,67 @@ def test_cloning(
                     trade_factory,
                     new_proxy,
                     gauge,
+                    {"from": gov},
+                )
+
+        elif which_strategy == 2:  # Prisma Convex
+            # Shouldn't be able to call initialize again
+            with brownie.reverts():
+                strategy.initialize(
+                    vault,
+                    strategist,
+                    rewards,
+                    keeper,
+                    trade_factory,
+                    10_000 * 1e6,
+                    25_000 * 1e6,
+                    prisma_vault,
+                    prisma_receiver,
+                    {"from": gov},
+                )
+            tx = strategy.cloneStrategyPrismaConvex(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                trade_factory,
+                10_000 * 1e6,
+                25_000 * 1e6,
+                prisma_vault,
+                prisma_receiver,
+                {"from": gov},
+            )
+
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
+
+            # Shouldn't be able to call initialize again
+            with brownie.reverts():
+                new_strategy.initialize(
+                    vault,
+                    strategist,
+                    rewards,
+                    keeper,
+                    trade_factory,
+                    10_000 * 1e6,
+                    25_000 * 1e6,
+                    prisma_vault,
+                    prisma_receiver,
+                    yprisma,
+                    {"from": gov},
+                )
+
+            ## shouldn't be able to clone a clone
+            with brownie.reverts():
+                new_strategy.cloneStrategyPrismaConvex(
+                    vault,
+                    strategist,
+                    rewards,
+                    keeper,
+                    trade_factory,
+                    10_000 * 1e6,
+                    25_000 * 1e6,
+                    prisma_vault,
+                    prisma_receiver,
                     {"from": gov},
                 )
 
@@ -256,7 +321,7 @@ def test_cloning(
                 {"from": gov},
             )
 
-            new_strategy = contract_name.at(tx.return_value)
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -293,7 +358,7 @@ def test_cloning(
     # revoke, get funds back into vault, remove old strat from queue
     vault.revokeStrategy(strategy, {"from": gov})
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
         chain.mine(1)
@@ -392,7 +457,7 @@ def test_cloning(
     chain.sleep(86400 * 5)
     chain.mine(1)
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
         chain.mine(1)

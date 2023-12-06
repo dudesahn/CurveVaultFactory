@@ -299,7 +299,7 @@ def test_withdraw_after_donation_2(
     assert strategy.estimatedTotalAssets() > initial_strategy_assets
     assert strategy_params["totalDebt"] == initial_debt
 
-    if which_strategy == 2:
+    if which_strategy == 4:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
         chain.sleep(86400 * 7)
         chain.mine(1)

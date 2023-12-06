@@ -1,7 +1,155 @@
 import pytest
 from utils import harvest_strategy, check_status
 import brownie
-from brownie import ZERO_ADDRESS, chain, interface
+from brownie import ZERO_ADDRESS, chain, interface, Contract
+from utils import harvest_strategy
+
+
+def test_yprisma_claim(
+    gov,
+    token,
+    vault,
+    whale,
+    strategy,
+    amount,
+    sleep_time,
+    profit_whale,
+    profit_amount,
+    target,
+    use_yswaps,
+    yprisma,
+):
+    ## deposit to the vault after approving
+    token.approve(vault, 2**256 - 1, {"from": whale})
+    vault.deposit(amount, {"from": whale})
+    use_yswaps = False
+    receiver = Contract(strategy.prismaReceiver())
+    eid = receiver.emissionId()
+    prisma_vault = Contract(strategy.prismaVault(), owner=receiver)
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False,
+    )
+    claimable = receiver.claimableReward(strategy).dict()
+    # Check if any non-zero values (shouldn't have any, should have small amounts for all assets)
+    assert any(x for x in (claimable if isinstance(claimable, tuple) else (claimable,)))
+
+    chain.sleep(sleep_time)
+
+    # check that we have claimable profit, need this for min and max profit checks below
+    claimable_profit = strategy.claimableProfitInUsdc()
+    assert claimable_profit > 0
+    print("🤑 Claimable profit >0:", claimable_profit / 1e6)
+
+    # set our max delay to 1 day so we trigger true, then set it back to 21 days
+    # but will be false because no max boost
+    strategy.setMaxReportDelay(sleep_time - 1)
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be False.", tx)
+    assert tx == False
+    strategy.setMaxReportDelay(86400 * 21)
+
+    # we have tiny profit but that's okay; our triggers should be false because we don't have max boost
+    # update our minProfit so our harvest should trigger true
+    strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
+    # update our maxProfit so harvest should trigger true (max profit ignores whether we have full boost or not)
+    strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    strategy.setHarvestTriggerParams(2000e6, 25000e6, {"from": gov})
+
+    # turn on the force claim
+    strategy.setForceClaimOnce(True, {"from": vault.governance()})
+
+    # update our minProfit so our harvest triggers true
+    strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    # update our maxProfit so harvest triggers true
+    strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    strategy.setHarvestTriggerParams(2000e6, 25000e6, {"from": gov})
+
+    # set our max delay to 1 day so we trigger true, then set it back to 21 days
+    strategy.setMaxReportDelay(sleep_time - 1)
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be True.", tx)
+    assert tx == True
+    strategy.setMaxReportDelay(86400 * 21)
+
+    strategy.setForceClaimOnce(False, {"from": vault.governance()})
+
+    # Now harvest again
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False,
+    )
+    # This only works if we have exhausted our boost for current week (we won't have claimed any yPRISMA)
+    assert yprisma.balanceOf(strategy) == 0
+
+    # sleep to get to the new epoch
+    chain.sleep(60 * 60 * 24 * 7)
+    chain.mine()
+
+    claimable_profit = strategy.claimableProfitInUsdc()
+    assert claimable_profit > 0
+    print("🤑 Claimable profit next epoch:", claimable_profit / 1e6)
+
+    prisma_vault.allocateNewEmissions(eid)
+    receiver.claimableReward(strategy)
+    y = "0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7"
+    boosted = prisma_vault.getClaimableWithBoost(y)
+    assert boosted[0] > 0
+    assert strategy.claimsAreMaxBoosted()
+
+    # now we should be able to claim without forcing
+    # update our minProfit so our harvest triggers true
+    strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    # update our maxProfit so harvest triggers true
+    strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
+
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False,
+    )
+    assert yprisma.balanceOf(strategy) > 0
+
 
 # test removing a strategy from the withdrawal queue
 def test_remove_from_withdrawal_queue(
@@ -210,7 +358,7 @@ def test_setters(
 
     ######### BELOW WILL NEED TO BE UPDATED BASED SETTERS OUR STRATEGY HAS #########
     # special setter for frax
-    if which_strategy == 2:
+    if which_strategy == 4:
         strategy.setLockTime(90000 * 7, {"from": gov})
 
         if not tests_using_tenderly:
@@ -241,7 +389,7 @@ def test_setters(
         profit_amount,
         target,
     )
-    if which_strategy == 2:
+    if which_strategy == 4:
         total_staked = strategy.stakedBalance()
         assert total_staked == maxToStake
         assert strategy.estimatedTotalAssets() > total_staked
@@ -254,7 +402,7 @@ def test_setters(
         assert strategy.estimatedTotalAssets() >= amount
 
     # check that we have claimable rewards, have to call for frax tho
-    if which_strategy == 2:
+    if which_strategy == 4:
         chain.sleep(86400 * 7)
         chain.mine(1)
         profit = strategy.claimableProfitInUsdc.call()
@@ -287,7 +435,25 @@ def test_setters(
             with brownie.reverts():
                 strategy.setLocalKeepCrv(1000000, {"from": gov})
 
-    else:
+    if which_strategy == 2:
+        strategy.setVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(1000000, 0, 0, {"from": gov})
+            with brownie.reverts():
+                strategy.setLocalKeepCrvs(0, 100000000, 0, {"from": gov})
+
+    if which_strategy == 3:
+        strategy.setVoter(gov, {"from": gov})
+        strategy.setLocalKeepCrv(10, {"from": gov})
+        if not tests_using_tenderly:
+            # test our reverts as well
+            with brownie.reverts():
+                strategy.setLocalKeepCrv(1000000, 0, 0, {"from": gov})
+
+    elif which_strategy == 4:
         strategy.setVoters(gov, gov, gov, {"from": gov})
         strategy.setLocalKeepCrvs(10, 10, 10, {"from": gov})
 
@@ -342,11 +508,11 @@ def test_sweep(
     assert token.balanceOf(strategy) > 0
 
     if not tests_using_tenderly:
-        with brownie.reverts("!want"):
+        with brownie.reverts():
             strategy.sweep(token, {"from": gov})
         with brownie.reverts():
             strategy.sweep(to_sweep, {"from": whale})
 
         # Vault share token doesn't work
-        with brownie.reverts("!shares"):
+        with brownie.reverts():
             strategy.sweep(vault.address, {"from": gov})

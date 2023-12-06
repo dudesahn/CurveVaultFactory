@@ -26,6 +26,7 @@ def test_keep(
     use_yswaps,
     which_strategy,
     new_proxy,
+    yprisma,
 ):
     ## deposit to the vault after approving
     token.approve(vault, 2**256 - 1, {"from": whale})
@@ -45,6 +46,18 @@ def test_keep(
             strategy.setLocalKeepCrv(1000, {"from": gov})
         strategy.setVoter(voter, {"from": gov})
         strategy.setLocalKeepCrv(1000, {"from": gov})
+    elif which_strategy == 2:
+        # need to set voters first if we're trying to set keep
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+    elif which_strategy == 3:
+        # need to set voters first if we're trying to set keep
+        with brownie.reverts():
+            strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
+        strategy.setVoters(gov, gov, gov, {"from": gov})
+        strategy.setLocalKeepCrvs(1000, 1000, {"from": gov})
     else:
         with brownie.reverts():
             strategy.setLocalKeepCrvs(1000, 1000, 1000, {"from": gov})
@@ -103,6 +116,38 @@ def test_keep(
         treasury_after = crv.balanceOf(strategy.curveVoter())
         if not no_profit:
             assert treasury_after > treasury_before
+    elif which_strategy == 2:
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        if not no_profit:
+            assert treasury_after > treasury_before
+    elif which_strategy == 3:
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        if not no_profit:
+            assert treasury_after > treasury_before
     else:
         treasury_before = fxs.balanceOf(strategy.fraxVoter())
 
@@ -138,6 +183,38 @@ def test_keep(
         treasury_after = convex_token.balanceOf(strategy.convexVoter())
         assert treasury_after == treasury_before
     elif which_strategy == 1:
+        strategy.setLocalKeepCrv(0, {"from": gov})
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        assert treasury_after == treasury_before
+    elif which_strategy == 2:
+        strategy.setLocalKeepCrvs(0, 0, 0, {"from": gov})
+        treasury_before = crv.balanceOf(strategy.curveVoter())
+
+        (profit, loss) = harvest_strategy(
+            use_yswaps,
+            strategy,
+            token,
+            gov,
+            profit_whale,
+            profit_amount,
+            target,
+        )
+
+        treasury_after = crv.balanceOf(strategy.curveVoter())
+        assert treasury_after == treasury_before
+    elif which_strategy == 3:
         strategy.setLocalKeepCrv(0, {"from": gov})
         treasury_before = crv.balanceOf(strategy.curveVoter())
 
@@ -365,7 +442,7 @@ def test_lower_keks(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     ## deposit to the vault after approving
@@ -579,7 +656,7 @@ def test_lower_keks_part_two(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     # lower it immediately
@@ -689,7 +766,7 @@ def test_increase_keks(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     ## deposit to the vault after approving
@@ -797,7 +874,7 @@ def test_withdraw_with_some_locked(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     ## deposit to the vault after approving
@@ -920,7 +997,7 @@ def test_manual_withdrawal(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     ## deposit to the vault after approving
@@ -1037,7 +1114,7 @@ def test_lower_keks_add_to_existing(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     # set it so we don't add new keks and only deposit to existing ones, once we reach our max
@@ -1257,7 +1334,7 @@ def test_lower_keks_part_two_add_to_existing(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     # set it so we don't add new keks and only deposit to existing ones, once we reach our max
@@ -1370,7 +1447,7 @@ def test_increase_keks_add_to_existing(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     # set it so we don't add new keks and only deposit to existing ones, once we reach our max
@@ -1481,7 +1558,7 @@ def test_keks_add_to_existing(
     frax_pid,
     target,
 ):
-    if which_strategy != 2:
+    if which_strategy != 4:
         return
 
     # set it so we don't add new keks and only deposit to existing ones, once we reach our max
