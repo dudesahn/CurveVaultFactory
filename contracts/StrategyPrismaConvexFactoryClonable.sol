@@ -16,7 +16,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
 
     /// @notice The address of the yPrisma token. This is minted to us as an alternative to creating a lock.
-    IERC20 public yPrisma = IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
+    IERC20 public constant yPrisma =
+        IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
 
     /* ========== STATE VARIABLES ========== */
 
