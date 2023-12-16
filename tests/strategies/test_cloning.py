@@ -258,6 +258,7 @@ def test_cloning(
             )
 
             new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
+            print("We have a clone!", new_strategy)
 
             # Shouldn't be able to call initialize again
             with brownie.reverts():
@@ -271,7 +272,6 @@ def test_cloning(
                     25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
-                    yprisma,
                     {"from": gov},
                 )
 

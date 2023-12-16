@@ -48,19 +48,20 @@ def test_yprisma_claim(
     print("🤑 Claimable profit >0:", claimable_profit / 1e6)
 
     # set our max delay to 1 day so we trigger true, then set it back to 21 days
-    # but will be false because no max boost
+    # but will be false because no max boost (I originally wrote this late in a week, will just be equal to if max boosted or not)
     strategy.setMaxReportDelay(sleep_time - 1)
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be False.", tx)
-    assert tx == False
+    assert tx == strategy.claimsAreMaxBoosted()
     strategy.setMaxReportDelay(86400 * 21)
 
     # we have tiny profit but that's okay; our triggers should be false because we don't have max boost
     # update our minProfit so our harvest should trigger true
+    # will be true/false same as above based on max boost
     strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be false.", tx)
-    assert tx == False
+    assert tx == strategy.claimsAreMaxBoosted()
 
     # update our maxProfit so harvest should trigger true (max profit ignores whether we have full boost or not)
     strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
@@ -108,7 +109,8 @@ def test_yprisma_claim(
         force_claim=False,
     )
     # This only works if we have exhausted our boost for current week (we won't have claimed any yPRISMA)
-    assert yprisma.balanceOf(strategy) == 0
+    if not strategy.claimsAreMaxBoosted():
+        assert yprisma.balanceOf(strategy) == 0
 
     # sleep to get to the new epoch
     chain.sleep(60 * 60 * 24 * 7)

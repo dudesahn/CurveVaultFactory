@@ -16,7 +16,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         0x90be6DFEa8C80c184C442a36e17cB2439AAE25a7;
 
     /// @notice The address of the yPrisma token. This is minted to us as an alternative to creating a lock.
-    IERC20 public yPrisma = IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
+    IERC20 public constant yPrisma =
+        IERC20(0xe3668873D944E4A949DA05fc8bDE419eFF543882);
 
     /* ========== STATE VARIABLES ========== */
 
@@ -69,6 +70,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
     /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
+
+    /// @notice Used to track the deployed version of this contract.
+    string public constant strategyVersion = "3.0.1";
 
     /* ========== CONSTRUCTOR ========== */
 
