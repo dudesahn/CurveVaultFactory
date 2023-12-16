@@ -43,16 +43,22 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /// @notice Whether we should claim rewards when withdrawing, generally this should be false.
     bool public claimRewards;
 
-    /// @notice Minimum profit size in USDC that we want to harvest.
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Minimum profit size in USDC that we want to harvest.
+     * @dev Only used in harvestTrigger.
+     */
     uint256 public harvestProfitMinInUsdc;
 
-    /// @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
+     * @dev Only used in harvestTrigger.
+     */
     uint256 public harvestProfitMaxInUsdc;
 
-    /// @notice Check if we need to earmark rewards on Convex before harvesting, usually false.
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Check if we need to earmark rewards on Convex before harvesting, usually false.
+     * @dev Only used in harvestTrigger.
+     */
     bool public checkEarmark;
 
     // ySwaps stuff
@@ -93,18 +99,21 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     event Cloned(address indexed clone);
 
-    /// @notice Use this to clone an exact copy of this strategy on another vault.
-    /// @dev In practice, this will only be called by the factory on the template contract.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _pid Our pool id (pid) for this strategy.
-    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _booster Address of the convex booster/deposit contract.
-    /// @param _convexToken Address of our convex token.
+    /**
+     * @notice Use this to clone an exact copy of this strategy on another vault.
+     * @dev In practice, this will only be called by the factory on the template contract.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _pid Our pool id (pid) for this strategy.
+     * @param _stakingAddress Convex staking address for our want token.
+     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+     * @param _booster Address of the convex booster/deposit contract.
+     * @param _convexToken Address of our convex token.
+     */
     function cloneStrategyConvex(
         address _vault,
         address _strategist,
@@ -155,18 +164,20 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         emit Cloned(newStrategy);
     }
 
-    /// @notice Initialize the strategy.
-    /// @dev This should only be called by the clone function above.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _pid Our pool id (pid) for this strategy.
-    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _booster Address of the convex booster/deposit contract.
-    /// @param _convexToken Address of our convex token.
+    /**
+     * @notice Initialize the strategy.
+     * @dev This should only be called by the clone function above.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _pid Our pool id (pid) for this strategy.
+     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+     * @param _booster Address of the convex booster/deposit contract.
+     * @param _convexToken Address of our convex token.
+     */
     function initialize(
         address _vault,
         address _strategist,
@@ -426,10 +437,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         returns (address[] memory)
     {}
 
-    /// @notice In case we need to emergency exit into the convex deposit
-    ///  token, this will allow us to do that.
-    /// @dev Make sure to check claimRewards before this step if needed, and
-    ///  plan to have gov sweep convex deposit tokens from strategy after this.
+    /**
+     * @notice In case we need to emergency exit into the convex deposit token, this will allow us to do that.
+     * @dev Make sure to check claimRewards before this step if needed, and plan to have gov sweep convex deposit tokens
+     *  from strategy after this.
+     */
     function withdrawToConvexDepositTokens() external onlyVaultManagers {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
@@ -439,9 +451,10 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
 
     /* ========== YSWAPS ========== */
 
-    /// @notice Use to add or update rewards, rebuilds tradefactory too
-    /// @dev Do this before updating trade factory if we have extra rewards.
-    ///  Can only be called by governance.
+    /**
+     * @notice Use to add or update rewards, rebuilds tradefactory too
+     * @dev Do this before updating trade factory if we have extra rewards. Can only be called by governance.
+     */
     function updateRewards() external onlyGovernance {
         // store this to save our tradefactory address before tearing it down
         address tf = tradeFactory;
@@ -475,9 +488,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    /// @notice Use to update our trade factory.
-    /// @dev Can only be called by governance.
-    /// @param _newTradeFactory Address of new trade factory.
+    /**
+     * @notice Use to update our trade factory.
+     * @dev Can only be called by governance.
+     * @param _newTradeFactory Address of new trade factory.
+     */
     function updateTradeFactory(
         address _newTradeFactory
     ) external onlyGovernance {
@@ -538,10 +553,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         (success, ) = _token.call(data);
     }
 
-    /// @notice Use this to remove permissions from our current trade factory.
-    /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
-    /// @param _disableTf Specify whether to disable the tradefactory when removing.
-    ///  Option given in case we need to get around a reverting disable.
+    /**
+     * @notice Use this to remove permissions from our current trade factory.
+     * @dev Once this is called, setUpTradeFactory must be called to get things working again.
+     * @param _disableTf Specify whether to disable the tradefactory when removing. Option given in case we need to get
+     *  around a reverting disable.
+     */
     function removeTradeFactoryPermissions(
         bool _disableTf
     ) external onlyVaultManagers {
@@ -656,9 +673,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         return false;
     }
 
-    /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
-    /// @dev Uses Chainlinks feed registry.
-    /// @return Total return in USDC from selling claimable CRV and CVX.
+    /**
+     * @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+     * @dev Uses Chainlinks feed registry.
+     * @return Total return in USDC from selling claimable CRV and CVX.
+     */
     function claimableProfitInUsdc() public view returns (uint256) {
         (, uint256 crvPrice, , , ) = IOracle(
             0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf
@@ -717,17 +736,21 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         return (crvPrice * _claimableBal + cvxPrice * mintableCvx) / 1e20;
     }
 
-    /// @notice Convert our keepers eth cost into want
-    /// @dev We dont use this since we dont factor call cost into our harvestTrigger.
-    /// @param _ethAmount Amount of ether spent.
-    /// @return Value of ether in want.
+    /**
+     * @notice Convert our keepers eth cost into want
+     * @dev We dont use this since we dont factor call cost into our harvestTrigger.
+     * @param _ethAmount Amount of ether spent.
+     * @return Value of ether in want.
+     */
     function ethToWant(
         uint256 _ethAmount
     ) public view override returns (uint256) {}
 
-    /// @notice Check if someone needs to earmark rewards on Convex before keepers harvest again.
-    /// @dev Not worth harvesting if this is true as our rewards will be minimal.
-    /// @return needsEarmark Whether or not rewards need to be earmarked before flowing again.
+    /**
+     * @notice Check if someone needs to earmark rewards on Convex before keepers harvest again.
+     * @dev Not worth harvesting if this is true as our rewards will be minimal.
+     * @return needsEarmark Whether or not rewards need to be earmarked before flowing again.
+     */
     function needsEarmarkReward() public view returns (bool needsEarmark) {
         // check if there is any CRV we need to earmark
         uint256 crvExpiry = rewardsContract.periodFinish();
@@ -739,10 +762,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /* ========== SETTERS ========== */
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    /// @notice Use this to set or update our keep amounts for this strategy.
-    /// @dev Must be less than 10,000. Set in basis points. Only governance can set this.
-    /// @param _keepCrv Percent of each CRV harvest to send to our voter.
-    /// @param _keepCvx Percent of each CVX harvest to send to our voter.
+    /**
+     * @notice Use this to set or update our keep amounts for this strategy.
+     * @dev Must be less than 10,000. Set in basis points. Only governance can set this.
+     * @param _keepCrv Percent of each CRV harvest to send to our voter.
+     * @param _keepCvx Percent of each CVX harvest to send to our voter.
+     */
     function setLocalKeepCrvs(
         uint256 _keepCrv,
         uint256 _keepCvx
@@ -763,11 +788,12 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         localKeepCVX = _keepCvx;
     }
 
-    /// @notice Use this to set or update our voter contracts.
-    /// @dev For Convex strategies, this is simply where we send our keepCRV and keepCVX.
-    ///  Only governance can set this.
-    /// @param _curveVoter Address of our curve voter.
-    /// @param _convexVoter Address of our convex voter.
+    /**
+     * @notice Use this to set or update our voter contracts.
+     * @dev For Convex strategies, this is simply where we send our keepCRV and keepCVX. Only governance can set this.
+     * @param _curveVoter Address of our curve voter.
+     * @param _convexVoter Address of our convex voter.
+     */
     function setVoters(
         address _curveVoter,
         address _convexVoter
@@ -776,9 +802,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
         convexVoter = _convexVoter;
     }
 
-    /// @notice Set whether we claim rewards on withdrawals.
-    /// @dev Usually false, but may set to true during migrations.
-    /// @param _claimRewards Whether we want to claim rewards on withdrawals.
+    /**
+     * @notice Set whether we claim rewards on withdrawals.
+     * @dev Usually false, but may set to true during migrations.
+     * @param _claimRewards Whether we want to claim rewards on withdrawals.
+     */
     function setClaimRewards(bool _claimRewards) external onlyVaultManagers {
         claimRewards = _claimRewards;
     }
@@ -786,12 +814,11 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     /**
      * @notice
      *  Here we set various parameters to optimize our harvestTrigger.
-     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
-     *  that will trigger a harvest if gas price is acceptable.
-     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
-     *  will trigger a harvest regardless of gas price.
-     * @param _checkEarmark Whether or not we should check Convexs
-     *  booster to see if we need to earmark before harvesting.
+     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals) that will trigger a harvest if gas
+     *  price is acceptable.
+     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that will trigger a harvest regardless of gas price.
+     * @param _checkEarmark Whether or not we should check Convexs booster to see if we need to earmark before
+     *  harvesting.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
