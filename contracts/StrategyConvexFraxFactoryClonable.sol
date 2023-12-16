@@ -117,8 +117,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     /// @notice Info about our keks. See struct NatSpec for more details.
     KekInfo public kekInfo;
 
-    /// @notice Used to track the deployed version of this contract.
-    string public constant strategyVersion = "2.1.0";
+    /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
+    string public constant strategyVersion = "3.0.2";
 
     /* ========== CONSTRUCTOR ========== */
 

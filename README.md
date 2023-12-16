@@ -46,6 +46,14 @@ as Frax deposits also can be locked for increased time periods for higher APR (m
 (called `keks` by Frax), and can also be configured to redeposit to the same keks over and over, meaning that past the initial 7-day period there
 is effectively no lock.
 
+### [StrategyPrismaConvexFactoryClonable.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/StrategyPrismaConvexFactoryClonable.sol)
+
+Our Prisma Convex strategy is very similar to the Convex strategy, except we receive extra yield through Prisma's _receiver_ contract, which is
+their name for a gauge. vePRISMA voters are able to approve proposed receivers to receive vePRISMA emissions. For this strategy, we deposit the
+Curve LP to the Prisma Convex receiver, which just deposits to Convex via a Prisma contract and then receives extra vePRISMA (as yPRISMA) on top.
+Note that for most of these pools, PRISMA emissions are the primary form of yield, so for these vaults we will send the majority of `debtRatio` (if
+not 100%) to this strategy.
+
 ### [KeeperWrapper.sol](https://github.com/dudesahn/CurveVaultFactory/blob/main/contracts/KeeperWrapper.sol)
 
 If set as the keeper of the strategy, this contract will make harvest public. Factory harvests do not swap atomically,
