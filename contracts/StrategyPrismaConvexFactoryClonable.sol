@@ -71,6 +71,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
 
+    /// @notice Used to track the deployed version of this contract.
+    string public constant strategyVersion = "3.0.1";
+
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
