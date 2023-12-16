@@ -53,12 +53,16 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     IERC20 public constant convexToken =
         IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
 
-    /// @notice Minimum profit size in USDC that we want to harvest.
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Minimum profit size in USDC that we want to harvest.
+     * @dev Only used in harvestTrigger.
+     */
     uint256 public harvestProfitMinInUsdc;
 
-    /// @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
-    /// @dev Only used in harvestTrigger.
+    /**
+     * @notice Maximum profit size in USDC that we want to harvest (ignore gas price once we get here).
+     * @dev Only used in harvestTrigger.
+     */
     uint256 public harvestProfitMaxInUsdc;
 
     // ySwaps stuff
@@ -97,17 +101,19 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
     event Cloned(address indexed clone);
 
-    /// @notice Use this to clone an exact copy of this strategy on another vault.
-    /// @dev In practice, this will only be called by the factory on the template contract.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _prismaVault Address of the Prisma vault.
-    /// @param _prismaReceiver Address of the Prisma receiver to farm.
+    /**
+     * @notice Use this to clone an exact copy of this strategy on another vault.
+     * @dev In practice, this will only be called by the factory on the template contract.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+     * @param _prismaVault Address of the Prisma vault.
+     * @param _prismaReceiver Address of the Prisma receiver to farm.
+     */
     function cloneStrategyPrismaConvex(
         address _vault,
         address _strategist,
@@ -156,17 +162,19 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         emit Cloned(newStrategy);
     }
 
-    /// @notice Initialize the strategy.
-    /// @dev This should only be called by the clone function above.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-    /// @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
-    /// @param _prismaVault Address of the Prisma vault to claim from.
-    /// @param _prismaReceiver Address of the Prisma receiver to farm.
+    /**
+     * @notice Initialize the strategy.
+     * @dev This should only be called by the clone function above.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
+     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
+     * @param _prismaVault Address of the Prisma vault to claim from.
+     * @param _prismaReceiver Address of the Prisma receiver to farm.
+     */
     function initialize(
         address _vault,
         address _strategist,
@@ -448,9 +456,11 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
     /* ========== YSWAPS ========== */
 
-    /// @notice Use to update our trade factory.
-    /// @dev Can only be called by governance.
-    /// @param _newTradeFactory Address of new trade factory.
+    /**
+     * @notice Use to update our trade factory.
+     * @dev Can only be called by governance.
+     * @param _newTradeFactory Address of new trade factory.
+     */
     function updateTradeFactory(
         address _newTradeFactory
     ) external onlyGovernance {
@@ -478,10 +488,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         tf.enable(address(yPrisma), _want);
     }
 
-    /// @notice Use this to remove permissions from our current trade factory.
-    /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
-    /// @param _disableTf Specify whether to disable the tradefactory when removing.
-    ///  Option given in case we need to get around a reverting disable.
+    /**
+     * @notice Use this to remove permissions from our current trade factory.
+     * @dev Once this is called, setUpTradeFactory must be called to get things working again.
+     * @param _disableTf Specify whether to disable the tradefactory when removing. Option given in case we need to get
+     *  around a reverting disable.
+     */
     function removeTradeFactoryPermissions(
         bool _disableTf
     ) external onlyVaultManagers {
@@ -582,9 +594,11 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         return false;
     }
 
-    /// @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
-    /// @dev Uses Chainlinks feed registry.
-    /// @return Total return in USDC from selling claimable CRV and CVX.
+    /**
+     * @notice Calculates the profit if all claimable assets were sold for USDC (6 decimals).
+     * @dev Uses Chainlinks feed registry.
+     * @return Total return in USDC from selling claimable CRV and CVX.
+     */
     function claimableProfitInUsdc() public view returns (uint256) {
         (
             uint256 yPrismaAmount,
@@ -624,10 +638,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             ((yPrismaPrice * yPrismaAmount) / (1e30)));
     }
 
-    /// @notice Convert our keepers eth cost into want
-    /// @dev We dont use this since we dont factor call cost into our harvestTrigger.
-    /// @param _ethAmount Amount of ether spent.
-    /// @return Value of ether in want.
+    /**
+     * @notice Convert our keepers eth cost into want
+     * @dev We dont use this since we dont factor call cost into our harvestTrigger.
+     * @param _ethAmount Amount of ether spent.
+     * @return Value of ether in want.
+     */
     function ethToWant(
         uint256 _ethAmount
     ) public view override returns (uint256) {}
@@ -635,10 +651,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /* ========== SETTERS ========== */
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    /// @notice Use this to set or update our keep amounts for this strategy.
-    /// @dev Must be less than 10,000. Set in basis points. Only governance can set this.
-    /// @param _keepCrv Percent of each CRV harvest to send to our voter.
-    /// @param _keepCvx Percent of each CVX harvest to send to our voter.
+    /**
+     * @notice Use this to set or update our keep amounts for this strategy.
+     * @dev Must be less than 10,000. Set in basis points. Only governance can set this.
+     * @param _keepCrv Percent of each CRV harvest to send to our voter.
+     * @param _keepCvx Percent of each CVX harvest to send to our voter.
+     */
     function setLocalKeepCrvs(
         uint256 _keepCrv,
         uint256 _keepCvx,
@@ -665,12 +683,13 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         localKeepYPrisma = _keepYPrisma;
     }
 
-    /// @notice Use this to set or update our voter contracts.
-    /// @dev For Convex strategies, this is simply where we send our keepCRV and keepCVX.
-    ///  Only governance can set this.
-    /// @param _curveVoter Address of our curve voter.
-    /// @param _convexVoter Address of our convex voter.
-    /// @param _yprismaVoter Address of our yPRISMA voter.
+    /**
+     * @notice Use this to set or update our voter contracts.
+     * @dev For Convex strategies, this is simply where we send our keepCRV and keepCVX. Only governance can set this.
+     * @param _curveVoter Address of our curve voter.
+     * @param _convexVoter Address of our convex voter.
+     * @param _yprismaVoter Address of our yPRISMA voter.
+     */
     function setVoters(
         address _curveVoter,
         address _convexVoter,
@@ -682,12 +701,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     }
 
     /**
-     * @notice
-     *  Here we set various parameters to optimize our harvestTrigger.
-     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals)
-     *  that will trigger a harvest if gas price is acceptable.
-     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that
-     *  will trigger a harvest regardless of gas price.
+     * @notice Here we set various parameters to optimize our harvestTrigger.
+     * @param _harvestProfitMinInUsdc The amount of profit (in USDC, 6 decimals) that will trigger a harvest if gas
+     *  price is acceptable.
+     * @param _harvestProfitMaxInUsdc The amount of profit in USDC that will trigger a harvest regardless of gas price.
      */
     function setHarvestTriggerParams(
         uint256 _harvestProfitMinInUsdc,
@@ -698,8 +715,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     }
 
     /**
-     * @notice
-     *  Here we force a claim of yPRISMA on our next harvest, even if not fully boosted.
+     * @notice Here we force a claim of yPRISMA on our next harvest, even if not fully boosted.
      @param _forceClaimOnce True if we want to allow claims that are not max boosted.
      */
     function setForceClaimOnce(

@@ -57,16 +57,18 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     event Cloned(address indexed clone);
 
-    /// @notice Use this to clone an exact copy of this strategy on another vault.
-    /// @dev In practice, this will only be called by the factory on the template contract.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _proxy Our strategy proxy address.
-    /// @param _gauge Gauge address for this strategy.
-    /// @return newStrategy Address of our new cloned strategy.
+    /**
+     * @notice Use this to clone an exact copy of this strategy on another vault.
+     * @dev In practice, this will only be called by the factory on the template contract.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _proxy Our strategy proxy address.
+     * @param _gauge Gauge address for this strategy.
+     * @return newStrategy Address of our new cloned strategy.
+     */
     function cloneStrategyCurveBoosted(
         address _vault,
         address _strategist,
@@ -111,15 +113,17 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         emit Cloned(newStrategy);
     }
 
-    /// @notice Initialize the strategy.
-    /// @dev This should only be called by the clone function above.
-    /// @param _vault Vault address we are targeting with this strategy.
-    /// @param _strategist Address to grant the strategist role.
-    /// @param _rewards If we have any strategist rewards, send them here.
-    /// @param _keeper Address to grant the keeper role.
-    /// @param _tradeFactory Our trade factory address.
-    /// @param _proxy Our strategy proxy address.
-    /// @param _gauge Gauge address for this strategy.
+    /**
+     * @notice Initialize the strategy.
+     * @dev This should only be called by the clone function above.
+     * @param _vault Vault address we are targeting with this strategy.
+     * @param _strategist Address to grant the strategist role.
+     * @param _rewards If we have any strategist rewards, send them here.
+     * @param _keeper Address to grant the keeper role.
+     * @param _tradeFactory Our trade factory address.
+     * @param _proxy Our strategy proxy address.
+     * @param _gauge Gauge address for this strategy.
+     */
     function initialize(
         address _vault,
         address _strategist,
@@ -338,10 +342,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     /* ========== YSWAPS ========== */
 
-    /// @notice Use to add or update rewards, rebuilds tradefactory too
-    /// @dev Do this before updating trade factory if we have extra rewards.
-    ///  Can only be called by governance.
-    /// @param _rewards Rewards tokens to add to our trade factory.
+    /**
+     * @notice Use to add or update rewards, rebuilds tradefactory too
+     * @dev Do this before updating trade factory if we have extra rewards. Can only be called by governance.
+     * @param _rewards Rewards tokens to add to our trade factory.
+     */
     function updateRewards(address[] memory _rewards) external onlyGovernance {
         address tf = tradeFactory;
         _removeTradeFactoryPermissions(true);
@@ -351,9 +356,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         _setUpTradeFactory();
     }
 
-    /// @notice Use to update our trade factory.
-    /// @dev Can only be called by governance.
-    /// @param _newTradeFactory Address of new trade factory.
+    /**
+     * @notice Use to update our trade factory.
+     * @dev Can only be called by governance.
+     * @param _newTradeFactory Address of new trade factory.
+     */
     function updateTradeFactory(
         address _newTradeFactory
     ) external onlyGovernance {
@@ -383,10 +390,12 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         }
     }
 
-    /// @notice Use this to remove permissions from our current trade factory.
-    /// @dev Once this is called, setUpTradeFactory must be called to get things working again.
-    /// @param _disableTf Specify whether to disable the tradefactory when removing.
-    ///  Option given in case we need to get around a reverting disable.
+    /**
+     * @notice Use this to remove permissions from our current trade factory.
+     * @dev Once this is called, setUpTradeFactory must be called to get things working again.
+     * @param _disableTf Specify whether to disable the tradefactory when removing. Option given in case we need to get
+     *  around a reverting disable.
+     */
     function removeTradeFactoryPermissions(
         bool _disableTf
     ) external onlyVaultManagers {
@@ -470,10 +479,12 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         return false;
     }
 
-    /// @notice Convert our keepers eth cost into want
-    /// @dev We dont use this since we dont factor call cost into our harvestTrigger.
-    /// @param _ethAmount Amount of ether spent.
-    /// @return Value of ether in want.
+    /**
+     * @notice Convert our keepers eth cost into want
+     * @dev We dont use this since we dont factor call cost into our harvestTrigger.
+     * @param _ethAmount Amount of ether spent.
+     * @return Value of ether in want.
+     */
     function ethToWant(
         uint256 _ethAmount
     ) public view override returns (uint256) {}
@@ -481,9 +492,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     /* ========== SETTERS ========== */
     // These functions are useful for setting parameters of the strategy that may need to be adjusted.
 
-    /// @notice Use this to set or update our keep amounts for this strategy.
-    /// @dev Must be less than 10,000. Set in basis points. Only governance can set this.
-    /// @param _keepCrv Percent of each CRV harvest to send to our voter.
+    /**
+     * @notice Use this to set or update our keep amounts for this strategy.
+     * @dev Must be less than 10,000. Set in basis points. Only governance can set this.
+     * @param _keepCrv Percent of each CRV harvest to send to our voter.
+     */
     function setLocalKeepCrv(uint256 _keepCrv) external onlyGovernance {
         if (_keepCrv > 10_000) {
             revert();
@@ -494,10 +507,11 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         localKeepCRV = _keepCrv;
     }
 
-    /// @notice Use this to set or update our voter contracts.
-    /// @dev For Curve strategies, this is where we send our keepCVX.
-    ///  Only governance can set this.
-    /// @param _curveVoter Address of our curve voter.
+    /**
+     * @notice Use this to set or update our voter contracts.
+     * @dev For Curve strategies, this is where we send our keepCVX. Only governance can set this.
+     * @param _curveVoter Address of our curve voter.
+     */
     function setVoter(address _curveVoter) external onlyGovernance {
         curveVoter = _curveVoter;
     }
