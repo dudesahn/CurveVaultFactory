@@ -7,6 +7,7 @@ import "./interfaces/CurveInterfaces.sol";
 
 contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
+
     /* ========== STATE VARIABLES ========== */
 
     /// @notice Yearns strategyProxy, needed for interacting with our Curve Voter.
@@ -37,6 +38,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     /// @notice Will only be true on the original deployed contract and not on clones; we dont want to clone a clone.
     bool public isOriginal = true;
+
+    /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
+    string public constant strategyVersion = "3.0.2";
 
     /* ========== CONSTRUCTOR ========== */
 
