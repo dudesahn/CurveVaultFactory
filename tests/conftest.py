@@ -74,12 +74,12 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
-    whale = accounts.at("0x13E58C7b1147385D735a06D14F0456E54C2dEBC8", force=True)
+    whale = accounts.at("0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784", force=True)
     # yPRISMA-f LP (gauge) 0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0, cvxPRISMA gauge: 0x13E58C7b1147385D735a06D14F0456E54C2dEBC8
     # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
     # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
-    # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
+    # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 6m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
     # 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng 40k (gauge, not perfect for strat testing but good for factory testing)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
@@ -92,7 +92,7 @@ def whale(accounts, amount, token):
 @pytest.fixture(scope="session")
 def amount(token):
     amount = (
-        100_000 * 10 ** token.decimals()
+        5_000 * 10 ** token.decimals()
     )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng, 5000 yPRISMA, 100k cvxPRISMA
     yield amount
 
@@ -100,7 +100,7 @@ def amount(token):
 @pytest.fixture(scope="session")
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
-    profit_whale = accounts.at("0xf76CB08792134aDb10F9cdeb0d1C7f9a59F0AA57", force=True)
+    profit_whale = accounts.at("0xf83deAdE1b0D2AfF07700C548a54700a082388bE", force=True)
     # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
@@ -116,7 +116,7 @@ def profit_whale(accounts, profit_amount, token):
 @pytest.fixture(scope="session")
 def profit_amount(token):
     profit_amount = (
-        100 * 10 ** token.decimals()
+        25 * 10 ** token.decimals()
     )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng, 25 yPRISMA, 100 cvxPRISMA
     yield profit_amount
 
@@ -490,8 +490,8 @@ def strategy(
 # if you change this, make sure to update addresses/values below too
 @pytest.fixture(scope="session")
 def pid():
-    pid = 258  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (do for frax), eCFX 160, eUSD-FRAXBP 156, crvUSD-FRAX 187, FRAX-USDC 100, frxETH-ng 219
-    # 258 cvxPRISMA LP, 260 yPRISMA LP
+    pid = 156  # 25 stETH, 157 cvxCRV new, 128 frxETH-ETH (frax), eCFX 160, eUSD-FRAXBP 156 (frax), crvUSD-FRAX 187 (frax)
+    # FRAX-USDC 100 (frax), frxETH-ng 219 (frax), 258 cvxPRISMA LP, 260 yPRISMA LP, 82 FPI-FRAX (frax)
     yield pid
 
 
@@ -510,7 +510,7 @@ def prisma_receiver(
 # put our pool's frax pid here
 @pytest.fixture(scope="session")
 def frax_pid():
-    frax_pid = 44  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH, 44 eUSD-FRAXBP, crvUSD-FRAX 49, frxETH-ng 63
+    frax_pid = 44  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH, 44 eUSD-FRAXBP, crvUSD-FRAX 49, frxETH-ng 63, 4 FPI-FRAX
     yield frax_pid
 
 
@@ -521,6 +521,7 @@ def staking_address():
     #  0xa537d64881b84faffb9Ae43c951EEbF368b71cdA frxETH, 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC,
     # 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP, 0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac eUSD-FRAXBP
     # 0x67CC47cF82785728DD5E3AE9900873a074328658 crvUSD-FRAX, 0xB4fdD7444E1d86b2035c97124C46b1528802DA35 frxETH-ng
+    # 0x0a08673E3d7c454E1c6b27acD059C50Df6727FC9 FPI-FRAX
     yield staking_address
 
 
@@ -551,7 +552,7 @@ def which_strategy():
     # prisma convex: 2
     # prisma curve: 3
     # Only test 4 (Frax) for pools that actually have frax.
-    which_strategy = 2
+    which_strategy = 4
     yield which_strategy
 
 

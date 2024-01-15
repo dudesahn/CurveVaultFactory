@@ -30,16 +30,33 @@ interface IDetails {
     function symbol() external view returns (string memory);
 }
 
+interface IConvexWrapper {
+    function deposit(uint256 _amount, address _to) external;
+
+    function withdrawAndUnwrap(uint256 _amount) external;
+
+    function balanceOf(address _user) external returns (uint256);
+}
+
 interface IConvexFrax {
     // use this to create our personal convex frax vault for this strategy to get convex's FXS boost
     function createVault(uint256 pid) external returns (address);
 
+    function stakingToken() external returns (address);
+
     function getReward() external; // claim our rewards from the staking contract via our user vault
+
+    function stakeLocked(
+        uint256 _liquidity,
+        uint256 _secs
+    ) external returns (bytes32 kek_id);
 
     function stakeLockedCurveLp(
         uint256 _liquidity,
         uint256 _secs
     ) external returns (bytes32 kek_id); // stake our frax convex LP as a new kek
+
+    function lockAdditional(bytes32 _kek_id, uint256 _addl_liq) external;
 
     function lockAdditionalCurveLp(bytes32 _kek_id, uint256 _addl_liq) external; // add want to an existing lock/kek
 
@@ -86,6 +103,8 @@ interface IConvexFrax {
     function lockedStakesOf(
         address _address
     ) external view returns (LockedStake[] memory);
+
+    function withdrawLocked(bytes32 _kek_id) external;
 
     function withdrawLockedAndUnwrap(bytes32 _kek_id) external;
 }

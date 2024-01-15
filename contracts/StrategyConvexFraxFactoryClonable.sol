@@ -118,7 +118,7 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
     KekInfo public kekInfo;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.0.2";
+    string public constant strategyVersion = "3.1.0";
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -271,10 +271,10 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         // have our strategy deploy our vault from the booster using the fraxPid
         userVault = IConvexFrax(IConvexFrax(_booster).createVault(_fraxPid));
 
-        // pull our token addresses from the user vault
-        convexToken = IERC20(userVault.cvx());
-        crv = IERC20(userVault.crv());
-        fxs = IERC20(userVault.fxs());
+        // hardcode these values; can't pull our token addresses from the user vault on earlier versions
+        convexToken = IERC20(0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B);
+        crv = IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+        fxs = IERC20(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0);
 
         // want = Curve LP
         want.approve(address(userVault), type(uint256).max);
@@ -473,6 +473,9 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
         uint256 _nextKek = uint256(kekInfo.nextKek);
         uint256 _maxKeks = uint256(kekInfo.maxKeks);
 
+        // pull our stakingToken
+        IConvexWrapper stakingToken = IConvexWrapper(userVault.stakingToken());
+
         // If we have already locked the max amount of keks, first check if we want to just add to existing keks or not
         if (_nextKek >= _maxKeks) {
             // pull our current stake data
@@ -501,7 +504,8 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     }
                 }
                 // deposit our assets to our smallest kek
-                userVault.lockAdditionalCurveLp(smallestKek, _toInvest);
+                stakingToken.deposit(_toInvest, address(this));
+                userVault.lockAdditional(smallestKek, _toInvest);
             } else {
                 // if not, we need to withdraw the oldest one and reinvest that alongside the new funds
 
@@ -512,7 +516,11 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                 // Make sure it hasnt already been withdrawn
                 if (firstStake.amount > 0) {
                     // Withdraw funds and add them to the amount to deposit
-                    userVault.withdrawLockedAndUnwrap(firstStake.kek_id);
+                    userVault.withdrawLocked(firstStake.kek_id);
+                    stakingToken.withdrawAndUnwrap(
+                        stakingToken.balanceOf(address(this))
+                    );
+
                     unchecked {
                         _toInvest += firstStake.amount;
                     }
@@ -523,12 +531,14 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                     }
                 }
                 // deposit, increment our next kek
-                userVault.stakeLockedCurveLp(_toInvest, lockTime);
+                stakingToken.deposit(_toInvest, address(this));
+                userVault.stakeLocked(_toInvest, lockTime);
                 kekInfo.nextKek++;
             }
         } else {
             // deposit, increment our next kek
-            userVault.stakeLockedCurveLp(_toInvest, lockTime);
+            stakingToken.deposit(_toInvest, address(this));
+            userVault.stakeLocked(_toInvest, lockTime);
             kekInfo.nextKek++;
         }
         lastDeposit = block.timestamp;
@@ -587,7 +597,13 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
             liquidity = stake.amount;
 
             if (liquidity > 0 && stake.ending_timestamp <= block.timestamp) {
-                userVault.withdrawLockedAndUnwrap(stake.kek_id);
+                userVault.withdrawLocked(stake.kek_id);
+                IConvexWrapper stakingToken = IConvexWrapper(
+                    userVault.stakingToken()
+                );
+                stakingToken.withdrawAndUnwrap(
+                    stakingToken.balanceOf(address(this))
+                );
 
                 if (liquidity < needed) {
                     unchecked {
@@ -934,9 +950,12 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
      * @param _index Index of the kek to withdraw.
      */
     function manualWithdraw(uint256 _index) external onlyVaultManagers {
-        userVault.withdrawLockedAndUnwrap(
+        // pull our stakingToken
+        IConvexWrapper stakingToken = IConvexWrapper(userVault.stakingToken());
+        userVault.withdrawLocked(
             stakingAddress.lockedStakesOf(address(userVault))[_index].kek_id
         );
+        stakingToken.withdrawAndUnwrap(stakingToken.balanceOf(address(this)));
     }
 
     /* ========== SETTERS ========== */
@@ -979,7 +998,13 @@ contract StrategyConvexFraxFactoryClonable is BaseStrategy {
                             stake.ending_timestamp < block.timestamp,
                             "Not liquid"
                         );
-                        userVault.withdrawLockedAndUnwrap(stake.kek_id);
+                        IConvexWrapper stakingToken = IConvexWrapper(
+                            userVault.stakingToken()
+                        );
+                        userVault.withdrawLocked(stake.kek_id);
+                        stakingToken.withdrawAndUnwrap(
+                            stakingToken.balanceOf(address(this))
+                        );
                     }
                 }
             }
