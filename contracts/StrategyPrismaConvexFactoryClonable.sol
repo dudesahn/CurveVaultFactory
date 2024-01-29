@@ -75,6 +75,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     // ySwaps stuff
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
+    
+    /// @notice Address of our current boost delegate
+    address public currentDelegate;
 
     /// @notice Struct containing bools for forceClaimOnce and shouldClaimRewards. Determines if we allow claiming
     ///  rewards without max boost for one harvest, and/or if we should skip claiming rewards entirely.
