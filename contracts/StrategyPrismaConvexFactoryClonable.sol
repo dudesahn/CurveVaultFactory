@@ -75,7 +75,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     // ySwaps stuff
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
-    
+
     /// @notice Address of our current boost delegate
     address public currentDelegate;
 

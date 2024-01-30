@@ -155,7 +155,6 @@ def test_yprisma_claim(
     assert tx == True
 
     # we shouldn't get any yPRISMA if we turn off claims
-    # if we have any, send it away!
     assert yprisma.balanceOf(strategy) == 0
     strategy.setClaimParams(False, False, {"from": vault.governance()})
 
