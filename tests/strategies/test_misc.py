@@ -69,16 +69,30 @@ def test_yprisma_claim(
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
 
+    # turn off claiming entirely
+    strategy.setClaimParams(False, False, {"from": vault.governance()})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+    strategy.setClaimParams(False, True, {"from": vault.governance()})
+
     strategy.setHarvestTriggerParams(2000e6, 25000e6, {"from": gov})
 
     # turn on the force claim
-    strategy.setForceClaimOnce(True, {"from": vault.governance()})
+    strategy.setClaimParams(True, True, {"from": vault.governance()})
 
     # update our minProfit so our harvest triggers true
     strategy.setHarvestTriggerParams(1, 1000000e6, {"from": gov})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
+
+    # turn off claiming entirely
+    strategy.setClaimParams(True, False, {"from": vault.governance()})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+    strategy.setClaimParams(True, True, {"from": vault.governance()})
 
     # update our maxProfit so harvest triggers true
     strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
@@ -95,7 +109,7 @@ def test_yprisma_claim(
     assert tx == True
     strategy.setMaxReportDelay(86400 * 21)
 
-    strategy.setForceClaimOnce(False, {"from": vault.governance()})
+    strategy.setClaimParams(False, True, {"from": vault.governance()})
 
     # Now harvest again
     (profit, loss) = harvest_strategy(
@@ -139,6 +153,26 @@ def test_yprisma_claim(
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
+
+    # we shouldn't get any yPRISMA if we turn off claims
+    # if we have any, send it away!
+    assert yprisma.balanceOf(strategy) == 0
+    strategy.setClaimParams(False, False, {"from": vault.governance()})
+
+    (profit, loss) = harvest_strategy(
+        use_yswaps,
+        strategy,
+        token,
+        gov,
+        profit_whale,
+        profit_amount,
+        target,
+        force_claim=False,
+    )
+    assert yprisma.balanceOf(strategy) == 0
+
+    # turn claiming back on
+    strategy.setClaimParams(False, True, {"from": vault.governance()})
 
     (profit, loss) = harvest_strategy(
         use_yswaps,

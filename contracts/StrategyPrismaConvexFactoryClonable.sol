@@ -442,8 +442,8 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         returns (address[] memory)
     {}
 
-    function _claimRewards(_forceClaimOnce) internal {
-        // By default, we only claim if max boosted. Force claim once if needed.
+    function _claimRewards(bool _forceClaimOnce) internal {
+        // By default, we only allow claims if max boosted. Force claim once if needed.
         if (claimsAreMaxBoosted() || _forceClaimOnce) {
             address[] memory rewardContracts = new address[](1);
             rewardContracts[0] = address(prismaReceiver);

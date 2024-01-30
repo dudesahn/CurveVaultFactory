@@ -456,6 +456,9 @@ def strategy(
 
         # this is the same for new or existing vaults
         strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
+
+        # set up our claim params; default to always claim
+        strategy.setClaimParams(False, True, {"from": gov})
     elif which_strategy == 3:  # Prisma Curve
         vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Prisma Curve Strategy")
