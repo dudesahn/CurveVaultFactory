@@ -76,9 +76,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
 
-    /// @notice Address of our current boost delegate
-    address public currentDelegate;
-
     /// @notice Struct containing bools for forceClaimOnce and shouldClaimRewards. Determines if we allow claiming
     ///  rewards without max boost for one harvest, and/or if we should skip claiming rewards entirely.
     ClaimParams public claimParams;
@@ -87,7 +84,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     bool public isOriginal = true;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.0.2";
+    string public constant strategyVersion = "3.1.0";
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -225,9 +222,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
         harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
 
-        // set our delegate, default to yearn
-        currentDelegate = YEARN_LOCKER;
-
         // want = Curve LP
         want.approve(address(_prismaReceiver), type(uint256).max);
 
@@ -281,7 +275,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
         ClaimParams memory _claimParams = claimParams;
         if (_claimParams.shouldClaimRewards) {
-            _claimRewards(_claimParams.forceClaimOnce);
+            _claimRewards(_claimParams.forceClaimOnce, YEARN_LOCKER, 10_000);
         }
 
         // by default this is zero, but if we want any for our voter this will be used
@@ -442,16 +436,34 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         returns (address[] memory)
     {}
 
-    function _claimRewards(bool _forceClaimOnce) internal {
+    /**
+     * @notice Check if claims via Yearn's locker are max boosted.
+     * @dev This does NOT adjust with set boost delegate address, and will always report status of yPRISMA locker. Thus,
+     *  it is possible this may return true but claims won't be fully boosted depending on delegate selected.
+     * @return Whether claims are max boosted or not.
+     */
+    function claimsAreMaxBoosted() public view returns (bool) {
+        (uint256 claimable, , ) = prismaReceiver.claimableReward(address(this));
+        (uint256 maxBoostable, ) = prismaVault.getClaimableWithBoost(
+            YEARN_LOCKER
+        );
+        return maxBoostable >= claimable;
+    }
+
+    function _claimRewards(
+        bool _forceClaimOnce,
+        address _boostDelegate,
+        uint256 _maxFee
+    ) internal {
         // By default, we only allow claims if max boosted. Force claim once if needed.
         if (claimsAreMaxBoosted() || _forceClaimOnce) {
             address[] memory rewardContracts = new address[](1);
             rewardContracts[0] = address(prismaReceiver);
             prismaVault.batchClaimRewards(
                 YEARN_LOCKER, // receiver
-                currentDelegate, // delegate
+                _boostDelegate, // delegate
                 rewardContracts, // rewards contracts
-                FEE_DENOMINATOR // maxFee
+                _maxFee // maxFee
             );
 
             // reset if we forced this one
@@ -461,12 +473,17 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         }
     }
 
-    function claimsAreMaxBoosted() public view returns (bool) {
-        (uint256 claimable, , ) = prismaReceiver.claimableReward(address(this));
-        (uint256 maxBoostable, ) = prismaVault.getClaimableWithBoost(
-            YEARN_LOCKER
-        );
-        return maxBoostable >= claimable;
+    /**
+     * @notice Force a rewards claim from the receiver regardless of max boost.
+     * @dev Can only be called by managers.
+     * @param _boostDelegate Address of the boost delegate to use.
+     * @param _maxFee Max we fee are willing to pay for boost rental.
+     */
+    function claimRewards(
+        address _boostDelegate,
+        uint256 _maxFee
+    ) external onlyVaultManagers {
+        _claimRewards(true, _boostDelegate, _maxFee);
     }
 
     /* ========== YSWAPS ========== */
@@ -539,10 +556,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         }
 
         tradeFactory = address(0);
-    }
-
-    function claimRewards(bool _forceClaim) external onlyVaultManagers {
-        _claimRewards(_forceClaim);
     }
 
     /* ========== KEEP3RS ========== */
@@ -701,14 +714,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         localKeepCRV = _keepCrv;
         localKeepCVX = _keepCvx;
         localKeepYPrisma = _keepYPrisma;
-    }
-
-    /**
-     * @notice Use this to update our delegate address.
-     * @param _delegate Address of our delegate for rewards claiming.
-     */
-    function setDelegate(address _delegate) external onlyVaultManagers {
-        currentDelegate = _delegate;
     }
 
     /**
