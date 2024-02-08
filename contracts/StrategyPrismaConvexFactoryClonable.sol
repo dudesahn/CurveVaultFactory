@@ -483,6 +483,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address _boostDelegate,
         uint256 _maxFee
     ) external onlyVaultManagers {
+        require(_boostDelegate != address(0));
         _claimRewards(true, _boostDelegate, _maxFee);
     }
 
