@@ -5,29 +5,24 @@ import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
 import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
 import "./interfaces/CurveInterfaces.sol";
 
-contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
+contract StrategyCurveNoBoostClonable is BaseStrategy {
     using SafeERC20 for IERC20;
 
     /* ========== STATE VARIABLES ========== */
 
-    /// @notice Yearns strategyProxy, needed for interacting with our Curve Voter.
-    ICurveStrategyProxy public proxy;
-
-    /// @notice Curve gauge contract, most are tokenized, held by Yearns voter.
-    address public gauge;
-
-    /// @notice The percentage of CRV from each harvest that we send to our voter (out of 10,000).
-    uint256 public localKeepCRV;
-
-    /// @notice The address of our Curve voter. This is where we send any keepCRV.
-    address public curveVoter;
+    /// @notice Curve gauge contract
+    IGauge public gauge;
 
     // this means all of our fee values are in basis points
     uint256 internal constant FEE_DENOMINATOR = 10000;
 
     /// @notice The address of our base token (CRV for Curve, BAL for Balancer, etc.).
     IERC20 public constant crv =
-        IERC20(0xD533a949740bb3306d119CC777fa900bA034cd52);
+        IERC20(0x712b3d230F3C1c19db860d80619288b1F0BDd0Bd);
+
+    /// @notice The address of Gnosis' CRV minter. Gibs CRV!
+    IMinter public constant mintr =
+        IMinter(0xabC000d88f23Bb45525E447528DBF656A9D55bf5);
 
     // ySwaps stuff
     /// @notice The address of our ySwaps trade factory.
@@ -40,17 +35,17 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     bool public isOriginal = true;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.0.2";
+    /// @dev We append "d" here because this strategy directly deposits to the gauge instead of the normal proxy+voter method.
+    string public constant strategyVersion = "3.0.2d";
 
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _vault,
         address _tradeFactory,
-        address _proxy,
         address _gauge
     ) BaseStrategy(_vault) {
-        _initializeStrat(_tradeFactory, _proxy, _gauge);
+        _initializeStrat(_tradeFactory, _gauge);
     }
 
     /* ========== CLONING ========== */
@@ -65,7 +60,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
      * @param _rewards If we have any strategist rewards, send them here.
      * @param _keeper Address to grant the keeper role.
      * @param _tradeFactory Our trade factory address.
-     * @param _proxy Our strategy proxy address.
      * @param _gauge Gauge address for this strategy.
      * @return newStrategy Address of our new cloned strategy.
      */
@@ -75,7 +69,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _rewards,
         address _keeper,
         address _tradeFactory,
-        address _proxy,
         address _gauge
     ) external returns (address newStrategy) {
         // dont clone a clone
@@ -100,13 +93,12 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             newStrategy := create(0, clone_code, 0x37)
         }
 
-        StrategyCurveBoostedFactoryClonable(newStrategy).initialize(
+        StrategyCurveNoBoostClonable(newStrategy).initialize(
             _vault,
             _strategist,
             _rewards,
             _keeper,
             _tradeFactory,
-            _proxy,
             _gauge
         );
 
@@ -121,7 +113,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
      * @param _rewards If we have any strategist rewards, send them here.
      * @param _keeper Address to grant the keeper role.
      * @param _tradeFactory Our trade factory address.
-     * @param _proxy Our strategy proxy address.
      * @param _gauge Gauge address for this strategy.
      */
     function initialize(
@@ -130,31 +121,25 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         address _rewards,
         address _keeper,
         address _tradeFactory,
-        address _proxy,
         address _gauge
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_tradeFactory, _proxy, _gauge);
+        _initializeStrat(_tradeFactory, _gauge);
     }
 
     // this is called by our original strategy, as well as any clones
-    function _initializeStrat(
-        address _tradeFactory,
-        address _proxy,
-        address _gauge
-    ) internal {
+    function _initializeStrat(address _tradeFactory, address _gauge) internal {
         // make sure that we havent initialized this before
-        if (gauge != address(0)) {
+        if (address(gauge) != address(0)) {
             revert("Already initialized");
         }
 
         // 1:1 assignments
         tradeFactory = _tradeFactory;
-        proxy = ICurveStrategyProxy(_proxy); // our factory checks the latest proxy from curve voter and passes it here
-        gauge = _gauge;
+        gauge = IGauge(_gauge);
 
         // want = Curve LP
-        want.approve(_proxy, type(uint256).max);
+        want.approve(_gauge, type(uint256).max);
 
         // set up our baseStrategy vars
         minReportDelay = 21 days;
@@ -180,7 +165,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     /// @notice Balance of want staked in Curves gauge.
     function stakedBalance() public view returns (uint256) {
-        return proxy.balanceOf(gauge);
+        return gauge.balanceOf(address(this));
     }
 
     /// @notice Balance of want sitting in our strategy.
@@ -203,32 +188,14 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         returns (uint256 _profit, uint256 _loss, uint256 _debtPayment)
     {
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
-        // if we have anything in the gauge, then harvest CRV from the gauge
-        uint256 _stakedBal = stakedBalance();
-        if (_stakedBal > 0) {
-            proxy.harvest(gauge);
 
-            // by default this is zero, but if we want any for our voter this will be used
-            uint256 _localKeepCRV = localKeepCRV;
-            address _curveVoter = curveVoter;
-            if (_localKeepCRV > 0 && _curveVoter != address(0)) {
-                uint256 crvBalance = crv.balanceOf(address(this));
-                uint256 _sendToVoter;
-                unchecked {
-                    _sendToVoter =
-                        (crvBalance * _localKeepCRV) /
-                        FEE_DENOMINATOR;
-                }
-                if (_sendToVoter > 0) {
-                    crv.safeTransfer(_curveVoter, _sendToVoter);
-                }
-            }
-        }
-
-        // claim any extra rewards we may have
+        // claim extra rewards if we have them
         if (rewardsTokens.length > 0) {
-            proxy.claimManyRewards(gauge, rewardsTokens);
+            gauge.claim_rewards();
         }
+
+        // Mintr CRV emissions
+        mintr.mint(address(gauge));
 
         // serious loss should never happen, but if it does (for instance, if Curve is hacked), lets record it accurately
         uint256 assets = estimatedTotalAssets();
@@ -274,8 +241,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         // Send all of our LP tokens to the proxy and deposit to the gauge
         uint256 _toInvest = balanceOfWant();
         if (_toInvest > 0) {
-            want.safeTransfer(address(proxy), _toInvest);
-            proxy.deposit(gauge, address(want));
+            gauge.deposit(_toInvest);
         }
     }
 
@@ -292,11 +258,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
                     _neededFromStaked = _amountNeeded - _wantBal;
                 }
                 // withdraw whatever extra funds we need
-                proxy.withdraw(
-                    gauge,
-                    address(want),
-                    Math.min(_stakedBal, _neededFromStaked)
-                );
+                gauge.withdraw(Math.min(_stakedBal, _neededFromStaked));
             }
             uint256 _withdrawnBal = balanceOfWant();
             _liquidatedAmount = Math.min(_amountNeeded, _withdrawnBal);
@@ -314,7 +276,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         uint256 _stakedBal = stakedBalance();
         if (_stakedBal > 0) {
             // dont bother withdrawing zero, save gas where we can
-            proxy.withdraw(gauge, address(want), _stakedBal);
+            gauge.withdraw(_stakedBal);
         }
         return balanceOfWant();
     }
@@ -323,7 +285,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     function prepareMigration(address _newStrategy) internal override {
         uint256 stakedBal = stakedBalance();
         if (stakedBal > 0) {
-            proxy.withdraw(gauge, address(want), stakedBal);
+            gauge.withdraw(stakedBal);
         }
         uint256 crvBal = crv.balanceOf(address(this));
 
@@ -488,31 +450,4 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     function ethToWant(
         uint256 _ethAmount
     ) public view override returns (uint256) {}
-
-    /* ========== SETTERS ========== */
-    // These functions are useful for setting parameters of the strategy that may need to be adjusted.
-
-    /**
-     * @notice Use this to set or update our keep amounts for this strategy.
-     * @dev Must be less than 10,000. Set in basis points. Only governance can set this.
-     * @param _keepCrv Percent of each CRV harvest to send to our voter.
-     */
-    function setLocalKeepCrv(uint256 _keepCrv) external onlyGovernance {
-        if (_keepCrv > 10_000) {
-            revert();
-        }
-        if (_keepCrv > 0 && curveVoter == address(0)) {
-            revert("Set voter when keep >0");
-        }
-        localKeepCRV = _keepCrv;
-    }
-
-    /**
-     * @notice Use this to set or update our voter contracts.
-     * @dev For Curve strategies, this is where we send our keepCVX. Only governance can set this.
-     * @param _curveVoter Address of our curve voter.
-     */
-    function setVoter(address _curveVoter) external onlyGovernance {
-        curveVoter = _curveVoter;
-    }
 }
