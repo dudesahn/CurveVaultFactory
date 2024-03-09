@@ -108,7 +108,6 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
      * @param _keeper Address to grant the keeper role.
      * @param _tradeFactory Our trade factory address.
      * @param _pid Our pool id (pid) for this strategy.
-     * @param _stakingAddress Convex staking address for our want token.
      * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
      * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
      * @param _booster Address of the convex booster/deposit contract.
