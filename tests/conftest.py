@@ -100,12 +100,12 @@ def amount(token):
 @pytest.fixture(scope="session")
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
-    profit_whale = accounts.at("0xf76CB08792134aDb10F9cdeb0d1C7f9a59F0AA57", force=True)
+    profit_whale = accounts.at("0x154001A2F9f816389b2F6D9E07563cE0359D813D", force=True)
     # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
     # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k, 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng
-    # 0x6806D62AAdF2Ee97cd4BCE46BF5fCD89766EF246 yPRISMA LP, cvxPRISMA LP 0x5C21F24e5772f52DEfA4BB37f662120c50597b4f
+    # 0x6806D62AAdF2Ee97cd4BCE46BF5fCD89766EF246 yPRISMA LP, cvxPRISMA LP 0x154001A2F9f816389b2F6D9E07563cE0359D813D
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -456,6 +456,9 @@ def strategy(
 
         # this is the same for new or existing vaults
         strategy.setHarvestTriggerParams(90000e6, 150000e6, {"from": gov})
+
+        # set up our claim params; default to always claim
+        strategy.setClaimParams(False, True, {"from": gov})
     elif which_strategy == 3:  # Prisma Curve
         vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Prisma Curve Strategy")

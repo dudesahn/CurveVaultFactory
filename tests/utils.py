@@ -49,7 +49,9 @@ def harvest_strategy(
 
     # for PRISMA, force claims by default
     if target in [2, 3]:
-        strategy.setForceClaimOnce(force_claim, {"from": vault.governance()})
+        claim_or_not = strategy.claimParams()["shouldClaimRewards"]
+        print("Claim or not:", claim_or_not)
+        strategy.setClaimParams(force_claim, claim_or_not, {"from": vault.governance()})
 
     if gov != 9:
         tx = strategy.harvest({"from": gov})
