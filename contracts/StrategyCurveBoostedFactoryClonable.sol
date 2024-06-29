@@ -40,7 +40,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
     bool public isOriginal = true;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.0.2";
+    string public constant strategyVersion = "4.0.2";
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -153,12 +153,9 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         proxy = ICurveStrategyProxy(_proxy); // our factory checks the latest proxy from curve voter and passes it here
         gauge = _gauge;
 
-        // want = Curve LP
-        want.approve(_proxy, type(uint256).max);
-
         // set up our baseStrategy vars
-        minReportDelay = 21 days;
-        maxReportDelay = 365 days;
+        minReportDelay = 3650 days;
+        maxReportDelay = 36500 days;
         creditThreshold = 50_000e18;
 
         // ySwaps setup
@@ -344,10 +341,12 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     /**
      * @notice Use to add or update rewards, rebuilds tradefactory too
-     * @dev Do this before updating trade factory if we have extra rewards. Can only be called by governance.
+     * @dev Do this before updating trade factory if we have extra rewards.
      * @param _rewards Rewards tokens to add to our trade factory.
      */
-    function updateRewards(address[] memory _rewards) external onlyGovernance {
+    function updateRewards(
+        address[] memory _rewards
+    ) external onlyVaultManagers {
         address tf = tradeFactory;
         _removeTradeFactoryPermissions(true);
         rewardsTokens = _rewards;
@@ -509,10 +508,19 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
 
     /**
      * @notice Use this to set or update our voter contracts.
-     * @dev For Curve strategies, this is where we send our keepCVX. Only governance can set this.
+     * @dev For Curve strategies, this is where we send our keepCRV. Only governance can set this.
      * @param _curveVoter Address of our curve voter.
      */
     function setVoter(address _curveVoter) external onlyGovernance {
         curveVoter = _curveVoter;
+    }
+
+    /**
+     * @notice Use this to set or update our strategy proxy.
+     * @dev Only governance can set this.
+     * @param _strategyProxy Address of our curve strategy proxy.
+     */
+    function setProxy(address _strategyProxy) external onlyGovernance {
+        proxy = ICurveStrategyProxy(_strategyProxy);
     }
 }
