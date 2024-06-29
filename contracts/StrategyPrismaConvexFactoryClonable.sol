@@ -84,7 +84,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     bool public isOriginal = true;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.1.0";
+    string public constant strategyVersion = "4.0.2";
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -475,14 +475,14 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
     /**
      * @notice Force a rewards claim from the receiver regardless of max boost.
-     * @dev Can only be called by managers.
+     * @dev Can only be called by emergency authorized (gov, mgmt, strategist, guardian).
      * @param _boostDelegate Address of the boost delegate to use.
      * @param _maxFee Max we fee are willing to pay for boost rental.
      */
     function claimRewards(
         address _boostDelegate,
         uint256 _maxFee
-    ) external onlyVaultManagers {
+    ) external onlyEmergencyAuthorized {
         require(_boostDelegate != address(0));
         _claimRewards(true, _boostDelegate, _maxFee);
     }
