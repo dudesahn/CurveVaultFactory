@@ -2,6 +2,7 @@ import pytest
 import brownie, time
 from brownie import interface, chain, accounts, ZERO_ADDRESS
 
+
 # returns (profit, loss) of a harvest
 def harvest_strategy(
     use_yswaps,
@@ -48,7 +49,7 @@ def harvest_strategy(
         print("\nTurned off health check!\n")
 
     # for PRISMA, force claims by default
-    if target in [2, 3]:
+    if target == 2:
         claim_or_not = strategy.claimParams()["shouldClaimRewards"]
         print("Claim or not:", claim_or_not)
         strategy.setClaimParams(force_claim, claim_or_not, {"from": vault.governance()})
@@ -99,21 +100,26 @@ def trade_handler_action(
     crvBalance = 0
     cvxBalance = 0
     yprismaBalance = 0
+    fxnBalance = 0
 
-    crv = interface.IERC20(strategy.crv())
-    if target != 1:
-        cvx = interface.IERC20(strategy.convexToken())
-        cvxBalance = cvx.balanceOf(strategy)
+    if target != 3:  # fxn doesn't know anything but FXN
+        crv = interface.IERC20(strategy.crv())
+        crvBalance = crv.balanceOf(strategy)
 
-    if target == 4:
-        fxs = interface.IERC20(strategy.fxs())
-        fxsBalance = fxs.balanceOf(strategy)
+        if target != 1:
+            cvx = interface.IERC20(strategy.convexToken())
+            cvxBalance = cvx.balanceOf(strategy)
 
-    if target in [2, 3]:
-        yprisma = interface.IERC20(strategy.yPrisma())
-        yprismaBalance = yprisma.balanceOf(strategy)
+        if target == 4:
+            fxs = interface.IERC20(strategy.fxs())
+            fxsBalance = fxs.balanceOf(strategy)
 
-    crvBalance = crv.balanceOf(strategy)
+        if target == 2:
+            yprisma = interface.IERC20(strategy.yPrisma())
+            yprismaBalance = yprisma.balanceOf(strategy)
+    else:
+        fxn = interface.IERC20(strategy.fxn())
+        fxnBalance = fxn.balanceOf(strategy)
 
     if crvBalance > 0:
         crv.transfer(token, crvBalance, {"from": strategy})
@@ -135,8 +141,19 @@ def trade_handler_action(
         print("yPRISMA rewards present:", yprismaBalance / 1e18)
         assert yprisma.balanceOf(strategy) == 0
 
+    if fxnBalance > 0:
+        fxn.transfer(token, fxnBalance, {"from": strategy})
+        print("FXN rewards present:", fxnBalance / 1e18)
+        assert fxn.balanceOf(strategy) == 0
+
     # send our profits back in
-    if crvBalance > 0 or cvxBalance > 0 or fxsBalance > 0 or yprismaBalance > 0:
+    if (
+        crvBalance > 0
+        or cvxBalance > 0
+        or fxsBalance > 0
+        or yprismaBalance > 0
+        or fxnBalance > 0
+    ):
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         print("Rewards converted into profit and returned")
         assert strategy.balanceOfWant() > 0

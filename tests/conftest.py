@@ -1,8 +1,8 @@
 import pytest
 from brownie import web3, config, Contract, ZERO_ADDRESS, chain, interface, accounts
-from eth_abi import encode_single
 import requests
 import os
+
 
 # Snapshots the chain before each test and reverts after test completion.
 @pytest.fixture(scope="function", autouse=True)
@@ -27,6 +27,7 @@ chain_used = 1
 
 
 ################################################## TENDERLY DEBUGGING ##################################################
+
 
 # change autouse to True if we want to use this fork to help debug tests
 @pytest.fixture(scope="session", autouse=use_tenderly)
@@ -62,11 +63,12 @@ def tenderly_fork(web3, chain):
 
 #################### FIXTURES BELOW NEED TO BE ADJUSTED FOR THIS REPO ####################
 
+
 # for curve/balancer, we will pull this automatically, so comment this out here (token below in unique fixtures section)
-# @pytest.fixture(scope="session")
-# def token():
-#     token_address = "0x6DEA81C8171D0bA574754EF6F8b412F2Ed88c54D"  # this should be the address of the ERC-20 used by the strategy/vault ()
-#     yield interface.IERC20(token_address)
+@pytest.fixture(scope="session")
+def token():
+    token_address = "0x74345504Eaea3D9408fC69Ae7EB2d14095643c5b"  # this should be the address of the ERC-20 used by the strategy/vault (GHO-fxUSD)
+    yield interface.IERC20(token_address)
 
 
 @pytest.fixture(scope="session")
@@ -74,13 +76,14 @@ def whale(accounts, amount, token):
     # Totally in it for the tech
     # Update this with a large holder of your want token (the largest EOA holder of LP)
     # use the FRAX-USDC pool for now
-    whale = accounts.at("0x13E58C7b1147385D735a06D14F0456E54C2dEBC8", force=True)
+    whale = accounts.at("0xec303960CF0456aC304Af45C0aDDe34921a10Fdf", force=True)
     # yPRISMA-f LP (gauge) 0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0, cvxPRISMA gauge: 0x13E58C7b1147385D735a06D14F0456E54C2dEBC8
     # cvxCRV new gauge (already deployed, only use for strategy testing): 0xfB18127c1471131468a1AaD4785c19678e521D86, 47m tokens,
     # stETH: 0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46, 1700 tokens, frax-usdc: 0xE57180685E3348589E9521aa53Af0BCD497E884d, DOLA pool, 23.6m tokens,
     # 0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5 frxETH 78k tokens, eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing)
     # 0x8605dc0C339a2e7e85EEA043bD29d42DA2c6D784 eUSD-FRAXBP, 13m, 0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c crvUSD-FRAX, 88.5k
     # 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng 40k (gauge, not perfect for strat testing but good for factory testing)
+    # 0xec303960CF0456aC304Af45C0aDDe34921a10Fdf GHO-crvUSD (gauge, 5M)
     if token.balanceOf(whale) < 2 * amount:
         raise ValueError(
             "Our whale needs more funds. Find another whale or reduce your amount variable."
@@ -92,20 +95,21 @@ def whale(accounts, amount, token):
 @pytest.fixture(scope="session")
 def amount(token):
     amount = (
-        100_000 * 10 ** token.decimals()
-    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng, 5000 yPRISMA, 100k cvxPRISMA
+        10_000 * 10 ** token.decimals()
+    )  # 500k for cvxCRV, 300 for stETH, 50k for frax-usdc, 5k for frxETH, 5 eCFX, 5_000 eUSD-FRAXBP, 10_000 crvUSD-FRAX, 100 frxETH-ng, 5000 yPRISMA, 100k cvxPRISMA, 1k GHO-crvUSD
     yield amount
 
 
 @pytest.fixture(scope="session")
 def profit_whale(accounts, profit_amount, token):
     # ideally not the same whale as the main whale, or else they will lose money
-    profit_whale = accounts.at("0x154001A2F9f816389b2F6D9E07563cE0359D813D", force=True)
+    profit_whale = accounts.at("0xfefB84273A4DEdd40D242f4C007190DE21C9E39e", force=True)
     # 0x109B3C39d675A2FF16354E116d080B94d238a7c9 (only use for strategy testing), new cvxCRV 5100 tokens, stETH: 0x82a7E64cdCaEdc0220D0a4eB49fDc2Fe8230087A, 500 tokens
     # frax-usdc 0x8fdb0bB9365a46B145Db80D0B1C5C5e979C84190, BUSD pool, 17m tokens, 0x38a93e70b0D8343657f802C1c3Fdb06aC8F8fe99 frxETH 28 tokens
     # eCFX 0xeCb456EA5365865EbAb8a2661B0c503410e9B347 (only use for factory deployment testing), 0xf83deAdE1b0D2AfF07700C548a54700a082388bE eUSD-FRAXBP 188
     # 0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A crvUSD-FRAX, 24.5k, 0x4E21418095d32d15c6e2B96A9910772613A50d50 frxETH-ng
     # 0x6806D62AAdF2Ee97cd4BCE46BF5fCD89766EF246 yPRISMA LP, cvxPRISMA LP 0x154001A2F9f816389b2F6D9E07563cE0359D813D
+    # 0xfefB84273A4DEdd40D242f4C007190DE21C9E39e GHO-crvUSD
     if token.balanceOf(profit_whale) < 5 * profit_amount:
         raise ValueError(
             "Our profit whale needs more funds. Find another whale or reduce your profit_amount variable."
@@ -116,8 +120,8 @@ def profit_whale(accounts, profit_amount, token):
 @pytest.fixture(scope="session")
 def profit_amount(token):
     profit_amount = (
-        100 * 10 ** token.decimals()
-    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng, 25 yPRISMA, 100 cvxPRISMA
+        50 * 10 ** token.decimals()
+    )  # 1k for FRAX-USDC, 2 for stETH, 100 for cvxCRV, 4 for frxETH, 1 eCFX, 25 for eUSD, 50 crvUSD-FRAX, 1 frxETH-ng, 25 yPRISMA, 100 cvxPRISMA, 50 GHO-crvUSD
     yield profit_amount
 
 
@@ -155,7 +159,7 @@ def contract_name(
     StrategyConvexFraxFactoryClonable,
     StrategyCurveBoostedFactoryClonable,
     StrategyPrismaConvexFactoryClonable,
-    # StrategyPrismaCurveFactoryClonable,
+    StrategyConvexFxnFactoryClonable,
     which_strategy,
 ):
     if which_strategy == 0:
@@ -164,8 +168,8 @@ def contract_name(
         contract_name = StrategyCurveBoostedFactoryClonable
     elif which_strategy == 2:
         contract_name = StrategyPrismaConvexFactoryClonable
-    # elif which_strategy == 3:
-    #     contract_name = StrategyPrismaCurveFactoryClonable
+    elif which_strategy == 3:
+        contract_name = StrategyConvexFxnFactoryClonable
     else:
         contract_name = StrategyConvexFraxFactoryClonable
     yield contract_name
@@ -188,7 +192,7 @@ def is_clonable():
 # use this to test our strategy in case there are no profits
 @pytest.fixture(scope="session")
 def no_profit():
-    no_profit = True
+    no_profit = False
     yield no_profit
 
 
@@ -294,6 +298,10 @@ if chain_used == 1:  # mainnet
     def yprisma():
         yield Contract("0xe3668873D944E4A949DA05fc8bDE419eFF543882")
 
+    @pytest.fixture(scope="session")
+    def fxn():
+        yield Contract("0x365AccFCa291e7D3914637ABf1F7635dB165Bb09")
+
 
 @pytest.fixture(scope="module")
 def vault(pm, gov, rewards, guardian, management, token, vault_address):
@@ -353,9 +361,9 @@ def strategy(
     frax_pid,
     staking_address,
     prisma_convex_factory,
-    prisma_curve_factory,
     yprisma,
     prisma_vault,
+    fxn_pid,
 ):
     if which_strategy == 0:  # convex
         strategy = gov.deploy(
@@ -390,16 +398,13 @@ def strategy(
                 pid
             ),  # This looks up the prisma receiver for the pool
         )
-    # elif which_strategy == 3:   # prisma curve
-    #     strategy = gov.deploy(
-    #         contract_name,
-    #         vault,
-    #         trade_factory,
-    #         10_000 * 1e6,
-    #         25_000 * 1e6,
-    #         prisma_vault,
-    #         prisma_curve_factory.getDeterministicAddress(gauge.address), # This looks up the prisma receiver for the pool
-    #     )
+    elif which_strategy == 3:  # FXN Convex
+        strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            fxn_pid,
+        )
     else:  # frax
         strategy = gov.deploy(
             contract_name,
@@ -459,11 +464,11 @@ def strategy(
 
         # set up our claim params; default to always claim
         strategy.setClaimParams(False, True, {"from": gov})
-    elif which_strategy == 3:  # Prisma Curve
+    elif which_strategy == 3:  # FXN Convex
         vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
-        print("New Vault, Prisma Curve Strategy")
+        print("New Vault, Convex FXN Strategy")
         chain.sleep(1)
-        # chain.mine(1)
+        chain.mine()
     else:  # frax
         vault.addStrategy(strategy, 10_000, 0, 2**256 - 1, 0, {"from": gov})
         print("New Vault, Frax Strategy")
@@ -488,6 +493,7 @@ def strategy(
 #################### FIXTURES ABOVE LIKELY NEED TO BE ADJUSTED FOR THIS REPO ####################
 
 ####################         PUT UNIQUE FIXTURES FOR THIS REPO BELOW         ####################
+
 
 # put our test pool's convex pid here
 # if you change this, make sure to update addresses/values below too
@@ -515,6 +521,13 @@ def prisma_receiver(
 def frax_pid():
     frax_pid = 44  # 27 DOLA-FRAXBP, 9 FRAX-USDC, 36 frxETH-ETH, 44 eUSD-FRAXBP, crvUSD-FRAX 49, frxETH-ng 63
     yield frax_pid
+
+
+# put our pool's fxn pid here
+@pytest.fixture(scope="session")
+def fxn_pid():
+    fxn_pid = 14  # 14 GHO-fxUSD
+    yield fxn_pid
 
 
 # put our pool's staking address here
@@ -552,9 +565,9 @@ def template_staking_address():
 def which_strategy():
     # must be 0 or 1 for vanilla convex and curve
     # prisma convex: 2
-    # prisma curve: 3
+    # fxn convex: 3
     # Only test 4 (Frax) for pools that actually have frax.
-    which_strategy = 2
+    which_strategy = 3
     yield which_strategy
 
 
@@ -628,6 +641,7 @@ def has_rewards():
 
 
 ########## ADDRESSES TO UPDATE FOR BALANCER VS CURVE ##########
+
 
 # all contracts below should be able to stay static based on the pid
 @pytest.fixture(scope="session")
@@ -718,11 +732,11 @@ def pool(token, curve_registry, curve_cryptoswap_registry, old_pool):
     yield poolContract
 
 
-@pytest.fixture(scope="session")
-def token(pid, booster):
-    # this should be the address of the ERC-20 used by the strategy/vault
-    token_address = booster.poolInfo(pid)[0]
-    yield Contract(token_address)
+# @pytest.fixture(scope="session")
+# def token(pid, booster):
+#     # this should be the address of the ERC-20 used by the strategy/vault
+#     token_address = booster.poolInfo(pid)[0]
+#     yield Contract(token_address)
 
 
 @pytest.fixture(scope="session")

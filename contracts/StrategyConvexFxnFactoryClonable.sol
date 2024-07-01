@@ -3,7 +3,7 @@ pragma solidity 0.8.19;
 
 import {Math} from "@openzeppelin/contracts@4.9.3/utils/math/Math.sol";
 import "github.com/yearn/yearn-vaults/blob/v0.4.6/contracts/BaseStrategy.sol";
-import "./interfaces/ConvexFxnInterfaces.sol";
+import {IConvexFxn, ITradeFactory, IDetails} from "./interfaces/ConvexFxnInterfaces.sol";
 
 contract StrategyConvexFxnFactoryClonable is BaseStrategy {
     using SafeERC20 for IERC20;
@@ -22,7 +22,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
     uint256 public fxnPid;
 
     /// @notice This is the Curve gauge address for our LP token.
-    IConvexFxn public gauge;
+    address public gauge;
 
     /// @notice This is the vault our strategy uses to stake on f(x) and use Convexs boost.
     IConvexFxn public userVault;
@@ -132,7 +132,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         uint256 _fxnPid
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(_tradeFactory, _fxnPid, _stakingAddress);
+        _initializeStrat(_tradeFactory, _fxnPid);
     }
 
     // this is called by our original strategy, as well as any clones
@@ -153,7 +153,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         // 1:1 assignments
         tradeFactory = _tradeFactory;
         fxnPid = _fxnPid;
-        gauge = IConvexFxn(_gauge);
+        gauge = _gauge;
 
         // have our strategy deploy our vault from the booster using the fxnPid
         userVault = IConvexFxn(fxnBooster.createVault(_fxnPid));
@@ -162,7 +162,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         want.approve(address(userVault), type(uint256).max);
 
         // set up our baseStrategy vars
-        maxReportDelay = 3650 days;
+        minReportDelay = 3650 days;
         creditThreshold = 50_000e18;
 
         // set up rewards and trade factory
@@ -196,7 +196,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
      * @return balanceStaked Balance of want staked in Convex f(x).
      */
     function stakedBalance() public view returns (uint256 balanceStaked) {
-        balanceStaked = gauge.balanceOf(userVault);
+        balanceStaked = IERC20(gauge).balanceOf(address(userVault));
     }
 
     /**
@@ -338,9 +338,9 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
 
     /**
      * @notice Use to add or update rewards, rebuilds tradefactory too
-     * @dev Do this before updating trade factory if we have extra rewards. Can only be called by governance.
+     * @dev Do this before updating trade factory if we have extra rewards.
      */
-    function updateRewards() external onlyGovernance {
+    function updateRewards() external onlyVaultManagers {
         address tf = tradeFactory;
         _removeTradeFactoryPermissions(true);
         _updateRewards();
@@ -354,10 +354,10 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         delete rewardsTokens;
 
         // check our user vault to see what rewards we have (if any)
-        IFxnRewards rewardsContract = IFxnRewards(userVault.rewards());
+        IConvexFxn rewardsContract = IConvexFxn(userVault.rewards());
 
         for (uint256 i; i < rewardsContract.rewardTokenLength(); ++i) {
-            rewardsTokens.push(rewardsContract.rewardsTokens(i));
+            rewardsTokens.push(rewardsContract.rewardTokens(i));
         }
     }
 
@@ -388,7 +388,11 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         // enable if we have anything else
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
+            require(_rewardsToken != address(want), "not rewards");
+            IERC20(_rewardsToken).forceApprove(
+                _tradeFactory,
+                type(uint256).max
+            );
             tf.enable(_rewardsToken, _want);
         }
 
@@ -456,12 +460,6 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
             return false;
         }
 
-        StrategyParams memory params = vault.strategies(address(this));
-        // harvest no matter what once we reach our maxDelay
-        if (block.timestamp - params.lastReport > maxReportDelay) {
-            return true;
-        }
-
         // check if the base fee gas price is higher than we allow. if it is, block harvests.
         if (!isBaseFeeAcceptable()) {
             return false;
@@ -472,6 +470,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
             return true;
         }
 
+        StrategyParams memory params = vault.strategies(address(this));
         // harvest if we hit our minDelay, but only if our gas price is acceptable
         if (block.timestamp - params.lastReport > minReportDelay) {
             return true;

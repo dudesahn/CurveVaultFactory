@@ -3,6 +3,7 @@ from brownie import chain, Contract
 import pytest
 from utils import harvest_strategy
 
+
 # make sure cloned strategy works just like normal
 def test_cloning(
     gov,

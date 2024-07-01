@@ -3,6 +3,7 @@ from utils import harvest_strategy
 from brownie import accounts, interface, chain
 import brownie
 
+
 # test migrating a strategy
 def test_migration(
     gov,

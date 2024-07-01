@@ -3,6 +3,7 @@ import brownie
 from brownie import Contract, chain, interface
 from utils import harvest_strategy, check_status
 
+
 # test that emergency exit works properly
 def test_emergency_exit(
     gov,
