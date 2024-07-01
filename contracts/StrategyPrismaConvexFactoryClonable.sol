@@ -419,12 +419,16 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
         uint256 crvBal = crv.balanceOf(address(this));
         uint256 cvxBal = convexToken.balanceOf(address(this));
+        uint256 yprismaBal = yPrisma.balanceOf(address(this));
 
         if (crvBal > 0) {
             crv.safeTransfer(_newStrategy, crvBal);
         }
         if (cvxBal > 0) {
             convexToken.safeTransfer(_newStrategy, cvxBal);
+        }
+        if (yprismaBal > 0) {
+            yPrisma.safeTransfer(_newStrategy, yprismaBal);
         }
     }
 
@@ -576,7 +580,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     function harvestTrigger(
         uint256 callCostinEth
     ) public view override returns (bool) {
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we dont need to adjust keeper job.
+        // Should not trigger if strategy is inactive (no assets and no debtRatio).
         if (!isActive()) {
             return false;
         }
@@ -611,11 +615,9 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         }
 
         StrategyParams memory params = vault.strategies(address(this));
-        // harvest regardless of profit once we reach our maxDelay and are max boosted.
-        if (
-            block.timestamp - params.lastReport > maxReportDelay &&
-            (claimsAreMaxBoosted() || _claimParams.forceClaimOnce)
-        ) {
+        // harvest regardless of profit once we reach our maxDelay
+        // this will likely be used to take profit on yield already converted to want
+        if (block.timestamp - params.lastReport > maxReportDelay) {
             return true;
         }
 

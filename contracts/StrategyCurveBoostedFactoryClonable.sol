@@ -384,7 +384,14 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         // enable for all rewards tokens too
         for (uint256 i; i < rewardsTokens.length; ++i) {
             address _rewardsToken = rewardsTokens[i];
-            IERC20(_rewardsToken).approve(_tradeFactory, type(uint256).max);
+            require(
+                _rewardsToken != address(want) && _rewardsToken != gauge,
+                "not rewards"
+            );
+            IERC20(_rewardsToken).forceApprove(
+                _tradeFactory,
+                type(uint256).max
+            );
             tf.enable(_rewardsToken, _want);
         }
     }
