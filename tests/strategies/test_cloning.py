@@ -42,6 +42,7 @@ def test_cloning(
     prisma_receiver,
     yprisma,
     RELATIVE_APPROX,
+    fxn_pid,
 ):
 
     # skip this test if we don't clone
@@ -288,6 +289,55 @@ def test_cloning(
                     25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
+                    {"from": gov},
+                )
+
+        elif which_strategy == 3:  # FXN Convex
+            # Shouldn't be able to call initialize again
+            with brownie.reverts():
+                strategy.initialize(
+                    vault,
+                    strategist,
+                    rewards,
+                    keeper,
+                    trade_factory,
+                    fxn_pid,
+                    {"from": gov},
+                )
+            tx = strategy.cloneStrategyConvexFxn(
+                vault,
+                strategist,
+                rewards,
+                keeper,
+                trade_factory,
+                fxn_pid,
+                {"from": gov},
+            )
+
+            new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
+            print("We have a clone!", new_strategy)
+
+            # Shouldn't be able to call initialize again
+            with brownie.reverts():
+                new_strategy.initialize(
+                    vault,
+                    strategist,
+                    rewards,
+                    keeper,
+                    trade_factory,
+                    fxn_pid,
+                    {"from": gov},
+                )
+
+            ## shouldn't be able to clone a clone
+            with brownie.reverts():
+                new_strategy.cloneStrategyConvexFxn(
+                    vault,
+                    strategist,
+                    rewards,
+                    keeper,
+                    trade_factory,
+                    fxn_pid,
                     {"from": gov},
                 )
 

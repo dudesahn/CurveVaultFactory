@@ -36,6 +36,7 @@ def test_migration(
     yprisma,
     prisma_vault,
     RELATIVE_APPROX,
+    fxn_pid,
 ):
 
     ## deposit to the vault after approving
@@ -77,7 +78,7 @@ def test_migration(
             new_proxy,
             gauge,
         )
-    elif which_strategy in [2, 3]:  # prisma
+    elif which_strategy == 2:  # prisma convex
         new_strategy = gov.deploy(
             contract_name,
             vault,
@@ -88,6 +89,13 @@ def test_migration(
             prisma_convex_factory.getDeterministicAddress(
                 pid
             ),  # This looks up the prisma receiver for the pool
+        )
+    elif which_strategy == 3:  # fxn convex
+        new_strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            fxn_pid,
         )
     elif which_strategy == 4:  # frax
         new_strategy = gov.deploy(
@@ -144,10 +152,10 @@ def test_migration(
 
     ####### ADD LOGIC TO MAKE SURE ASSET TRANSFER WENT AS EXPECTED #######
     assert crv.balanceOf(strategy) == 0
-    if which_strategy != 2:
+    if which_strategy not in [2, 3]:
         assert crv.balanceOf(new_strategy) > 0
 
-    if which_strategy != 1 and which_strategy not in [2, 3]:
+    if which_strategy not in [1, 2, 3]:
         assert convex_token.balanceOf(strategy) == 0
         assert convex_token.balanceOf(new_strategy) > 0
 
@@ -235,6 +243,7 @@ def test_empty_migration(
     prisma_vault,
     prisma_convex_factory,
     yprisma,
+    fxn_pid,
 ):
 
     ## deposit to the vault after approving
@@ -276,7 +285,7 @@ def test_empty_migration(
             new_proxy,
             gauge,
         )
-    elif which_strategy in [2, 3]:  # prisma
+    elif which_strategy == 2:  # prisma convex
         new_strategy = gov.deploy(
             contract_name,
             vault,
@@ -287,6 +296,13 @@ def test_empty_migration(
             prisma_convex_factory.getDeterministicAddress(
                 pid
             ),  # This looks up the prisma receiver for the pool
+        )
+    elif which_strategy == 3:  # fxn convex
+        new_strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            fxn_pid,
         )
     elif which_strategy == 4:  # frax
         new_strategy = gov.deploy(

@@ -493,7 +493,7 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
      */
     function triggerClaimRewards(
         address _boostDelegate,
-        uint256 _maxFee
+        uint80 _maxFee
     ) external onlyEmergencyAuthorized {
         require(_boostDelegate != address(0));
         ClaimParams memory _claimParams = claimParams;
