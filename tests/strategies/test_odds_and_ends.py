@@ -71,13 +71,20 @@ def test_liquidatePosition(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2, 3]:
+    elif which_strategy == 2:
 
         # send all funds out of the gauge
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
 
         print("Gauge Balance of Vault", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 3:
+        # userVault sends away all of the gauge tokens
+        user_vault = strategy.userVault()
+        fxn_gauge = Contract(strategy.fxnGauge())
+        to_send = fxn_gauge.balanceOf(user_vault)
+        fxn_gauge.transfer(gov, to_send, {"from": user_vault})
         assert strategy.estimatedTotalAssets() == 0
     else:
         # wait another week so our frax LPs are unlocked
@@ -279,13 +286,20 @@ def test_rekt(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2, 3]:
+    elif which_strategy == 2:
 
         # send all funds out of the gauge
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
 
         print("Gauge Balance of Vault", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 3:
+        # userVault sends away all of the gauge tokens
+        user_vault = strategy.userVault()
+        fxn_gauge = Contract(strategy.fxnGauge())
+        to_send = fxn_gauge.balanceOf(user_vault)
+        fxn_gauge.transfer(gov, to_send, {"from": user_vault})
         assert strategy.estimatedTotalAssets() == 0
     elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
@@ -367,7 +381,7 @@ def test_weird_reverts(
         vault.migrateStrategy(strategy, other_strategy, {"from": gov})
 
     # can't withdraw from a non-vault address
-    with brownie.reverts():
+    with brownie.reverts("!vault"):
         strategy.withdraw(1e18, {"from": gov})
 
 
@@ -445,12 +459,19 @@ def test_empty_strat(
         # curve needs a little push to manually get that small amount of yield earned
         if which_strategy == 1:
             new_proxy.harvest(gauge, {"from": strategy})
-    elif which_strategy in [2, 3]:
+    elif which_strategy == 2:
         # send all funds out of the gauge
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
 
         print("Gauge Balance of Vault", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 3:
+        # userVault sends away all of the gauge tokens
+        user_vault = strategy.userVault()
+        fxn_gauge = Contract(strategy.fxnGauge())
+        to_send = fxn_gauge.balanceOf(user_vault)
+        fxn_gauge.transfer(gov, to_send, {"from": user_vault})
         assert strategy.estimatedTotalAssets() == 0
     elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked

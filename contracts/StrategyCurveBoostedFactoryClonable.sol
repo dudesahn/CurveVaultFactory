@@ -455,12 +455,6 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
             return false;
         }
 
-        StrategyParams memory params = vault.strategies(address(this));
-        // harvest no matter what once we reach our maxDelay
-        if (block.timestamp - params.lastReport > maxReportDelay) {
-            return true;
-        }
-
         // check if the base fee gas price is higher than we allow. if it is, block harvests.
         if (!isBaseFeeAcceptable()) {
             return false;
@@ -472,6 +466,7 @@ contract StrategyCurveBoostedFactoryClonable is BaseStrategy {
         }
 
         // harvest if we hit our minDelay, but only if our gas price is acceptable
+        StrategyParams memory params = vault.strategies(address(this));
         if (block.timestamp - params.lastReport > minReportDelay) {
             return true;
         }

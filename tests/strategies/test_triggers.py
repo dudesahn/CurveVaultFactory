@@ -214,8 +214,9 @@ def test_triggers(
 
         # simulate earnings
         chain.sleep(sleep_time)
+        chain.mine()
 
-        # the rest of our trigger tests for the prisma receiver strategy is in test_misc
+        # the rest of our trigger tests for the prisma receiver strategy is in test_curve_convex_frax_operation
         if which_strategy == 2:
             return
 
@@ -224,11 +225,13 @@ def test_triggers(
         # for curve vaults, we shouldn't have to worry about a lack of claimable profit, should auto-generate
 
         # set our max delay to 1 day so we trigger true, then set it back to 21 days
-        strategy.setMaxReportDelay(sleep_time - 1)
-        tx = strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be True.", tx)
-        assert tx == True
-        strategy.setMaxReportDelay(86400 * 21)
+        # we only use min delay in Curve and FXN strategies
+        if which_strategy not in [1, 3]:
+            strategy.setMaxReportDelay(1)
+            tx = strategy.harvestTrigger(0, {"from": gov})
+            print("\nShould we harvest? Should be True.", tx)
+            assert tx == True
+            strategy.setMaxReportDelay(86400 * 21)
 
         # only convex does this mess with earmarking
         if which_strategy == 0:
@@ -282,8 +285,8 @@ def test_triggers(
             )
             assert tx == False
             strategy.setHarvestTriggerParams(90000e6, 150000e6, False, {"from": gov})
-        else:  # curve uses minDelay as well
-            strategy.setMinReportDelay(sleep_time - 1)
+        else:  # curve and FXN use minDelay as well
+            strategy.setMinReportDelay(1)
             tx = strategy.harvestTrigger(0, {"from": gov})
             print("\nShould we harvest? Should be True.", tx)
             assert tx == True

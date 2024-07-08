@@ -21,10 +21,10 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
     /// @notice This is a unique numerical identifier for each Convex f(x) pool.
     uint256 public fxnPid;
 
-    /// @notice This is the Curve gauge address for our LP token.
-    address public gauge;
+    /// @notice This is the FXN gauge address for our LP token. Different from Curve gauge.
+    address public fxnGauge;
 
-    /// @notice This is the vault our strategy uses to stake on f(x) and use Convexs boost.
+    /// @notice This is the vault our strategy uses to stake on f(x) and use Convex boost.
     IConvexFxn public userVault;
 
     // this means all of our fee values are in basis points
@@ -38,7 +38,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
     /// @notice The address of our ySwaps trade factory.
     address public tradeFactory;
 
-    /// @notice Array of any extra rewards tokens this Convex pool may have.
+    /// @notice Array of any extra rewards tokens this pool may have. Add CRV and CVX if those rewards start flowing.
     address[] public rewardsTokens;
 
     /// @notice Will only be true on the original deployed contract and not on clones; we do not want to clone a clone.
@@ -138,7 +138,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
     // this is called by our original strategy, as well as any clones
     function _initializeStrat(address _tradeFactory, uint256 _fxnPid) internal {
         // make sure that we havent initialized this before
-        if (gauge != address(0)) {
+        if (fxnGauge != address(0)) {
             revert("Already initialized");
         }
 
@@ -153,7 +153,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         // 1:1 assignments
         tradeFactory = _tradeFactory;
         fxnPid = _fxnPid;
-        gauge = _gauge;
+        fxnGauge = _gauge;
 
         // have our strategy deploy our vault from the booster using the fxnPid
         userVault = IConvexFxn(fxnBooster.createVault(_fxnPid));
@@ -165,8 +165,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
         minReportDelay = 3650 days;
         creditThreshold = 50_000e18;
 
-        // set up rewards and trade factory
-        _updateRewards();
+        // set up trade factory
         _setUpTradeFactory();
     }
 
@@ -196,7 +195,7 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
      * @return balanceStaked Balance of want staked in Convex f(x).
      */
     function stakedBalance() public view returns (uint256 balanceStaked) {
-        balanceStaked = IERC20(gauge).balanceOf(address(userVault));
+        balanceStaked = IERC20(fxnGauge).balanceOf(address(userVault));
     }
 
     /**
@@ -339,26 +338,17 @@ contract StrategyConvexFxnFactoryClonable is BaseStrategy {
     /**
      * @notice Use to add or update rewards, rebuilds tradefactory too
      * @dev Do this before updating trade factory if we have extra rewards.
+     * @param _rewards Rewards tokens to add to our trade factory.
      */
-    function updateRewards() external onlyVaultManagers {
+    function updateRewards(
+        address[] memory _rewards
+    ) external onlyVaultManagers {
         address tf = tradeFactory;
         _removeTradeFactoryPermissions(true);
-        _updateRewards();
+        rewardsTokens = _rewards;
 
         tradeFactory = tf;
         _setUpTradeFactory();
-    }
-
-    function _updateRewards() internal {
-        // empty the rewardsTokens and rebuild
-        delete rewardsTokens;
-
-        // check our user vault to see what rewards we have (if any)
-        IConvexFxn rewardsContract = IConvexFxn(userVault.rewards());
-
-        for (uint256 i; i < rewardsContract.rewardTokenLength(); ++i) {
-            rewardsTokens.push(rewardsContract.rewardTokens(i));
-        }
     }
 
     /**

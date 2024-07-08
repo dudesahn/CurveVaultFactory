@@ -109,7 +109,8 @@ def test_simple_harvest(
         receiver = Contract(strategy.prismaReceiver())
         print("Claimable from receiver:", receiver.claimableReward(strategy))
 
-    if which_strategy != 3:
+    # curve and FXN don't have a claimable amount readable
+    if which_strategy not in [1, 3]:
         print(
             "🤑 Claimable profit for second harvest:",
             strategy.claimableProfitInUsdc() / 1e6,

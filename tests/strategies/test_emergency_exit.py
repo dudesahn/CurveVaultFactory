@@ -96,7 +96,8 @@ def test_emergency_exit(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 4:
+    # similarly, for FXN strategies, we need to manually claim rewards from the user vault
+    if which_strategy in [3, 4]:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -278,7 +279,8 @@ def test_emergency_exit_with_profit(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 4:
+    # similarly, for FXN strategies, we need to manually claim rewards from the user vault
+    if which_strategy in [3, 4]:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -444,10 +446,17 @@ def test_emergency_exit_with_loss(
         print("Gauge Balance of Vault", to_send)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2, 3]:
+    elif which_strategy == 2:
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
         print("Balance of Strategy", to_send)
+        assert strategy.estimatedTotalAssets() == 0
+    elif which_strategy == 3:
+        # userVault sends away all of the gauge tokens
+        user_vault = strategy.userVault()
+        fxn_gauge = Contract(strategy.fxnGauge())
+        to_send = fxn_gauge.balanceOf(user_vault)
+        fxn_gauge.transfer(gov, to_send, {"from": user_vault})
         assert strategy.estimatedTotalAssets() == 0
     elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
@@ -516,7 +525,8 @@ def test_emergency_exit_with_loss(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 4:
+    # similarly, for FXN strategies, we need to manually claim rewards from the user vault
+    if which_strategy in [3, 4]:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -697,10 +707,19 @@ def test_emergency_exit_with_no_loss(
         print("Gauge Balance of Vault", to_send / 1e18)
         gauge.transfer(gov, to_send, {"from": voter})
         assert strategy.estimatedTotalAssets() == 0
-    elif which_strategy in [2, 3]:
+        # gov withdraws
+        gauge.withdraw(to_send, {"from": gov})
+    elif which_strategy == 2:
         # send away all funds, will need to alter this based on strategy
         to_send = prisma_receiver.balanceOf(strategy)
         prisma_receiver.withdraw(gov, to_send, {"from": strategy})
+    elif which_strategy == 3:
+        # userVault sends away all of the gauge tokens
+        user_vault = strategy.userVault()
+        fxn_gauge = Contract(strategy.fxnGauge())
+        to_send = fxn_gauge.balanceOf(user_vault)
+        fxn_gauge.transfer(gov, to_send, {"from": user_vault})
+        assert strategy.estimatedTotalAssets() == 0
     elif which_strategy == 4:
         # wait another week so our frax LPs are unlocked
         chain.sleep(86400 * 7)
@@ -738,7 +757,7 @@ def test_emergency_exit_with_no_loss(
     assert vault.debtOutstanding(strategy) == 0
 
     ################# GOV SENDS IT BACK, ADJUST AS NEEDED. #################
-    if which_strategy in [0, 2, 3]:
+    if which_strategy in [0, 1]:
         # gov sends it back, glad someone was watching!
         token.transfer(strategy, to_send, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
@@ -746,6 +765,13 @@ def test_emergency_exit_with_no_loss(
         # gov unwraps and sends it back, glad someone was watching!
         gauge.withdraw(to_send, {"from": gov})
         token.transfer(strategy, to_send, {"from": gov})
+        assert strategy.estimatedTotalAssets() > 0
+    elif which_strategy == 3:
+        # gov sends it back
+        user_vault = strategy.userVault()
+        fxn_gauge = Contract(strategy.fxnGauge())
+        to_send = fxn_gauge.balanceOf(gov)
+        fxn_gauge.transfer(user_vault, to_send, {"from": gov})
         assert strategy.estimatedTotalAssets() > 0
     elif which_strategy == 4:
         # gov unwraps and sends it back, glad someone was watching!
@@ -774,7 +800,8 @@ def test_emergency_exit_with_no_loss(
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 4:
+    # similarly, for FXN strategies, we need to manually claim rewards from the user vault
+    if which_strategy in [3, 4]:
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 

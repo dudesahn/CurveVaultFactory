@@ -116,7 +116,7 @@ def test_cloning(
     else:
         if which_strategy == 0:  # convex
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 strategy.initialize(
                     vault,
                     strategist,
@@ -148,7 +148,7 @@ def test_cloning(
             new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 new_strategy.initialize(
                     vault,
                     strategist,
@@ -164,7 +164,7 @@ def test_cloning(
                 )
 
             ## shouldn't be able to clone a clone
-            with brownie.reverts():
+            with brownie.reverts("Cant clone a clone"):
                 new_strategy.cloneStrategyConvex(
                     vault,
                     strategist,
@@ -181,7 +181,7 @@ def test_cloning(
 
         elif which_strategy == 1:  # curve
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 strategy.initialize(
                     vault,
                     strategist,
@@ -206,7 +206,7 @@ def test_cloning(
             new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 new_strategy.initialize(
                     vault,
                     strategist,
@@ -219,7 +219,7 @@ def test_cloning(
                 )
 
             ## shouldn't be able to clone a clone
-            with brownie.reverts():
+            with brownie.reverts("Cant clone a clone"):
                 new_strategy.cloneStrategyCurveBoosted(
                     vault,
                     strategist,
@@ -233,7 +233,7 @@ def test_cloning(
 
         elif which_strategy == 2:  # Prisma Convex
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 strategy.initialize(
                     vault,
                     strategist,
@@ -263,7 +263,7 @@ def test_cloning(
             print("We have a clone!", new_strategy)
 
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 new_strategy.initialize(
                     vault,
                     strategist,
@@ -278,7 +278,7 @@ def test_cloning(
                 )
 
             ## shouldn't be able to clone a clone
-            with brownie.reverts():
+            with brownie.reverts("Cant clone a clone"):
                 new_strategy.cloneStrategyPrismaConvex(
                     vault,
                     strategist,
@@ -294,7 +294,7 @@ def test_cloning(
 
         elif which_strategy == 3:  # FXN Convex
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 strategy.initialize(
                     vault,
                     strategist,
@@ -318,7 +318,7 @@ def test_cloning(
             print("We have a clone!", new_strategy)
 
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 new_strategy.initialize(
                     vault,
                     strategist,
@@ -330,7 +330,7 @@ def test_cloning(
                 )
 
             ## shouldn't be able to clone a clone
-            with brownie.reverts():
+            with brownie.reverts("Cant clone a clone"):
                 new_strategy.cloneStrategyConvexFxn(
                     vault,
                     strategist,
@@ -343,7 +343,7 @@ def test_cloning(
 
         else:  # frax
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 strategy.initialize(
                     vault,
                     strategist,
@@ -375,7 +375,7 @@ def test_cloning(
             new_strategy = contract_name.at(tx.events["Cloned"]["clone"])
 
             # Shouldn't be able to call initialize again
-            with brownie.reverts():
+            with brownie.reverts("Strategy already initialized"):
                 new_strategy.initialize(
                     vault,
                     strategist,
@@ -391,7 +391,7 @@ def test_cloning(
                 )
 
             ## shouldn't be able to clone a clone
-            with brownie.reverts():
+            with brownie.reverts("Cant clone a clone"):
                 new_strategy.cloneStrategyConvexFrax(
                     vault,
                     strategist,

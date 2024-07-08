@@ -37,6 +37,7 @@ def test_migration(
     prisma_vault,
     RELATIVE_APPROX,
     fxn_pid,
+    fxn,
 ):
 
     ## deposit to the vault after approving
@@ -117,23 +118,21 @@ def test_migration(
         print("\nShould we harvest? Should be False.", tx)
         assert tx == False
 
-    if which_strategy != 4:
-        # can we harvest an unactivated strategy? should be no
-        tx = new_strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be False.", tx)
-        assert tx == False
+    # had it skipping for FRAX here too, not sure why tho
 
     ######### ADD LOGIC TO TEST CLAIMING OF ASSETS FOR TRANSFER TO NEW STRATEGY AS NEEDED #########
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 4:
-        with brownie.reverts():
-            vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
-        chain.sleep(86400 * 7)
-        chain.mine(1)
+    if which_strategy in [3, 4]:
+        if which_strategy == 4:
+            with brownie.reverts():
+                vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+            # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+            chain.sleep(86400 * 7)
+            chain.mine(1)
 
+        # do the claim for both FXN and FRAX strategies
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -162,6 +161,10 @@ def test_migration(
     if which_strategy == 4:
         assert fxs.balanceOf(strategy) == 0
         assert fxs.balanceOf(new_strategy) > 0
+
+    if which_strategy == 3:
+        assert fxn.balanceOf(strategy) == 0
+        assert fxn.balanceOf(new_strategy) > 0
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()

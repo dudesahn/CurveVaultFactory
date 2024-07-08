@@ -61,30 +61,28 @@ def tenderly_fork(web3, chain):
 
 ################################################ UPDATE THINGS BELOW HERE ################################################
 
-#################### FIXTURES BELOW NEED TO BE ADJUSTED FOR THIS REPO ####################
 
-
-# for curve/balancer, we will pull this automatically via convex_token. set to False to manually set address
 @pytest.fixture(scope="session")
-def token(token_address_via_convex):
-    use_convex_token = True
-    if use_convex_token:
-        yield token_address_via_convex
-    else:
-        token_address = ""
-        yield interface.IERC20(token_address)
+def which_strategy():
+    # vanilla convex: 0
+    # curve: 1
+    # prisma convex: 2
+    # fxn convex: 3
+    # Only test 4 (Frax) for pools that actually have frax.
+    which_strategy = 2
+    yield which_strategy
 
 
 @pytest.fixture(scope="session")
 def token_string():
-    id_number = 10
+    id_number = 0
     token_string = "ERROR"
     if id_number == 0:
         token_string = "yPRISMA"
     elif id_number == 1:
         token_string = "cvxPRISMA"
     elif id_number == 2:
-        token_string = "cvxCRV New"
+        token_string = "cvxCRV New" # working 7/8/24
     elif id_number == 3:
         token_string = "stETH"
     elif id_number == 4:
@@ -100,10 +98,24 @@ def token_string():
     elif id_number == 9:
         token_string = "frxETH-ng"
     elif id_number == 10:
-        token_string = "GHO-fxUSD"
+        token_string = "GHO-fxUSD" # working 7/8/24
     elif id_number == 11:
-        token_string = ""
+        token_string = "CurveLend-WETH" # working 7/8/24
     yield token_string
+
+
+####### GENERALLY SHOULDN'T HAVE TO CHANGE ANYTHING BELOW HERE UNLESS UPDATING/ADDING WHALE/PROFIT AMOUNTS OR ADDRESSES
+
+
+# for curve/balancer, we will pull this automatically via convex_token. set to False to manually set address
+@pytest.fixture(scope="session")
+def token(token_address_via_convex):
+    use_convex_token = True
+    if use_convex_token:
+        yield token_address_via_convex
+    else:
+        token_address = ""
+        yield interface.IERC20(token_address)
 
 
 @pytest.fixture(scope="session")
@@ -111,7 +123,7 @@ def whale_accounts():
     whale_accounts = {
         "yPRISMA": "0xf1ce237a1E1a88F6e289CD7998A826138AEB30b0",  # gauge
         "cvxPRISMA": "0x13E58C7b1147385D735a06D14F0456E54C2dEBC8",  # gauge
-        "cvxCRV New": "0xfB18127c1471131468a1AaD4785c19678e521D86",  # gauge, 47M tokens
+        "cvxCRV New": "0xfB18127c1471131468a1AaD4785c19678e521D86",  # gauge, 55M tokens
         "stETH": "0x65eaB5eC71ceC12f38829Fbb14C98ce4baD28C46",  # 1700 tokens
         "FRAX-USDC": "0xE57180685E3348589E9521aa53Af0BCD497E884d",  # DOLA Pool, 23.6M tokens
         "frxETH": "0x2932a86df44Fe8D2A706d8e9c5d51c24883423F5",  # 78k tokens
@@ -120,6 +132,7 @@ def whale_accounts():
         "crvUSD-FRAX": "0x96424E6b5eaafe0c3B36CA82068d574D44BE4e3c",  # 88.5k
         "frxETH-ng": "0x4E21418095d32d15c6e2B96A9910772613A50d50",  # 40k (gauge, not perfect for strat testing but good for factory testing)
         "GHO-fxUSD": "0xec303960CF0456aC304Af45C0aDDe34921a10Fdf",  # 5M, gauge
+        "CurveLend-WETH": "0xF3F6D6d412a77b680ec3a5E35EbB11BbEC319739",  # 7.5B, gauge (1000x)
         "NEW": "",  #
     }
     yield whale_accounts
@@ -151,6 +164,7 @@ def whale_amounts():
         "crvUSD-FRAX": 10_000,
         "frxETH-ng": 100,
         "GHO-fxUSD": 1_000,
+        "CurveLend-WETH": 100_000_000,  # $100k of crvUSD
         "NEW": 0,
     }
     yield whale_amounts
@@ -177,6 +191,7 @@ def profit_whale_accounts():
         "crvUSD-FRAX": "0x97283C716f72b6F716D6a1bf6Bd7C3FcD840027A",  # 24.5k
         "frxETH-ng": "0x4E21418095d32d15c6e2B96A9910772613A50d50",
         "GHO-fxUSD": "0xfefB84273A4DEdd40D242f4C007190DE21C9E39e",
+        "CurveLend-WETH": "0x4Ec3fa22540f841657197440FeE70B5967465AaA",  # 5M, but actually $5k since each is 1000x
         "NEW": "",  #
     }
     yield profit_whale_accounts
@@ -207,6 +222,7 @@ def profit_amounts():
         "crvUSD-FRAX": 50,
         "frxETH-ng": 1,
         "GHO-fxUSD": 50,
+        "CurveLend-WETH": 500_000,  # $500 of crvUSD
         "NEW": 0,
     }
     yield profit_amounts
@@ -484,8 +500,6 @@ def strategy(
             contract_name,
             vault,
             trade_factory,
-            10_000 * 1e6,
-            25_000 * 1e6,
             prisma_vault,
             prisma_convex_factory.getDeterministicAddress(
                 pid
@@ -516,10 +530,10 @@ def strategy(
     vault.setManagementFee(0, {"from": gov})
     vault.setPerformanceFee(0, {"from": gov})
 
-    # we will be migrating on our live vault instead of adding it directly
     if which_strategy == 0:  # convex
-        # earmark rewards if we are using a convex strategy
-        booster.earmarkRewards(pid, {"from": gov})
+        # convex implemented a change where you might need to wait until next epoch to earmark to prevent over-harvesting
+        # chain.sleep(86400 * 7)
+        # booster.earmarkRewards(pid, {"from": gov})
         chain.sleep(1)
         chain.mine(1)
 
@@ -544,7 +558,7 @@ def strategy(
             strategy.updateRewards([rewards_token], {"from": gov})
             new_proxy.approveRewardToken(strategy.rewardsTokens(0), {"from": gov})
 
-        # approve our new strategy on the proxy
+        # approve our new strategy on the proxy (if we want to test an existing want, then add more logic here)
         new_proxy.approveStrategy(strategy.gauge(), strategy, {"from": gov})
         assert new_proxy.strategies(gauge.address) == strategy.address
         assert voter.strategy() == new_proxy.address
@@ -601,8 +615,9 @@ def pid_list():
         "eUSD-FRAXBP": 156,
         "crvUSD-FRAX": 187,
         "frxETH-ng": 219,
-        "GHO-fxUSD": 316,  # we don't really need this for FXN strategies, but set anyway
-        "NEW": 1_000,
+        "GHO-fxUSD": 316,  # we don't really need this for FXN strategies, but set to use for token lookup
+        "CurveLend-WETH": 365,
+        "NEW": 0,
     }
     yield pid_list
 
@@ -639,7 +654,8 @@ def frax_pid_list():
         "crvUSD-FRAX": 49,
         "frxETH-ng": 63,
         "GHO-fxUSD": 1_000,
-        "NEW": 1_000,
+        "CurveLend-WETH": 1_000,
+        "NEW": 0,
     }
     yield frax_pid_list
 
@@ -665,8 +681,8 @@ def fxn_pid_list():
         "crvUSD-FRAX": 1_000,
         "frxETH-ng": 1_000,
         "GHO-fxUSD": 14,
-        "NEW": 1_000,
-        "NEW": 1_000,
+        "CurveLend-WETH": 1_000,
+        "NEW": 0,
     }
     yield fxn_pid_list
 
@@ -678,13 +694,30 @@ def fxn_pid(fxn_pid_list, token_string):
     yield fxn_pid
 
 
-# put our pool's staking address here
 @pytest.fixture(scope="session")
-def staking_address():
-    staking_address = "0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac"
-    #  0xa537d64881b84faffb9Ae43c951EEbF368b71cdA frxETH, 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC,
-    # 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP, 0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac eUSD-FRAXBP
-    # 0x67CC47cF82785728DD5E3AE9900873a074328658 crvUSD-FRAX, 0xB4fdD7444E1d86b2035c97124C46b1528802DA35 frxETH-ng
+def staking_address_list():
+    staking_address_list = {
+        "yPRISMA": "NULL",
+        "cvxPRISMA": "NULL",
+        "cvxCRV New": "NULL",
+        "stETH": "NULL",
+        "FRAX-USDC": "0x963f487796d54d2f27bA6F3Fbe91154cA103b199",
+        "frxETH": "0xa537d64881b84faffb9Ae43c951EEbF368b71cdA",
+        "eCFX": "NULL",
+        "eUSD-FRAXBP": "0x4c9AD8c53d0a001E7fF08a3E5E26dE6795bEA5ac",
+        "crvUSD-FRAX": "0x67CC47cF82785728DD5E3AE9900873a074328658",
+        "frxETH-ng": "0xB4fdD7444E1d86b2035c97124C46b1528802DA35",
+        "GHO-fxUSD": "NULL",
+        "CurveLend-WETH": "NULL",
+        "NEW": "NULL",
+    }
+    yield staking_address_list
+
+
+# our pool's staking address
+@pytest.fixture(scope="session")
+def staking_address(token_string, staking_address_list):
+    staking_address = staking_address_list[token_string]
     yield staking_address
 
 
@@ -707,16 +740,6 @@ def template_frax_pid():
 def template_staking_address():
     template_staking_address = "0xE7211E87D60177575846936F2123b5FA6f0ce8Ab"  # 0x963f487796d54d2f27bA6F3Fbe91154cA103b199 FRAX-USDC, 0xE7211E87D60177575846936F2123b5FA6f0ce8Ab DOLA-FRAXBP
     yield template_staking_address
-
-
-@pytest.fixture(scope="session")
-def which_strategy():
-    # must be 0 or 1 for vanilla convex and curve
-    # prisma convex: 2
-    # fxn convex: 3
-    # Only test 4 (Frax) for pools that actually have frax.
-    which_strategy = 3
-    yield which_strategy
 
 
 # curve deposit pool for old pools, set to ZERO_ADDRESS otherwise
@@ -818,6 +841,11 @@ def crv_whale():
 
 
 @pytest.fixture(scope="session")
+def fxn_whale():
+    yield accounts.at("0x26B2ec4E02ebe2F54583af25b647b1D619e67BbF", force=True)
+
+
+@pytest.fixture(scope="session")
 def convex_token():
     yield Contract("0x4e3FBD56CD56c3e72c1403e103b45Db9da5B9D2B")
 
@@ -904,7 +932,7 @@ def rewards_contract(pid, booster):
 @pytest.fixture(scope="session")
 def gauge(pid, booster):
     gauge = booster.poolInfo(pid)[2]
-    yield Contract(gauge)
+    yield interface.ICurveGaugeV6(gauge)
 
 
 @pytest.fixture(scope="function")

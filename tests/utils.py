@@ -17,7 +17,7 @@ def harvest_strategy(
 
     # reset everything with a sleep and mine
     chain.sleep(1)
-    # chain.mine(1)
+    chain.mine()
 
     # add in any custom logic needed here, for instance with router strategy (also reason we have a destination strategy).
     # also add in any custom logic needed to get raw reward assets to the strategy (like for liquity)
@@ -32,8 +32,9 @@ def harvest_strategy(
 
     # this should only happen with convex strategies
     if target == 0:
-        booster = interface.IConvexBooster(strategy.depositContract())
-        booster.earmarkRewards(strategy.pid(), {"from": profit_whale})
+        # we used to earmark each time, but don't anymore since convex added logic to prevent over-harvesting
+        # booster = interface.IConvexBooster(strategy.depositContract())
+        # booster.earmarkRewards(strategy.pid(), {"from": profit_whale})
 
         # when in emergency exit we don't enter prepare return, so we should manually claim rewards when withdrawing
         if strategy.emergencyExit():
@@ -123,27 +124,27 @@ def trade_handler_action(
 
     if crvBalance > 0:
         crv.transfer(token, crvBalance, {"from": strategy})
-        print("CRV rewards present:", crvBalance / 1e18)
+        print("\n🌀 CRV rewards present:", crvBalance / 1e18, "\n")
         assert crv.balanceOf(strategy) == 0
 
     if cvxBalance > 0:
         cvx.transfer(token, cvxBalance, {"from": strategy})
-        print("CVX rewards present:", cvxBalance / 1e18)
+        print("\n🍦 CVX rewards present:", cvxBalance / 1e18, "\n")
         assert cvx.balanceOf(strategy) == 0
 
     if fxsBalance > 0:
         fxs.transfer(token, fxsBalance, {"from": strategy})
-        print("FXS rewards present:", fxsBalance / 1e18)
+        print("\n🌗 FXS rewards present:", fxsBalance / 1e18, "\n")
         assert fxs.balanceOf(strategy) == 0
 
     if yprismaBalance > 0:
         yprisma.transfer(token, yprismaBalance, {"from": strategy})
-        print("yPRISMA rewards present:", yprismaBalance / 1e18)
+        print("\n🌈 yPRISMA rewards present:", yprismaBalance / 1e18, "\n")
         assert yprisma.balanceOf(strategy) == 0
 
     if fxnBalance > 0:
         fxn.transfer(token, fxnBalance, {"from": strategy})
-        print("FXN rewards present:", fxnBalance / 1e18)
+        print("\n🧮 FXN rewards present:", fxnBalance / 1e18, "\n")
         assert fxn.balanceOf(strategy) == 0
 
     # send our profits back in
