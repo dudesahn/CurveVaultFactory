@@ -3,6 +3,7 @@ from utils import harvest_strategy
 from brownie import accounts, interface, chain
 import brownie
 
+
 # test migrating a strategy
 def test_migration(
     gov,
@@ -35,6 +36,8 @@ def test_migration(
     yprisma,
     prisma_vault,
     RELATIVE_APPROX,
+    fxn_pid,
+    fxn,
 ):
 
     ## deposit to the vault after approving
@@ -76,17 +79,22 @@ def test_migration(
             new_proxy,
             gauge,
         )
-    elif which_strategy in [2, 3]:  # prisma
+    elif which_strategy == 2:  # prisma convex
         new_strategy = gov.deploy(
             contract_name,
             vault,
             trade_factory,
-            10_000 * 1e6,
-            25_000 * 1e6,
             prisma_vault,
             prisma_convex_factory.getDeterministicAddress(
                 pid
             ),  # This looks up the prisma receiver for the pool
+        )
+    elif which_strategy == 3:  # fxn convex
+        new_strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            fxn_pid,
         )
     elif which_strategy == 4:  # frax
         new_strategy = gov.deploy(
@@ -108,23 +116,21 @@ def test_migration(
         print("\nShould we harvest? Should be False.", tx)
         assert tx == False
 
-    if which_strategy != 4:
-        # can we harvest an unactivated strategy? should be no
-        tx = new_strategy.harvestTrigger(0, {"from": gov})
-        print("\nShould we harvest? Should be False.", tx)
-        assert tx == False
+    # had it skipping for FRAX here too, not sure why tho
 
     ######### ADD LOGIC TO TEST CLAIMING OF ASSETS FOR TRANSFER TO NEW STRATEGY AS NEEDED #########
     # for some reason withdrawing via our user vault doesn't include the same getReward() call that the staking pool does natively
     # since emergencyExit doesn't enter prepareReturn, we have to manually claim these rewards
     # also, FXS profit accrues every block, so we will still get some dust rewards after we exit as well if we were to call getReward() again
-    if which_strategy == 4:
-        with brownie.reverts():
-            vault.migrateStrategy(strategy, new_strategy, {"from": gov})
-        # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
-        chain.sleep(86400 * 7)
-        chain.mine(1)
+    if which_strategy in [3, 4]:
+        if which_strategy == 4:
+            with brownie.reverts():
+                vault.migrateStrategy(strategy, new_strategy, {"from": gov})
+            # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
+            chain.sleep(86400 * 7)
+            chain.mine(1)
 
+        # do the claim for both FXN and FRAX strategies
         user_vault = interface.IFraxVault(strategy.userVault())
         user_vault.getReward({"from": gov})
 
@@ -135,6 +141,12 @@ def test_migration(
     # migrate our old strategy, need to claim rewards for convex when withdrawing for convex
     if which_strategy == 0:
         strategy.setClaimRewards(True, {"from": gov})
+        
+    # ADD MANUAL CLAIM FOR YPRISMA HERE ***********
+    if which_strategy == 2:
+        strategy.claimRewards(True, {"from": gov})
+        
+        
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
 
     # if a curve strat, whitelist on our strategy proxy
@@ -143,16 +155,24 @@ def test_migration(
 
     ####### ADD LOGIC TO MAKE SURE ASSET TRANSFER WENT AS EXPECTED #######
     assert crv.balanceOf(strategy) == 0
-    if which_strategy != 2:
+    if which_strategy not in [2, 3]:
         assert crv.balanceOf(new_strategy) > 0
 
-    if which_strategy != 1 and which_strategy not in [2, 3]:
+    if which_strategy not in [1, 2, 3]:
         assert convex_token.balanceOf(strategy) == 0
         assert convex_token.balanceOf(new_strategy) > 0
 
     if which_strategy == 4:
         assert fxs.balanceOf(strategy) == 0
         assert fxs.balanceOf(new_strategy) > 0
+
+    if which_strategy == 2:
+        assert yprisma.balanceOf(strategy) == 0
+        assert yprisma.balanceOf(new_strategy) > 0
+
+    if which_strategy == 3:
+        assert fxn.balanceOf(strategy) == 0
+        assert fxn.balanceOf(new_strategy) > 0
 
     # assert that our old strategy is empty
     updated_total_old = strategy.estimatedTotalAssets()
@@ -234,6 +254,7 @@ def test_empty_migration(
     prisma_vault,
     prisma_convex_factory,
     yprisma,
+    fxn_pid,
 ):
 
     ## deposit to the vault after approving
@@ -275,17 +296,22 @@ def test_empty_migration(
             new_proxy,
             gauge,
         )
-    elif which_strategy in [2, 3]:  # prisma
+    elif which_strategy == 2:  # prisma convex
         new_strategy = gov.deploy(
             contract_name,
             vault,
             trade_factory,
-            10_000 * 1e6,
-            25_000 * 1e6,
             prisma_vault,
             prisma_convex_factory.getDeterministicAddress(
                 pid
             ),  # This looks up the prisma receiver for the pool
+        )
+    elif which_strategy == 3:  # fxn convex
+        new_strategy = gov.deploy(
+            contract_name,
+            vault,
+            trade_factory,
+            fxn_pid,
         )
     elif which_strategy == 4:  # frax
         new_strategy = gov.deploy(

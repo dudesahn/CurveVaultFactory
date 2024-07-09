@@ -2,6 +2,7 @@ from brownie import chain, ZERO_ADDRESS
 import pytest
 from utils import harvest_strategy, check_status
 
+
 # these tests all assess whether a strategy will hit accounting errors following donations to the strategy.
 # lower debtRatio to 50%, donate, withdraw less than the donation, then harvest
 def test_withdraw_after_donation_1(

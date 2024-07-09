@@ -72,7 +72,7 @@ contract StrategyConvexFactoryClonable is BaseStrategy {
     bool public isOriginal = true;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.0.2";
+    string public constant strategyVersion = "4.1.0";
 
     /* ========== CONSTRUCTOR ========== */
 

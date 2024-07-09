@@ -2,6 +2,7 @@ import pytest
 import brownie, time
 from brownie import interface, chain, accounts, ZERO_ADDRESS
 
+
 # returns (profit, loss) of a harvest
 def harvest_strategy(
     use_yswaps,
@@ -16,7 +17,7 @@ def harvest_strategy(
 
     # reset everything with a sleep and mine
     chain.sleep(1)
-    # chain.mine(1)
+    chain.mine()
 
     # add in any custom logic needed here, for instance with router strategy (also reason we have a destination strategy).
     # also add in any custom logic needed to get raw reward assets to the strategy (like for liquity)
@@ -31,8 +32,9 @@ def harvest_strategy(
 
     # this should only happen with convex strategies
     if target == 0:
-        booster = interface.IConvexBooster(strategy.depositContract())
-        booster.earmarkRewards(strategy.pid(), {"from": profit_whale})
+        # we used to earmark each time, but don't anymore since convex added logic to prevent over-harvesting
+        # booster = interface.IConvexBooster(strategy.depositContract())
+        # booster.earmarkRewards(strategy.pid(), {"from": profit_whale})
 
         # when in emergency exit we don't enter prepare return, so we should manually claim rewards when withdrawing
         if strategy.emergencyExit():
@@ -48,7 +50,7 @@ def harvest_strategy(
         print("\nTurned off health check!\n")
 
     # for PRISMA, force claims by default
-    if target in [2, 3]:
+    if target == 2:
         claim_or_not = strategy.claimParams()["shouldClaimRewards"]
         print("Claim or not:", claim_or_not)
         strategy.setClaimParams(force_claim, claim_or_not, {"from": vault.governance()})
@@ -99,44 +101,60 @@ def trade_handler_action(
     crvBalance = 0
     cvxBalance = 0
     yprismaBalance = 0
+    fxnBalance = 0
 
-    crv = interface.IERC20(strategy.crv())
-    if target != 1:
-        cvx = interface.IERC20(strategy.convexToken())
-        cvxBalance = cvx.balanceOf(strategy)
+    if target != 3:  # fxn doesn't know anything but FXN
+        crv = interface.IERC20(strategy.crv())
+        crvBalance = crv.balanceOf(strategy)
 
-    if target == 4:
-        fxs = interface.IERC20(strategy.fxs())
-        fxsBalance = fxs.balanceOf(strategy)
+        if target != 1:
+            cvx = interface.IERC20(strategy.convexToken())
+            cvxBalance = cvx.balanceOf(strategy)
 
-    if target in [2, 3]:
-        yprisma = interface.IERC20(strategy.yPrisma())
-        yprismaBalance = yprisma.balanceOf(strategy)
+        if target == 4:
+            fxs = interface.IERC20(strategy.fxs())
+            fxsBalance = fxs.balanceOf(strategy)
 
-    crvBalance = crv.balanceOf(strategy)
+        if target == 2:
+            yprisma = interface.IERC20(strategy.yPrisma())
+            yprismaBalance = yprisma.balanceOf(strategy)
+    else:
+        fxn = interface.IERC20(strategy.fxn())
+        fxnBalance = fxn.balanceOf(strategy)
 
     if crvBalance > 0:
         crv.transfer(token, crvBalance, {"from": strategy})
-        print("CRV rewards present:", crvBalance / 1e18)
+        print("\n🌀 CRV rewards present:", crvBalance / 1e18, "\n")
         assert crv.balanceOf(strategy) == 0
 
     if cvxBalance > 0:
         cvx.transfer(token, cvxBalance, {"from": strategy})
-        print("CVX rewards present:", cvxBalance / 1e18)
+        print("\n🍦 CVX rewards present:", cvxBalance / 1e18, "\n")
         assert cvx.balanceOf(strategy) == 0
 
     if fxsBalance > 0:
         fxs.transfer(token, fxsBalance, {"from": strategy})
-        print("FXS rewards present:", fxsBalance / 1e18)
+        print("\n🌗 FXS rewards present:", fxsBalance / 1e18, "\n")
         assert fxs.balanceOf(strategy) == 0
 
     if yprismaBalance > 0:
         yprisma.transfer(token, yprismaBalance, {"from": strategy})
-        print("yPRISMA rewards present:", yprismaBalance / 1e18)
+        print("\n🌈 yPRISMA rewards present:", yprismaBalance / 1e18, "\n")
         assert yprisma.balanceOf(strategy) == 0
 
+    if fxnBalance > 0:
+        fxn.transfer(token, fxnBalance, {"from": strategy})
+        print("\n🧮 FXN rewards present:", fxnBalance / 1e18, "\n")
+        assert fxn.balanceOf(strategy) == 0
+
     # send our profits back in
-    if crvBalance > 0 or cvxBalance > 0 or fxsBalance > 0 or yprismaBalance > 0:
+    if (
+        crvBalance > 0
+        or cvxBalance > 0
+        or fxsBalance > 0
+        or yprismaBalance > 0
+        or fxnBalance > 0
+    ):
         token.transfer(strategy, profit_amount, {"from": profit_whale})
         print("Rewards converted into profit and returned")
         assert strategy.balanceOfWant() > 0

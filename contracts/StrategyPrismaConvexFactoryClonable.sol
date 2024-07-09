@@ -11,8 +11,12 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     struct ClaimParams {
         /// @notice We use this flag to signal a desire to claim even if Yearns locker cant provide max boost.
         bool forceClaimOnce;
-        /// @notice Defaults to true, set to false to skip reward claiming altogether.
+        /// @notice Defaults to false, set to true to always claim rewards using yprisma when max boosted.
         bool shouldClaimRewards;
+        /// @notice Address for boost delegate. defaults to address(0), which will use yearn's boost
+        address boostDelegate;
+        /// @notice Max fee value to pass in when claiming rewards. uint80 to pack the struct.
+        uint80 maxFee;
     }
 
     // Fees are in basis points
@@ -84,25 +88,17 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     bool public isOriginal = true;
 
     /// @notice Used to track the deployed version of this contract. Maps to releases in the CurveVaultFactory repo.
-    string public constant strategyVersion = "3.1.0";
+    string public constant strategyVersion = "4.1.0";
 
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
         address _vault,
         address _tradeFactory,
-        uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
         address _prismaReceiver
     ) BaseStrategy(_vault) {
-        _initializeStrat(
-            _tradeFactory,
-            _harvestProfitMinInUsdc,
-            _harvestProfitMaxInUsdc,
-            _prismaVault,
-            _prismaReceiver
-        );
+        _initializeStrat(_tradeFactory, _prismaVault, _prismaReceiver);
     }
 
     /* ========== CLONING ========== */
@@ -117,8 +113,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
      * @param _rewards If we have any strategist rewards, send them here.
      * @param _keeper Address to grant the keeper role.
      * @param _tradeFactory Our trade factory address.
-     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
      * @param _prismaVault Address of the Prisma vault.
      * @param _prismaReceiver Address of the Prisma receiver to farm.
      */
@@ -128,8 +122,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address _rewards,
         address _keeper,
         address _tradeFactory,
-        uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
         address _prismaReceiver
     ) external returns (address newStrategy) {
@@ -161,8 +153,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
             _rewards,
             _keeper,
             _tradeFactory,
-            _harvestProfitMinInUsdc,
-            _harvestProfitMaxInUsdc,
             _prismaVault,
             _prismaReceiver
         );
@@ -178,8 +168,6 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
      * @param _rewards If we have any strategist rewards, send them here.
      * @param _keeper Address to grant the keeper role.
      * @param _tradeFactory Our trade factory address.
-     * @param _harvestProfitMinInUsdc Minimum acceptable profit for a harvest.
-     * @param _harvestProfitMaxInUsdc Maximum acceptable profit for a harvest.
      * @param _prismaVault Address of the Prisma vault to claim from.
      * @param _prismaReceiver Address of the Prisma receiver to farm.
      */
@@ -189,26 +177,16 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         address _rewards,
         address _keeper,
         address _tradeFactory,
-        uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
         address _prismaReceiver
     ) public {
         _initialize(_vault, _strategist, _rewards, _keeper);
-        _initializeStrat(
-            _tradeFactory,
-            _harvestProfitMinInUsdc,
-            _harvestProfitMaxInUsdc,
-            _prismaVault,
-            _prismaReceiver
-        );
+        _initializeStrat(_tradeFactory, _prismaVault, _prismaReceiver);
     }
 
     // this is called by our original strategy, as well as any clones via the above function
     function _initializeStrat(
         address _tradeFactory,
-        uint256 _harvestProfitMinInUsdc,
-        uint256 _harvestProfitMaxInUsdc,
         address _prismaVault,
         address _prismaReceiver
     ) internal {
@@ -219,8 +197,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         prismaReceiver = IPrismaReceiver(_prismaReceiver);
         prismaVault = IPrismaVault(_prismaVault);
         tradeFactory = _tradeFactory;
-        harvestProfitMinInUsdc = _harvestProfitMinInUsdc;
-        harvestProfitMaxInUsdc = _harvestProfitMaxInUsdc;
+
+        // set these values high by default so they are essentially turned off
+        harvestProfitMinInUsdc = 20_000e6;
+        harvestProfitMaxInUsdc = 200_000e6;
 
         // want = Curve LP
         want.approve(address(_prismaReceiver), type(uint256).max);
@@ -273,8 +253,22 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         returns (uint256 _profit, uint256 _loss, uint256 _debtPayment)
     {
         // rewards will be converted later with mev protection by yswaps (tradeFactory)
+
+        // store claim params locally to save gas
         ClaimParams memory _claimParams = claimParams;
-        if (_claimParams.shouldClaimRewards) {
+
+        // if boostDelegate is set, means this is part of a triggered claim
+        if (_claimParams.boostDelegate != address(0)) {
+            _claimRewards(
+                true,
+                _claimParams.boostDelegate,
+                _claimParams.maxFee
+            );
+            // reset local vars to zero and do a single storage write to, you guessed it, save gas
+            _claimParams.boostDelegate = address(0);
+            claimParams.maxFee = 0;
+            claimParams = _claimParams;
+        } else if (_claimParams.shouldClaimRewards) {
             _claimRewards(_claimParams.forceClaimOnce, YEARN_LOCKER, 10_000);
         }
 
@@ -419,12 +413,16 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
         uint256 crvBal = crv.balanceOf(address(this));
         uint256 cvxBal = convexToken.balanceOf(address(this));
+        uint256 yprismaBal = yPrisma.balanceOf(address(this));
 
         if (crvBal > 0) {
             crv.safeTransfer(_newStrategy, crvBal);
         }
         if (cvxBal > 0) {
             convexToken.safeTransfer(_newStrategy, cvxBal);
+        }
+        if (yprismaBal > 0) {
+            yPrisma.safeTransfer(_newStrategy, yprismaBal);
         }
     }
 
@@ -475,16 +473,34 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
 
     /**
      * @notice Force a rewards claim from the receiver regardless of max boost.
-     * @dev Can only be called by managers.
+     * @dev Can only be called by emergency authorized (gov, mgmt, strategist, guardian).
      * @param _boostDelegate Address of the boost delegate to use.
      * @param _maxFee Max we fee are willing to pay for boost rental.
      */
     function claimRewards(
         address _boostDelegate,
         uint256 _maxFee
-    ) external onlyVaultManagers {
+    ) external onlyEmergencyAuthorized {
         require(_boostDelegate != address(0));
         _claimRewards(true, _boostDelegate, _maxFee);
+    }
+
+    /**
+     * @notice Force a rewards claim by our keeper using the specified boost delegate.
+     * @dev Can only be called by emergency authorized (gov, mgmt, strategist, guardian).
+     * @param _boostDelegate Address of the boost delegate to use.
+     * @param _maxFee Max we fee are willing to pay for boost rental.
+     */
+    function triggerClaimRewards(
+        address _boostDelegate,
+        uint80 _maxFee
+    ) external onlyEmergencyAuthorized {
+        require(_boostDelegate != address(0));
+        ClaimParams memory _claimParams = claimParams;
+        _claimParams.boostDelegate = _boostDelegate;
+        _claimParams.maxFee = _maxFee;
+        claimParams = _claimParams;
+        forceHarvestTriggerOnce = true;
     }
 
     /* ========== YSWAPS ========== */
@@ -576,17 +592,21 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     function harvestTrigger(
         uint256 callCostinEth
     ) public view override returns (bool) {
-        // Should not trigger if strategy is not active (no assets and no debtRatio). This means we dont need to adjust keeper job.
+        // Should not trigger if strategy is inactive (no assets and no debtRatio).
         if (!isActive()) {
             return false;
         }
+
+        // store locally
+        bool _claimsAreMaxBoosted = claimsAreMaxBoosted();
 
         // harvest if we have a profit to claim at our upper limit without considering gas price
         ClaimParams memory _claimParams = claimParams;
         uint256 claimableProfit = claimableProfitInUsdc();
         if (
             claimableProfit > harvestProfitMaxInUsdc &&
-            _claimParams.shouldClaimRewards
+            _claimParams.shouldClaimRewards &&
+            (_claimsAreMaxBoosted || _claimParams.forceClaimOnce)
         ) {
             return true;
         }
@@ -605,17 +625,15 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
         if (
             claimableProfit > harvestProfitMinInUsdc &&
             _claimParams.shouldClaimRewards &&
-            (claimsAreMaxBoosted() || _claimParams.forceClaimOnce)
+            (_claimsAreMaxBoosted || _claimParams.forceClaimOnce)
         ) {
             return true;
         }
 
         StrategyParams memory params = vault.strategies(address(this));
-        // harvest regardless of profit once we reach our maxDelay and are max boosted.
-        if (
-            block.timestamp - params.lastReport > maxReportDelay &&
-            (claimsAreMaxBoosted() || _claimParams.forceClaimOnce)
-        ) {
+        // harvest regardless of profit once we reach our maxDelay
+        // this will likely be used to take profit on yield already converted to want
+        if (block.timestamp - params.lastReport > maxReportDelay) {
             return true;
         }
 
@@ -749,9 +767,10 @@ contract StrategyPrismaConvexFactoryClonable is BaseStrategy {
     }
 
     /**
-     * @notice Here we set params to determine if we claim PRISMA emissions.
-     # @param _forceClaimOnce True if we want to allow claims that are not max boosted. Reset to false on rewards claim.
-     # @param _shouldClaimRewards Default value true. Set to false if we want to skip reward claims during harvests.
+     * @notice Here we set params to determine if and how we claim PRISMA emissions.
+     * @param _forceClaimOnce True if we want force a single rewards claim no matter boost, resets to false after claim.
+     * @param _shouldClaimRewards Default value false. Set to true if we want to turn on auto-claims using yprisma as
+     *  boost delegate when max boosted.
      */
     function setClaimParams(
         bool _forceClaimOnce,

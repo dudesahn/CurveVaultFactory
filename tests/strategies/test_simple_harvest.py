@@ -2,6 +2,7 @@ from brownie import chain, Contract, ZERO_ADDRESS, interface
 from utils import harvest_strategy
 import pytest
 
+
 # test the our strategy's ability to deposit, harvest, and withdraw, with different optimal deposit tokens if we have them
 def test_simple_harvest(
     gov,
@@ -108,9 +109,12 @@ def test_simple_harvest(
         receiver = Contract(strategy.prismaReceiver())
         print("Claimable from receiver:", receiver.claimableReward(strategy))
 
-    print(
-        "🤑 Claimable profit for second harvest:", strategy.claimableProfitInUsdc() / 1e6
-    )
+    # curve and FXN don't have a claimable amount readable
+    if which_strategy not in [1, 3]:
+        print(
+            "🤑 Claimable profit for second harvest:",
+            strategy.claimableProfitInUsdc() / 1e6,
+        )
 
     # harvest, store new asset amount
     (profit, loss) = harvest_strategy(

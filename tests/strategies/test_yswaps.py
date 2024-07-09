@@ -2,6 +2,7 @@ import brownie
 from brownie import ZERO_ADDRESS, interface, chain
 from utils import harvest_strategy
 
+
 # test our permissionless swaps and our trade handler functions as intended
 def test_keepers_and_trade_handler(
     gov,
@@ -21,6 +22,7 @@ def test_keepers_and_trade_handler(
     which_strategy,
     tests_using_tenderly,
     yprisma,
+    fxn_whale,
 ):
     # no testing needed if we're not using yswaps
     if not use_yswaps:
@@ -67,52 +69,94 @@ def test_keepers_and_trade_handler(
 
     ####### ADD LOGIC AS NEEDED FOR SENDING REWARDS TO STRATEGY #######
     # send our strategy some CRV. normally it would be sitting waiting for trade handler but we automatically process it
-    crv = interface.IERC20(strategy.crv())
-    crv.transfer(strategy, 100e18, {"from": crv_whale})
+    if which_strategy != 3:
+        crv = interface.IERC20(strategy.crv())
+        crv.transfer(strategy, 100e18, {"from": crv_whale})
 
-    # whale can't sweep, but trade handler can
-    if not tests_using_tenderly:
-        with brownie.reverts():
-            crv.transferFrom(
-                strategy, whale, crv.balanceOf(strategy) / 2, {"from": whale}
-            )
+        # whale can't sweep, but trade handler can
+        if not tests_using_tenderly:
+            with brownie.reverts():
+                crv.transferFrom(
+                    strategy, whale, crv.balanceOf(strategy) / 2, {"from": whale}
+                )
 
-    crv.transferFrom(
-        strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
-    )
-
-    if which_strategy in [2, 3]:
-        yprisma.transferFrom(
-            strategy, whale, yprisma.balanceOf(strategy) / 2, {"from": trade_factory}
+        crv.transferFrom(
+            strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
         )
 
-    # remove our trade handler
-    strategy.removeTradeFactoryPermissions(True, {"from": gov})
-    assert strategy.tradeFactory() == ZERO_ADDRESS
-    assert crv.balanceOf(strategy) > 0
-
-    # trade factory now cant sweep
-    if not tests_using_tenderly:
-        with brownie.reverts():
-            crv.transferFrom(
-                strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
+        if which_strategy == 2:
+            yprisma.transferFrom(
+                strategy,
+                whale,
+                yprisma.balanceOf(strategy) / 2,
+                {"from": trade_factory},
             )
-        if which_strategy in [2, 3]:
-            assert yprisma.allowance(strategy, trade_factory) == 0
-            if yprisma.balanceOf(strategy) > 0:
-                with brownie.reverts():
-                    yprisma.transferFrom(
-                        strategy,
-                        whale,
-                        yprisma.balanceOf(strategy) / 2,
-                        {"from": trade_factory},
-                    )
 
-    # give back those permissions, now trade factory can sweep
-    strategy.updateTradeFactory(trade_factory, {"from": gov})
-    crv.transferFrom(
-        strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
-    )
+        # remove our trade handler
+        strategy.removeTradeFactoryPermissions(True, {"from": gov})
+        assert strategy.tradeFactory() == ZERO_ADDRESS
+        assert crv.balanceOf(strategy) > 0
+
+        # trade factory now cant sweep
+        if not tests_using_tenderly:
+            with brownie.reverts():
+                crv.transferFrom(
+                    strategy,
+                    whale,
+                    crv.balanceOf(strategy) / 2,
+                    {"from": trade_factory},
+                )
+            if which_strategy == 2:
+                assert yprisma.allowance(strategy, trade_factory) == 0
+                if yprisma.balanceOf(strategy) > 0:
+                    with brownie.reverts():
+                        yprisma.transferFrom(
+                            strategy,
+                            whale,
+                            yprisma.balanceOf(strategy) / 2,
+                            {"from": trade_factory},
+                        )
+
+        # give back those permissions, now trade factory can sweep
+        strategy.updateTradeFactory(trade_factory, {"from": gov})
+        crv.transferFrom(
+            strategy, whale, crv.balanceOf(strategy) / 2, {"from": trade_factory}
+        )
+    else:
+        fxn = interface.IERC20(strategy.fxn())
+        fxn.transfer(strategy, 100e18, {"from": fxn_whale})
+
+        # whale can't sweep, but trade handler can
+        if not tests_using_tenderly:
+            with brownie.reverts():
+                fxn.transferFrom(
+                    strategy, whale, fxn.balanceOf(strategy) / 2, {"from": whale}
+                )
+
+        fxn.transferFrom(
+            strategy, whale, fxn.balanceOf(strategy) / 2, {"from": trade_factory}
+        )
+
+        # remove our trade handler
+        strategy.removeTradeFactoryPermissions(True, {"from": gov})
+        assert strategy.tradeFactory() == ZERO_ADDRESS
+        assert fxn.balanceOf(strategy) > 0
+
+        # trade factory now cant sweep
+        if not tests_using_tenderly:
+            with brownie.reverts():
+                fxn.transferFrom(
+                    strategy,
+                    whale,
+                    fxn.balanceOf(strategy) / 2,
+                    {"from": trade_factory},
+                )
+
+        # give back those permissions, now trade factory can sweep
+        strategy.updateTradeFactory(trade_factory, {"from": gov})
+        fxn.transferFrom(
+            strategy, whale, fxn.balanceOf(strategy) / 2, {"from": trade_factory}
+        )
 
     # remove again!
     strategy.removeTradeFactoryPermissions(False, {"from": gov})
@@ -126,7 +170,7 @@ def test_keepers_and_trade_handler(
 
     # can't set trade factory to zero
     if not tests_using_tenderly:
-        with brownie.reverts():
+        with brownie.reverts("Cant remove with this function"):
             strategy.updateTradeFactory(ZERO_ADDRESS, {"from": gov})
 
     # remove again!
@@ -150,15 +194,12 @@ def test_keepers_and_trade_handler(
             # for convex, 0 position may be occupied by wrapped CVX token
             with brownie.reverts():
                 strategy.rewardsTokens(1)
-        if which_strategy == 1:
-            with brownie.reverts():
-                strategy.rewardsTokens(0)
-        if which_strategy == 4:
+        if which_strategy in [1, 3, 4]:
             with brownie.reverts():
                 strategy.rewardsTokens(0)
 
-        # only gov can update rewards
-        if which_strategy not in [2, 3]:
+        # only vault managers can update rewards, prisma doesn't have extra rewards
+        if which_strategy != 2:
             if which_strategy != 1:
                 with brownie.reverts():
                     strategy.updateRewards({"from": whale})
