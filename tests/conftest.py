@@ -82,7 +82,7 @@ def token_string():
     elif id_number == 1:
         token_string = "cvxPRISMA"
     elif id_number == 2:
-        token_string = "cvxCRV New" # working 7/8/24
+        token_string = "cvxCRV New"  # working 7/8/24
     elif id_number == 3:
         token_string = "stETH"
     elif id_number == 4:
@@ -98,9 +98,9 @@ def token_string():
     elif id_number == 9:
         token_string = "frxETH-ng"
     elif id_number == 10:
-        token_string = "GHO-fxUSD" # working 7/8/24
+        token_string = "GHO-fxUSD"  # working 7/8/24
     elif id_number == 11:
-        token_string = "CurveLend-WETH" # working 7/8/24
+        token_string = "CurveLend-WETH"  # working 7/8/24
     yield token_string
 
 

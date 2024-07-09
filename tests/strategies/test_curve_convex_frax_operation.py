@@ -116,7 +116,7 @@ def test_keep(
         if not no_profit:
             assert treasury_after > treasury_before
     elif which_strategy == 2:
-        treasury_before = crv.balanceOf(strategy.curveVoter())
+        treasury_before = yprisma.balanceOf(strategy.yprismaVoter())
 
         (profit, loss) = harvest_strategy(
             use_yswaps,
@@ -128,7 +128,7 @@ def test_keep(
             target,
         )
 
-        treasury_after = crv.balanceOf(strategy.curveVoter())
+        treasury_after = yprisma.balanceOf(strategy.yprismaVoter())
         if not no_profit:
             assert treasury_after > treasury_before
     else:
@@ -1904,11 +1904,10 @@ def test_yprisma_claim(
     print("🤑 Claimable profit >0:", claimable_profit / 1e6)
 
     # set our max delay to 1 day so we trigger true, then set it back to 21 days
-    # but will be false because no max boost (I originally wrote this late in a week, will just be equal to if max boosted or not)
-    strategy.setMaxReportDelay(sleep_time - 1)
+    strategy.setMaxReportDelay(1)
     tx = strategy.harvestTrigger(0, {"from": gov})
-    print("\nShould we harvest? Should be False.", tx)
-    assert tx == strategy.claimsAreMaxBoosted()
+    print("\nShould we harvest? Should be true.", tx)
+    assert tx == True
     strategy.setMaxReportDelay(86400 * 21)
 
     # we have tiny profit but that's okay; our triggers should be false because we don't have max boost
@@ -1919,8 +1918,14 @@ def test_yprisma_claim(
     print("\nShould we harvest? Should be false.", tx)
     assert tx == strategy.claimsAreMaxBoosted()
 
-    # update our maxProfit so harvest should trigger true (max profit ignores whether we have full boost or not)
+    # update our maxProfit, but should still be false
     strategy.setHarvestTriggerParams(1000000e6, 1, {"from": gov})
+    tx = strategy.harvestTrigger(0, {"from": gov})
+    print("\nShould we harvest? Should be false.", tx)
+    assert tx == False
+
+    # force claim so we should be true
+    strategy.setClaimParams(True, True, {"from": vault.governance()})
     tx = strategy.harvestTrigger(0, {"from": gov})
     print("\nShould we harvest? Should be true.", tx)
     assert tx == True
@@ -2041,7 +2046,7 @@ def test_yprisma_claim(
     )
     assert yprisma.balanceOf(strategy) > 0
 
-
+# ADD SOME MORE STUFF HERE W/ NEW TRIGGER CLAIM!!!!!! TEST TRIGGER FLIPS AND NEXT HARVEST DOES WHAT WE EXPECT IT TO
 def test_yprisma_force_claim(
     gov,
     token,

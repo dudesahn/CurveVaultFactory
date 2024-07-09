@@ -84,8 +84,6 @@ def test_migration(
             contract_name,
             vault,
             trade_factory,
-            10_000 * 1e6,
-            25_000 * 1e6,
             prisma_vault,
             prisma_convex_factory.getDeterministicAddress(
                 pid
@@ -143,6 +141,12 @@ def test_migration(
     # migrate our old strategy, need to claim rewards for convex when withdrawing for convex
     if which_strategy == 0:
         strategy.setClaimRewards(True, {"from": gov})
+        
+    # ADD MANUAL CLAIM FOR YPRISMA HERE ***********
+    if which_strategy == 2:
+        strategy.claimRewards(True, {"from": gov})
+        
+        
     vault.migrateStrategy(strategy, new_strategy, {"from": gov})
 
     # if a curve strat, whitelist on our strategy proxy
@@ -161,6 +165,10 @@ def test_migration(
     if which_strategy == 4:
         assert fxs.balanceOf(strategy) == 0
         assert fxs.balanceOf(new_strategy) > 0
+
+    if which_strategy == 2:
+        assert yprisma.balanceOf(strategy) == 0
+        assert yprisma.balanceOf(new_strategy) > 0
 
     if which_strategy == 3:
         assert fxn.balanceOf(strategy) == 0
@@ -293,8 +301,6 @@ def test_empty_migration(
             contract_name,
             vault,
             trade_factory,
-            10_000 * 1e6,
-            25_000 * 1e6,
             prisma_vault,
             prisma_convex_factory.getDeterministicAddress(
                 pid

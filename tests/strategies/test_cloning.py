@@ -240,8 +240,6 @@ def test_cloning(
                     rewards,
                     keeper,
                     trade_factory,
-                    10_000 * 1e6,
-                    25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
                     {"from": gov},
@@ -252,8 +250,6 @@ def test_cloning(
                 rewards,
                 keeper,
                 trade_factory,
-                10_000 * 1e6,
-                25_000 * 1e6,
                 prisma_vault,
                 prisma_receiver,
                 {"from": gov},
@@ -270,8 +266,6 @@ def test_cloning(
                     rewards,
                     keeper,
                     trade_factory,
-                    10_000 * 1e6,
-                    25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
                     {"from": gov},
@@ -285,8 +279,6 @@ def test_cloning(
                     rewards,
                     keeper,
                     trade_factory,
-                    10_000 * 1e6,
-                    25_000 * 1e6,
                     prisma_vault,
                     prisma_receiver,
                     {"from": gov},
@@ -408,6 +400,11 @@ def test_cloning(
 
     # revoke, get funds back into vault, remove old strat from queue
     vault.revokeStrategy(strategy, {"from": gov})
+
+    # prisma needs to be told to always claim
+    if which_strategy == 2:
+        # set up our claim params; default to always claim
+        new_strategy.setClaimParams(False, True, {"from": gov})
 
     if which_strategy == 4:
         # wait another week so our frax LPs are unlocked, need to do this when reducing debt or withdrawing
